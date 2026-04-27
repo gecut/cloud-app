@@ -1,0 +1,3 @@
+{
+  "extends": "@gecut-cloud/config/tsconfig.base.json"
+}
