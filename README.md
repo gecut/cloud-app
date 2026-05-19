@@ -7,7 +7,6 @@ This project was created with [Better-T-Stack](https://github.com/AmanVarshney01
 - **TypeScript** - For type safety and improved developer experience
 - **TanStack Router** - File-based routing with full type safety
 - **TailwindCSS** - Utility-first CSS for rapid UI development
-- **Shared UI package** - shadcn/ui primitives live in `packages/ui`
 - **Hono** - Lightweight, performant server framework
 - **oRPC** - End-to-end type-safe APIs with OpenAPI integration
 - **Bun** - Runtime environment
@@ -42,53 +41,54 @@ Then, run the development server:
 pnpm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser to see the web application.
+Open admin at [http://localhost:3001](http://localhost:3001) and customer app at [http://localhost:3002](http://localhost:3002).
 The API is running at [http://localhost:3000](http://localhost:3000).
+
+## UI Stack (Hybrid)
+
+- `apps/admin`: uses shared shadcn/ui primitives from `packages/ui`
+- `apps/customer-app`: uses **HeroUI v3** and `next-themes`
 
 ## UI Customization
 
-React web apps in this stack share shadcn/ui primitives through `packages/ui`.
+### Admin UI (shadcn/shared)
 
 - Change design tokens and global styles in `packages/ui/src/styles/globals.css`
 - Update shared primitives in `packages/ui/src/components/*`
-- Adjust shadcn aliases or style config in `packages/ui/components.json` and `apps/web/components.json`
+- Adjust shadcn aliases/style config in `packages/ui/components.json` and `apps/admin/components.json`
 
-### Add more shared components
-
-Run this from the project root to add more primitives to the shared UI package:
+To add shared shadcn primitives:
 
 ```bash
 npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
 ```
 
-Import shared components like this:
+### Customer App UI (HeroUI)
 
-```tsx
-import { Button } from "@gecut-cloud/ui/components/button";
-```
-
-### Add app-specific blocks
-
-If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
+- Components: `@heroui/react`
+- Styles: `@heroui/styles`
+- Theme switching: `next-themes` (`apps/customer-app/src/components/theme-provider.tsx`)
 
 ## Project Structure
 
 ```
 gecut-cloud/
 ├── apps/
-│   ├── web/         # Frontend application (React + TanStack Router)
-│   └── server/      # Backend API (Hono, ORPC)
+│   ├── admin/         # Admin frontend application (React + TanStack Router)
+│   ├── customer-app/  # Customer frontend application (React + TanStack Router)
+│   └── server/        # Backend API (Hono, ORPC)
 ├── packages/
-│   ├── ui/          # Shared shadcn/ui components and styles
-│   ├── api/         # API layer / business logic
-│   └── db/          # Database schema & queries
+│   ├── ui/            # Shared shadcn/ui components for admin
+│   ├── api/           # API layer / business logic
+│   └── db/            # Database schema & queries
 ```
 
 ## Available Scripts
 
 - `pnpm run dev`: Start all applications in development mode
 - `pnpm run build`: Build all applications
-- `pnpm run dev:web`: Start only the web application
+- `pnpm run dev:admin`: Start only the admin application
+- `pnpm run dev:customer-app`: Start only the customer application
 - `pnpm run dev:server`: Start only the server
 - `pnpm run check-types`: Check TypeScript types across all apps
 - `pnpm run db:push`: Push schema changes to database

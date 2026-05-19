@@ -18,7 +18,9 @@
     "@orpc/zod": "catalog:",
     "dotenv": "catalog:",
     "hono": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@gecut-cloud/contracts": "workspace:*",
+    "@gecut-cloud/core": "workspace:*"
   },
   "devDependencies": {
     "@gecut-cloud/config": "workspace:*",

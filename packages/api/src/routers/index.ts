@@ -1,11 +1,18 @@
 import type { RouterClient } from "@orpc/server";
 
-import { publicProcedure } from "../index";
+import { adminRouter } from "./admin/index";
+import { authRouter } from "./auth";
+import { customerRouter } from "./customer/index";
+import { publicRouter } from "./public";
+import { systemRouter } from "./system/index";
 
 export const appRouter = {
-  healthCheck: publicProcedure.handler(() => {
-    return "OK";
-  }),
+  public: publicRouter,
+  auth: authRouter,
+  admin: adminRouter,
+  customer: customerRouter,
+  system: systemRouter,
 };
+
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;

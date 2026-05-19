@@ -12,12 +12,24 @@ import { logger } from "hono/logger";
 
 const app = new Hono();
 
+const allowedOrigins = env.CORS_ORIGINS.split(",")
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
+
 app.use(logger());
 app.use(
   "/*",
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: (origin) => {
+      if (!origin) {
+        return undefined;
+      }
+
+      return allowedOrigins.includes(origin) ? origin : undefined;
+    },
+    credentials: true,
     allowMethods: ["GET", "POST", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
   }),
 );
 

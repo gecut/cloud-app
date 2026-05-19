@@ -1,0 +1,25 @@
+{
+  "name": "@gecut-cloud/core",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gecut-cloud/contracts": "workspace:*",
+    "@gecut-cloud/db": "workspace:*",
+    "@gecut-cloud/env": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@gecut-cloud/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
