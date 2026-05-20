@@ -6,13 +6,6 @@ args = [
 ]
 command = "pnpm"
 
-[mcp_servers.context7]
-args = [
-    "-y",
-    "@upstash/context7-mcp",
-]
-command = "npx"
-
 [mcp_servers.heroui-react]
 args = [
     "-y",
