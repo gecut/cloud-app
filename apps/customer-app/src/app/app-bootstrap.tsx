@@ -1,13 +1,13 @@
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 
+import { queryClient } from "@/lib/orpc";
 import { routeTree } from "@/routeTree.gen";
-import { orpc, queryClient } from "@/lib/orpc";
 
 const router = createRouter({
   routeTree,
   defaultPreload: "intent",
   scrollRestoration: true,
-  context: { orpc, queryClient },
+  context: { queryClient },
   defaultViewTransition: true,
 });
 

@@ -7,5 +7,7 @@ export const Route = createFileRoute("/_app/invoices/$id")({
 });
 
 function CustomerInvoiceDetailRoute() {
-  return <InvoiceDetailPage />;
+  const { id } = Route.useParams();
+
+  return <InvoiceDetailPage id={id} />;
 }

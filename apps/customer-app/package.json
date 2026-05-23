@@ -11,15 +11,10 @@
     "check-types": "vite build && tsc --noEmit"
   },
   "dependencies": {
-    "@gecut-cloud/api": "workspace:*",
-    "@gecut-cloud/db": "workspace:*",
-    "@gecut-cloud/env": "workspace:*",
+    "@gecut-cloud/contracts": "workspace:*",
     "@heroui/react": "^3.0.3",
     "@heroui/styles": "^3.0.3",
     "@hookform/resolvers": "^5.2.2",
-    "@orpc/client": "catalog:",
-    "@orpc/server": "catalog:",
-    "@orpc/tanstack-query": "^1.13.14",
     "@prisma/client": "catalog:",
     "@solar-icons/react-perf": "^2.1.0",
     "@tailwindcss/vite": "^4.2.2",

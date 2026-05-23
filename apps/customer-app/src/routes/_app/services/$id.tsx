@@ -7,5 +7,7 @@ export const Route = createFileRoute("/_app/services/$id")({
 });
 
 function CustomerServiceDetailRoute() {
-  return <ServiceDetailPage />;
+  const { id } = Route.useParams();
+
+  return <ServiceDetailPage id={id} />;
 }

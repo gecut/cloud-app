@@ -7,5 +7,8 @@ export const Route = createFileRoute("/_app/payments/$id")({
 });
 
 function CustomerPaymentDetailRoute() {
-  return <PaymentDetailPage />;
+  const routeContext = Route.useRouteContext();
+  const { id } = Route.useParams();
+
+  return <PaymentDetailPage id={id} queryClient={routeContext.queryClient} />;
 }

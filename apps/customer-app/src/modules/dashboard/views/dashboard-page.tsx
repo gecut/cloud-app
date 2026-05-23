@@ -1,20 +1,16 @@
 import useEmblaCarousel from "embla-carousel-react";
 import Fade from "embla-carousel-fade";
-import { useMyServicesQuery } from "@/modules/dashboard/api/dashboard.queries";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardErrorState } from "@/modules/dashboard/states/dashboard-error-state";
 import { DashboardEmptyState } from "@/modules/dashboard/states/dashboard-empty-state";
 import { DashboardPageSkeleton } from "@/modules/dashboard/skeletons/dashboard-page-skeleton";
 import { ServicesSlider } from "@/modules/dashboard/components/services-slider";
+import { mockListDashboardServices } from "@/modules/dashboard/_mock/dashboard.mock";
 import { useCallback, useEffect } from "react";
 
-import type { RouterAppContext } from "@/routes/__root";
 import { ServiceDetail } from "../components/service-detail";
 
-interface DashboardPageProps {
-  routeContext: Pick<RouterAppContext, "orpc">;
-}
-
-export function DashboardPage({ routeContext }: DashboardPageProps) {
+export function DashboardPage() {
   const [emblaServicesRef, emblaServiceApi] = useEmblaCarousel({
     direction: "rtl",
     align: "center",
@@ -28,21 +24,21 @@ export function DashboardPage({ routeContext }: DashboardPageProps) {
     },
     [Fade()]
   );
-  const servicesQuery = useMyServicesQuery(routeContext);
+
+  const servicesQuery = useQuery({
+    queryKey: ["dashboard", "my-services"],
+    queryFn: mockListDashboardServices,
+  });
 
   const onSelect = useCallback(() => {
     if (!emblaServiceApi || !emblaServiceDetailApi) return;
-
     emblaServiceDetailApi.scrollTo(emblaServiceApi.selectedScrollSnap());
   }, [emblaServiceApi, emblaServiceDetailApi]);
 
   useEffect(() => {
     if (!emblaServiceApi) return;
-
     onSelect();
-
     emblaServiceApi.on("select", onSelect).on("reInit", onSelect);
-
     return () => {
       emblaServiceApi.off("select", onSelect).off("reInit", onSelect);
     };
@@ -55,26 +51,20 @@ export function DashboardPage({ routeContext }: DashboardPageProps) {
       </div>
     );
   }
-  if (servicesQuery.isError)
+  if (servicesQuery.isError) {
     return <DashboardErrorState message={servicesQuery.error?.message} />;
+  }
 
   const services = servicesQuery.data?.items ?? [];
-
   if (services.length === 0) return <DashboardEmptyState />;
 
   return (
     <div className="w-full h-full min-h-0 overflow-hidden flex flex-col py-4 md:py-6">
       <div className="shrink-0">
-        <ServicesSlider
-          routeContext={routeContext}
-          emblaRef={emblaServicesRef}
-        />
+        <ServicesSlider emblaRef={emblaServicesRef} />
       </div>
       <div className="flex-1 min-h-0">
-        <ServiceDetail
-          routeContext={routeContext}
-          emblaRef={emblaServiceDetailRef}
-        />
+        <ServiceDetail emblaRef={emblaServiceDetailRef} />
       </div>
     </div>
   );

@@ -7,7 +7,5 @@ export const Route = createFileRoute("/_app/")({
 });
 
 function CustomerDashboardRoute() {
-  const routeContext = Route.useRouteContext();
-
-  return <DashboardPage routeContext={routeContext} />;
+  return <DashboardPage />;
 }
