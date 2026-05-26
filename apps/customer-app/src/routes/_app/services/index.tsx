@@ -1,14 +1,11 @@
-import { TopTabs } from "@/modules/services/views/top-tabs";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/services/")({
-  component: CustomerServicesListRoute,
+  component: ServiceListRoute,
 });
 
-function CustomerServicesListRoute() {
+function ServiceListRoute() {
   return (
-    <div className="w-full">
-      <TopTabs />
-    </div>
+    <h1>List of Services</h1>
   );
 }
