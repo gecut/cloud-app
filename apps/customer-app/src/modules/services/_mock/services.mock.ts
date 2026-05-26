@@ -7,7 +7,7 @@ export async function mockListServices(input?: { search?: string }) {
     ? data.items.filter(
         (item) =>
           item.name.toLowerCase().includes(search) ||
-          item.description?.toLowerCase().includes(search)
+          item.description?.toLowerCase().includes(search),
       )
     : data.items;
 

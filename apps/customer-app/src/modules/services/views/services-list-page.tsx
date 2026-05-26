@@ -7,23 +7,30 @@ import { ServicesErrorState } from "@/modules/services/states/services-error-sta
 import { ServicesPageSkeleton } from "@/modules/services/skeletons/services-page-skeleton";
 
 export function ServicesListPage() {
-  const query = useQuery({ queryKey: ["services", "list"], queryFn: () => mockListServices() });
+  const query = useQuery({
+    queryKey: ["services", "list"],
+    queryFn: () => mockListServices(),
+  });
 
   if (query.isPending) return <ServicesPageSkeleton />;
   if (query.isError) return <ServicesErrorState />;
   if (!query.data.items.length) return <ServicesEmptyState />;
 
   return (
-    <main className="space-y-3 p-4 md:p-6">
+    <main className="w-fll flex flex-col gap-4">
       {query.data.items.map((service) => (
         <Card key={service.id} className="p-4" variant="secondary">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="font-medium">{service.name}</h2>
-              <p className="text-xs opacity-70 mt-1">{service.serviceType.name}</p>
+              <p className="text-xs opacity-70 mt-1">
+                {service.serviceType.name}
+              </p>
             </div>
             <div className="text-left">
-              <p className="text-sm font-semibold">{service.priceToman.toLocaleString("fa-IR")} تومان</p>
+              <p className="text-sm font-semibold">
+                {service.priceToman.toLocaleString("fa-IR")} تومان
+              </p>
               <p className="text-xs opacity-70 mt-1">{service.status}</p>
             </div>
           </div>

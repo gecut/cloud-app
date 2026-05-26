@@ -35,8 +35,8 @@ const NAVIGATION_ITEMS: Record<string, NavigationItemType> = {
     activeIcon: ChatRoundDotsBold,
     href: "/invoices",
   },
-  fucksahbaee: {
-    label: "پشتیبانی",
+  services: {
+    label: "سرویس ها",
     icon: ChatRoundDotsLinear,
     activeIcon: ChatRoundDotsBold,
     href: "/services",
@@ -51,13 +51,13 @@ export function Navigation() {
       className={cn(
         "h-22 fixed inset-x-0 bottom-0 z-50",
         "border-t border-t-border bg-overlay",
-        "supports-[backdrop-filter]:backdrop-blur-sm supports-[backdrop-filter]:bg-overlay/80"
+        "supports-[backdrop-filter]:backdrop-blur-sm supports-[backdrop-filter]:bg-overlay/80",
       )}
     >
       <nav
         className={cn(
           "w-full flex items-center justify-between h-full px-6",
-          "max-w-md mx-auto"
+          "max-w-md mx-auto",
         )}
       >
         {Object.keys(NAVIGATION_ITEMS).map((key) => {
@@ -84,7 +84,7 @@ export function Navigation() {
                     "transition-[width,height,background-color,color] duration-300",
                     isSelected
                       ? "size-12 bg-accent text-accent-foreground delay-150"
-                      : "size-6 bg-transparent text-accent"
+                      : "size-6 bg-transparent text-accent",
                   )}
                 >
                   <item.icon
@@ -92,7 +92,7 @@ export function Navigation() {
                       "absolute inset-0 size-6 transition-opacity duration-300 m-auto",
                       isSelected
                         ? "opacity-0"
-                        : "opacity-100 group-hover:opacity-0"
+                        : "opacity-100 group-hover:opacity-0",
                     )}
                   />
                   <item.activeIcon
@@ -100,7 +100,7 @@ export function Navigation() {
                       "absolute inset-0 size-6 transition-opacity duration-300 m-auto",
                       isSelected
                         ? "opacity-100"
-                        : "opacity-0 group-hover:opacity-100"
+                        : "opacity-0 group-hover:opacity-100",
                     )}
                   />
                 </div>
@@ -108,7 +108,7 @@ export function Navigation() {
                   className={cn(
                     "overflow-hidden transition-[max-height,padding] duration-150",
                     "text-xs font-normal",
-                    isSelected ? "max-h-0 pt-0" : "max-h-8 pt-1.5"
+                    isSelected ? "max-h-0 pt-0" : "max-h-8 pt-1.5",
                   )}
                 >
                   {item.label}
