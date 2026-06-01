@@ -4,11 +4,10 @@ import { cn } from "tailwind-variants";
 type TableProps = {
   data: Payments[];
 };
+
 export function Tables({ data }: TableProps) {
   return (
-    <div
-      className="w-full rounded-xl overflow-hidden text-xs"
-    >
+    <div className="w-full rounded-xl overflow-hidden text-xs">
       {data.map((x) => {
         return (
           <div className="w-full">
@@ -46,7 +45,7 @@ export function Tables({ data }: TableProps) {
             <div
               className={cn(
                 "w-full flex items-center justify-between text-center rounded-b-2xl px-4 py-2 text-xs",
-                x.status === "paid" ? "bg-success" : "bg-danger",
+                x.status === "paid" ? "bg-success" : "bg-danger"
               )}
             >
               <span className="text-sm text-muted-foreground">

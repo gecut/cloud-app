@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { payments } from "../data";
 import { CardTransfer } from "@solar-icons/react-perf/category/money/LineDuotone";
 import { Documents } from "@solar-icons/react-perf/category/notes/LineDuotone";
-import { PaymentDetails } from "@/app/components/pages/payments/payment/payment-details";
+import { InvoiceList } from "@/app/components/pages/payments/payment/payment-details";
 import { Transactions } from "@/app/components/pages/payments/transactions/transaction";
 
 export const Route = createFileRoute("/_app/payments/")({
@@ -41,7 +41,7 @@ function RouteComponent() {
           </Tabs.List>
         </Tabs.ListContainer>
         <Tabs.Panel className="p-0" id="payments">
-          <PaymentDetails data={payments} />
+          <InvoiceList data={payments} />
         </Tabs.Panel>
         <Tabs.Panel className="p-0" id="transactions">
           <Transactions data={payments} />
