@@ -18,7 +18,7 @@
     "@prisma/client": "catalog:",
     "@solar-icons/react-perf": "^2.1.0",
     "@tailwindcss/vite": "^4.2.2",
-    "@tanstack/react-query": "^5.90.12",
+    "@tanstack/react-query": "^5.100.5",
     "@tanstack/react-router": "^1.168.22",
     "dotenv": "catalog:",
     "next-themes": "catalog:",

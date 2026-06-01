@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppTestIndexRouteImport } from './routes/_app/test/index'
+import { Route as AppSupportsIndexRouteImport } from './routes/_app/supports/index'
 import { Route as AppServicesIndexRouteImport } from './routes/_app/services/index'
+import { Route as AppPaymentsIndexRouteImport } from './routes/_app/payments/index'
 import { Route as AppTestIdRouteImport } from './routes/_app/test/$id'
 
 const AppRoute = AppRouteImport.update({
@@ -29,9 +31,19 @@ const AppTestIndexRoute = AppTestIndexRouteImport.update({
   path: '/test/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSupportsIndexRoute = AppSupportsIndexRouteImport.update({
+  id: '/supports/',
+  path: '/supports/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppServicesIndexRoute = AppServicesIndexRouteImport.update({
   id: '/services/',
   path: '/services/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPaymentsIndexRoute = AppPaymentsIndexRouteImport.update({
+  id: '/payments/',
+  path: '/payments/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppTestIdRoute = AppTestIdRouteImport.update({
@@ -43,13 +55,17 @@ const AppTestIdRoute = AppTestIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/test/$id': typeof AppTestIdRoute
+  '/payments/': typeof AppPaymentsIndexRoute
   '/services/': typeof AppServicesIndexRoute
+  '/supports/': typeof AppSupportsIndexRoute
   '/test/': typeof AppTestIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/test/$id': typeof AppTestIdRoute
+  '/payments': typeof AppPaymentsIndexRoute
   '/services': typeof AppServicesIndexRoute
+  '/supports': typeof AppSupportsIndexRoute
   '/test': typeof AppTestIndexRoute
 }
 export interface FileRoutesById {
@@ -57,20 +73,30 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_app/': typeof AppIndexRoute
   '/_app/test/$id': typeof AppTestIdRoute
+  '/_app/payments/': typeof AppPaymentsIndexRoute
   '/_app/services/': typeof AppServicesIndexRoute
+  '/_app/supports/': typeof AppSupportsIndexRoute
   '/_app/test/': typeof AppTestIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/test/$id' | '/services/' | '/test/'
+  fullPaths:
+    | '/'
+    | '/test/$id'
+    | '/payments/'
+    | '/services/'
+    | '/supports/'
+    | '/test/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/test/$id' | '/services' | '/test'
+  to: '/' | '/test/$id' | '/payments' | '/services' | '/supports' | '/test'
   id:
     | '__root__'
     | '/_app'
     | '/_app/'
     | '/_app/test/$id'
+    | '/_app/payments/'
     | '/_app/services/'
+    | '/_app/supports/'
     | '/_app/test/'
   fileRoutesById: FileRoutesById
 }
@@ -101,11 +127,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTestIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/supports/': {
+      id: '/_app/supports/'
+      path: '/supports'
+      fullPath: '/supports/'
+      preLoaderRoute: typeof AppSupportsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/services/': {
       id: '/_app/services/'
       path: '/services'
       fullPath: '/services/'
       preLoaderRoute: typeof AppServicesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/payments/': {
+      id: '/_app/payments/'
+      path: '/payments'
+      fullPath: '/payments/'
+      preLoaderRoute: typeof AppPaymentsIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/test/$id': {
@@ -121,14 +161,18 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppTestIdRoute: typeof AppTestIdRoute
+  AppPaymentsIndexRoute: typeof AppPaymentsIndexRoute
   AppServicesIndexRoute: typeof AppServicesIndexRoute
+  AppSupportsIndexRoute: typeof AppSupportsIndexRoute
   AppTestIndexRoute: typeof AppTestIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppTestIdRoute: AppTestIdRoute,
+  AppPaymentsIndexRoute: AppPaymentsIndexRoute,
   AppServicesIndexRoute: AppServicesIndexRoute,
+  AppSupportsIndexRoute: AppSupportsIndexRoute,
   AppTestIndexRoute: AppTestIndexRoute,
 }
 
