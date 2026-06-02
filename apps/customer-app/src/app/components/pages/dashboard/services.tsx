@@ -30,7 +30,7 @@ export function Services({ data }: ServiceDetailsProps) {
             <div className="flex flex-col gap-6 w-full p-8 rounded-3xl bg-surface">
               <div className="w-full flex items-start justify-between">
                 <div className="flex items-center gap-4">
-                  <ServerSquareCloud size={48} className="*:stroke-[0.5]" />
+                  <ServerSquareCloud size={50} />
 
                   <div className="flex flex-col justify-center gap-2">
                     <span className="leading-none">{x.serviceType.name}</span>
