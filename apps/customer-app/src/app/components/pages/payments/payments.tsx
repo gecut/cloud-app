@@ -9,8 +9,6 @@ import { Transactions } from "./transactions/transaction";
 export function Payments() {
   return (
     <div className="w-full flex flex-col gap-2 p-0">
-      <h2>مالــی</h2>
-
       <Factor price={80213000} />
 
       <Tabs className="w-full max-w-md p-0">
