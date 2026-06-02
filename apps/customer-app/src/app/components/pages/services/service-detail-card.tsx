@@ -10,12 +10,12 @@ import { Table } from "./table";
 import { Progress } from "../../common/progress";
 
 interface ServiceDetailCardProps {
-  data: Service;
+  serviceDetail: Service;
   showIcon?: boolean;
 }
 
 export function ServiceDetailCard({
-  data,
+  serviceDetail,
   showIcon = true,
 }: ServiceDetailCardProps) {
   const statusStyle: Record<Service["status"], string> = {
@@ -27,9 +27,11 @@ export function ServiceDetailCard({
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
   const totalDays =
-    (data.renewalDate.getTime() - data.startDate.getTime()) / MS_PER_DAY;
+    (serviceDetail.renewalDate.getTime() - serviceDetail.startDate.getTime()) /
+    MS_PER_DAY;
 
-  const passedDays = (Date.now() - data.startDate.getTime()) / MS_PER_DAY;
+  const passedDays =
+    (Date.now() - serviceDetail.startDate.getTime()) / MS_PER_DAY;
 
   const totalMonths = Math.round(totalDays / 30);
   const passedMonths = Math.round(passedDays / 30);
@@ -41,7 +43,7 @@ export function ServiceDetailCard({
         <div className="flex w-full items-start justify-between">
           <div className="flex items-center gap-4">
             {showIcon &&
-              (data.type === "SERVICE" ? (
+              (serviceDetail.type === "SERVICE" ? (
                 <ServerSquareCloudLineDuotone
                   size={48}
                   className="*:stroke-1"
@@ -50,35 +52,37 @@ export function ServiceDetailCard({
 
             <div className="flex flex-col gap-2">
               <span className="leading-none text-md">
-                {data.serviceType.name}
+                {serviceDetail.serviceType.name}
               </span>
 
-              <span className="text-xs leading-none">{data.description}</span>
+              <span className="text-xs leading-none">
+                {serviceDetail.description}
+              </span>
             </div>
           </div>
 
-          {data.type === "SERVICE" ? (
+          {serviceDetail.type === "SERVICE" ? (
             <div className="flex items-center gap-1">
               <div
                 className={cn(
                   "w-1 h-2 rounded-full animate-wiggle delay-250",
-                  statusStyle[data.status],
+                  statusStyle[serviceDetail.status],
                 )}
               />
               <div
                 className={cn(
                   "w-1 h-2 rounded-full animate-wiggle delay-450",
-                  statusStyle[data.status],
+                  statusStyle[serviceDetail.status],
                 )}
               />
               <div
                 className={cn(
                   "w-1 h-2 rounded-full animate-wiggle delay-650",
-                  statusStyle[data.status],
+                  statusStyle[serviceDetail.status],
                 )}
               />
             </div>
-          ) : data.type === "DOMAIN" ? (
+          ) : serviceDetail.type === "DOMAIN" ? (
             <Link size={48} />
           ) : (
             <ServerSquareCloud size={48} />
@@ -103,9 +107,9 @@ export function ServiceDetailCard({
 
         <Table
           data={{
-            Date: data.renewalDate,
+            Date: serviceDetail.renewalDate,
             cycle: "ماهانه",
-            price: data.priceToman,
+            price: serviceDetail.priceToman,
           }}
         />
 
