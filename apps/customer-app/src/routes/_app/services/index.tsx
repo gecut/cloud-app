@@ -1,4 +1,4 @@
-import { TopTabs } from "@/app/components/pages/services/top-tabs";
+import { Services } from "@/app/components/pages/services/services";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/services/")({
@@ -10,8 +10,7 @@ function ServiceListRoute() {
     <div className="w-full flex flex-col gap-4 mt-4 items-stretch">
       <h1 className="text-xl">سرویس ها</h1>
       <div className="w-full">
-        {" "}
-        <TopTabs />
+        <Services />
       </div>
     </div>
   );

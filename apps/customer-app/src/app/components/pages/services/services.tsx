@@ -5,10 +5,9 @@ import { LinkRound } from "@solar-icons/react-perf/category/text-formatting/Bold
 import { LayersMinimalistic } from "@solar-icons/react-perf/category/tools/BoldDuotone";
 import { Server2 } from "@solar-icons/react-perf/category/devices/LineDuotone";
 
-import { dataTypes, ServiceType } from "@/routes/_app/data";
-import { ServicesDetail } from "./service-details";
-import { Heart } from "@solar-icons/react-perf/category/like/BoldDuotone";
-import { Subscription } from "./subscription/subscription";
+import { dataTypes, ServiceType, subscriptions } from "@/routes/_app/data";
+import { ServiceDetailList } from "./service-detail-list";
+import { SubscriptionList } from "./subscription/subscription-list";
 
 const allData = dataTypes.services;
 
@@ -20,36 +19,36 @@ const tabs = [
     id: "all",
     label: "همه",
     icon: <LayersMinimalistic size={24} />,
-    content: <ServicesDetail data={allData} />,
+    content: <ServiceDetailList data={allData} />,
   },
   {
     id: "services",
     label: "سرویس ها",
-    icon: <ServerSquareCloud size={24} />,
-    content: <ServicesDetail data={getFilteredData("SERVICE")} />,
+    icon: <ServerSquareCloud size={24} className="*:stroke-1" />,
+    content: <ServiceDetailList data={getFilteredData("SERVICE")} />,
   },
   {
     id: "domains",
     label: "دامنه",
     icon: <LinkRound size={24} />,
-    content: <ServicesDetail data={getFilteredData("DOMAIN")} />,
+    content: <ServiceDetailList data={getFilteredData("DOMAIN")} />,
   },
   {
     id: "hosting",
     label: "میزبانی",
     icon: <Server2 size={24} />,
-    content: <ServicesDetail data={getFilteredData("DOMAIN")} />,
+    content: <ServiceDetailList data={getFilteredData("DOMAIN")} />,
   },
   {
     id: "shares",
     label: "اشتراک",
     icon: <HeartPulse size={24} />,
-    content: <Subscription />,
+    content: <SubscriptionList data={subscriptions} />,
   },
 ];
-export function TopTabs() {
+export function Services() {
   return (
-    <Tabs defaultSelectedKey="services" className=" mx-auto">
+    <Tabs defaultSelectedKey="services" className="mx-auto">
       <Tabs.ListContainer>
         <Tabs.List
           aria-label="Dashboard Tabs"
@@ -62,7 +61,6 @@ export function TopTabs() {
               className="relative flex h-full w-full flex-col items-center justify-center rounded-xl text-sm"
             >
               {tab.icon}
-
               <span className="text-xs whitespace-nowrap">{tab.label}</span>
 
               <Tabs.Indicator className="bg-accent rounded-xl" />

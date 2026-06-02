@@ -28,7 +28,7 @@ export type Payments = {
   subTitle: string;
   type: ServiceType;
   factorCreated: Date;
-  volume: string;
+  volume: number;
   price: number;
   paymentDeadline: Date;
   status: "paid" | "Awaiting payment";
@@ -226,7 +226,7 @@ export const payments: Payments[] = [
     subTitle: "پشت پرده",
     type: "DOMAIN",
     factorCreated: new Date("2026-05-01"),
-    volume: "120GB",
+    volume: 120,
     price: 450000,
     paymentDeadline: new Date("2026-05-10"),
     status: "paid",
@@ -237,7 +237,7 @@ export const payments: Payments[] = [
     subTitle: "پلن پایه ذخیره‌سازی",
     type: "SERVICE",
     factorCreated: new Date("2026-05-03"),
-    volume: "50GB",
+    volume: 50,
     price: 300000,
     paymentDeadline: new Date("2026-05-12"),
     status: "Awaiting payment",
@@ -248,7 +248,7 @@ export const payments: Payments[] = [
     subTitle: "درخواست‌های ماهانه API",
     type: "SERVER",
     factorCreated: new Date("2026-05-05"),
-    volume: "1M requests",
+    volume: 1000000,
     price: 1200000,
     paymentDeadline: new Date("2026-05-15"),
     status: "paid",
@@ -259,7 +259,7 @@ export const payments: Payments[] = [
     subTitle: "هاست اشتراکی پرسرعت",
     type: "DOMAIN",
     factorCreated: new Date("2026-05-07"),
-    volume: "200GB",
+    volume: 200,
     price: 750000,
     paymentDeadline: new Date("2026-05-18"),
     status: "Awaiting payment",
@@ -270,7 +270,7 @@ export const payments: Payments[] = [
     subTitle: "پشتیبانی 24/7",
     type: "SERVER",
     factorCreated: new Date("2026-05-09"),
-    volume: "unlimited",
+    volume: 300,
     price: 500000,
     paymentDeadline: new Date("2026-05-20"),
     status: "paid",

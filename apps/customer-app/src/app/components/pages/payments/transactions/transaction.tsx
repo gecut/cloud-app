@@ -1,4 +1,4 @@
-import { Payments, payments } from "@/routes/_app/data";
+import { Payments } from "@/routes/_app/data";
 import { Chip } from "@heroui/react";
 import { Server2 } from "@solar-icons/react-perf/category/devices/LineDuotone";
 import { GalleryWide } from "@solar-icons/react-perf/category/video/LineDuotone";
@@ -13,7 +13,7 @@ export function Transactions({ data }: Transaction) {
       {data.map((x) => {
         return (
           <div className="flex rounded-2xl bg-surface px-6 py-4">
-            <div className="flex w-full items-start justify-between">
+            <div className="flex w-full items-center justify-between">
               <div className="flex items-center gap-4">
                 {x.type === "DOMAIN" ? (
                   <GalleryWide size={32} />
@@ -21,13 +21,17 @@ export function Transactions({ data }: Transaction) {
                   <Server2 size={32} />
                 )}
                 <div className="flex flex-col gap-2">
-                  <span className="leading-none">{x.title}</span>
+                  <span className="leading-none text-md font-medium">
+                    {x.title}
+                  </span>
 
-                  <span className="text-xs leading-none text-accent">{x.subTitle}</span>
+                  <span className="text-xs leading-none text-accent">
+                    {x.subTitle}
+                  </span>
                 </div>
               </div>
-              <div className="flex flex-col text-xs font-light gap-1 justify-center items-center">
-                <Chip className="px-4 font-light  bg-accent-soft rounded-[8px]">
+              <div className="flex flex-col text-xs font-light gap-1 justify-end items-center">
+                <Chip className="w-fit px-4 font-light bg-accent-soft rounded-[8px]">
                   {x.paymentDeadline.toLocaleDateString("fa-IR")}
                 </Chip>
                 {x.price.toLocaleString("fa-IR")}تومــان
