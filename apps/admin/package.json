@@ -11,13 +11,10 @@
     "check-types": "vite build && tsc --noEmit"
   },
   "dependencies": {
-    "@gecut-cloud/api": "workspace:*",
+    "@gecut-cloud/contracts": "workspace:*",
     "@gecut-cloud/env": "workspace:*",
     "@gecut-cloud/ui": "workspace:*",
     "@hookform/resolvers": "^5.2.2",
-    "@orpc/client": "catalog:",
-    "@orpc/server": "catalog:",
-    "@orpc/tanstack-query": "^1.13.14",
     "@prisma/client": "catalog:",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/react-query": "^5.90.12",

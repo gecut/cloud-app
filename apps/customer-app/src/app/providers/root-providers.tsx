@@ -1,9 +1,8 @@
 import { Toast } from "@heroui/react";
-import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/api-client";
 import { ThemeProvider } from "@/app/providers/theme-provider";
-import { queryClient } from "@/lib/orpc";
 
 interface RootProvidersProps {
   children: ReactNode;
@@ -24,3 +23,4 @@ export function RootProviders({ children }: RootProvidersProps) {
     </QueryClientProvider>
   );
 }
+

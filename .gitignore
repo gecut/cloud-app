@@ -49,3 +49,8 @@ coverage
 .cache
 tmp
 temp
+
+# Local Reports & Overview Docs
+DEMO_INTEGRATION_REPORT.md
+BACKEND_SETUP_REPORT.md
+*_REPORT.md

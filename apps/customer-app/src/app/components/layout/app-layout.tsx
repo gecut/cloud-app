@@ -10,21 +10,12 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { pathname } = useLocation();
-  const isDashboardRoute = pathname === "/";
 
   return (
-    <div
-      className={`flex flex-col pt-16 pb-22 ${
-        isDashboardRoute ? "h-svh overflow-hidden" : "min-h-svh"
-      }`}
-    >
+    <div className="flex flex-col pt-16 pb-22 overflow-hidden min-h-screen">
       <Header />
-      <main
-        className={`page-transition-container flex-1 min-h-0 mx-auto w-full max-w-md ${
-          isDashboardRoute ? "overflow-hidden" : ""
-        }`}
-      >
-        <div key={pathname} className="page-transition-fallback h-full min-h-0">
+      <main className="flex-1 min-h-0 mx-auto w-full max-w-100">
+        <div key={pathname} className="h-full min-h-0 p-2">
           {children}
         </div>
       </main>

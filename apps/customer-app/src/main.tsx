@@ -7,7 +7,7 @@ import { GecutPageLoader } from "@/app/components/feedback/page-loader";
 import "./index.css";
 
 const AppBootstrap = lazy(async () => {
-  await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+  // await new Promise<void>((resolve) => setTimeout(resolve, 1000));
 
   return await import("@/app/app-bootstrap");
 });

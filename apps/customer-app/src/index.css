@@ -1,11 +1,11 @@
 @font-face {
-  font-family: "vazirmatn";
-  src: url("./fonts/Vazirmatn[wght].woff2") format("woff2-variations");
+  font-family: "peyda";
+  src: url("./app/fonts/PEYDA-MEDIUM.TTF") format("woff2-variations");
   font-weight: 100 900;
   font-stretch: 75% 125%;
   font-display: swap; /* Recommended for better performance */
 }
 
 body {
-  font-family: "vazirmatn", sans-serif;
+  font-family: "peyda", sans-serif;
 }

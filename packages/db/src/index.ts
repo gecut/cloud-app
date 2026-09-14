@@ -1,8 +1,8 @@
 import { env } from "@gecut-cloud/env/server";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-import { PrismaClient } from "../prisma/generated/client";
-export * from "../prisma/generated/client";
+import { PrismaClient } from "@prisma/client";
+export * from "@prisma/client";
 
 export function createPrismaClient() {
   const adapter = new PrismaPg({

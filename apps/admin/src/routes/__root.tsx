@@ -5,12 +5,10 @@ import { HeadContent, Outlet, createRootRouteWithContext } from "@tanstack/react
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { ThemeProvider } from "@/components/theme-provider";
-import { orpc } from "@/utils/orpc";
 
 import "../index.css";
 
 export interface RouterAppContext {
-  orpc: typeof orpc;
   queryClient: QueryClient;
 }
 
