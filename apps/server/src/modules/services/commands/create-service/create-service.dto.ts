@@ -2,20 +2,25 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, Min } from "class-validator";
 
 export class CreateServiceDto {
-    @ApiProperty({ description: "Customer ID" })
-    @IsString()
-    @IsNotEmpty()
-    customerId: string;
+  @ApiPropertyOptional({ description: "Customer ID" })
+  @IsString()
+  @IsOptional()
+  customerId?: string;
 
   @ApiPropertyOptional({ description: "Service Group ID" })
   @IsString()
   @IsOptional()
   serviceGroupId?: string;
 
-  @ApiProperty({ description: "Service Type ID" })
+  @ApiPropertyOptional({ description: "Service Type ID" })
   @IsString()
-  @IsNotEmpty()
-  serviceTypeId: string;
+  @IsOptional()
+  serviceTypeId?: string;
+
+  @ApiPropertyOptional({ description: "Service Type Slug (e.g. domain, hosting, server, api, package)" })
+  @IsString()
+  @IsOptional()
+  serviceTypeSlug?: string;
 
   @ApiPropertyOptional({ description: "Server ID" })
   @IsString()
@@ -32,16 +37,32 @@ export class CreateServiceDto {
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ description: "Price in Toman" })
+  @ApiPropertyOptional({ description: "Price in Toman" })
   @IsInt()
+  @IsOptional()
   @Min(0)
-  priceToman: number;
+  priceToman?: number;
 
-  @ApiProperty({ description: "Start Date (ISO string)" })
-  @IsDateString()
-  startDate: string;
+  @ApiPropertyOptional({ description: "Billing Cycle (MONTHLY, QUARTERLY, SEMI_ANNUAL, ANNUAL)" })
+  @IsString()
+  @IsOptional()
+  billingCycle?: string;
 
-  @ApiProperty({ description: "Renewal Date (ISO string)" })
+  @ApiPropertyOptional({ description: "Auto Renew flag" })
+  @IsOptional()
+  autoRenew?: boolean;
+
+  @ApiPropertyOptional({ description: "Package quantity" })
+  @IsOptional()
+  quantity?: number;
+
+  @ApiPropertyOptional({ description: "Start Date (ISO string)" })
   @IsDateString()
-  renewalDate: string;
+  @IsOptional()
+  startDate?: string;
+
+  @ApiPropertyOptional({ description: "Renewal Date (ISO string)" })
+  @IsDateString()
+  @IsOptional()
+  renewalDate?: string;
 }

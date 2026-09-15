@@ -13,9 +13,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost) {
-    const ctx = host.switchToRpc();
-    const response = ctx.getContext<FastifyReply>();
-    const request = ctx.getContext<FastifyRequest>();
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<FastifyReply>();
+    const request = ctx.getRequest<FastifyRequest>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | object = "Internal server error";

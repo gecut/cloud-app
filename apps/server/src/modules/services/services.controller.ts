@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -10,8 +11,10 @@ import {
 } from "@nestjs/common";
 import { CommandBus, QueryBus } from "@nestjs/cqrs";
 import { ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { CurrentUser, CurrentUserData } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
+import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { CreateServiceCommand } from "./commands/create-service/create-service.command";
 import { CreateServiceDto } from "./commands/create-service/create-service.dto";
 import { UpdateServiceCommand } from "./commands/update-service/update-service.command";
@@ -26,6 +29,7 @@ export class ServicesController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post()
@@ -50,13 +54,20 @@ export class ServicesController {
   @ApiQuery({ name: "page", required: false, type: Number })
   @ApiQuery({ name: "limit", required: false, type: Number })
   async list(
+    @CurrentUser() user: CurrentUserData,
     @Query("customerId") customerId?: string,
     @Query("status") status?: string,
     @Query("page") page = 1,
     @Query("limit") limit = 20,
   ) {
+    // For customers, enforce tenant isolation: only return their services
+    let effectiveCustomerId = customerId;
+    if (user?.role === "CUSTOMER") {
+      effectiveCustomerId = user.customerId || user.id;
+    }
+
     return this.queryBus.execute(
-      new ListServicesQuery(customerId, Number(page), Number(limit), status),
+      new ListServicesQuery(effectiveCustomerId, Number(page), Number(limit), status),
     );
   }
 
@@ -65,5 +76,12 @@ export class ServicesController {
   @ApiOperation({ summary: "Get service details by ID" })
   async get(@Param("id") id: string) {
     return this.queryBus.execute(new GetServiceQuery(id));
+  }
+
+  @Delete(":id")
+  @Roles("ADMIN")
+  @ApiOperation({ summary: "Delete a service by ID" })
+  async delete(@Param("id") id: string) {
+    return this.prisma.service.delete({ where: { id } });
   }
 }

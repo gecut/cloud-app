@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
@@ -15,6 +15,8 @@ import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
+import { normalizePhoneNumber } from "@/utils/phone";
+import { formatJalaliDate, formatJalaliDateWords, formatJalaliDateTime } from "@gecut-cloud/contracts";
 import {
   User,
   Users,
@@ -40,7 +42,76 @@ import {
   Layers,
   Activity,
   X,
+  Ban,
+  Eye,
+  Globe,
+  HardDrive,
+  Cpu,
+  Package,
+  Repeat,
 } from "lucide-react";
+import { InvoiceDetailModal } from "@/components/invoices/invoice-detail-modal";
+
+function getServiceCategoryBadge(slug?: string) {
+  switch (slug) {
+    case "domain":
+      return {
+        label: "دامنه",
+        icon: Globe,
+        className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      };
+    case "server":
+      return {
+        label: "سرور",
+        icon: Server,
+        className: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      };
+    case "hosting":
+      return {
+        label: "هاست",
+        icon: HardDrive,
+        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+      };
+    case "api":
+      return {
+        label: "وب‌سرویس و API",
+        icon: Cpu,
+        className: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+      };
+    case "package":
+      return {
+        label: "بسته تعدادی",
+        icon: Package,
+        className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      };
+    default:
+      return {
+        label: "سرویس ابری",
+        icon: Layers,
+        className: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20",
+      };
+  }
+}
+
+function getBillingCycleLabel(cycle?: string | number) {
+  if (!cycle) return "۳۰ روزه";
+  const num = Number(cycle);
+  if (!isNaN(num) && num > 0) {
+    return `${num.toLocaleString("fa-IR")} روزه`;
+  }
+  switch (String(cycle).toUpperCase()) {
+    case "MONTHLY":
+      return "۳۰ روزه";
+    case "QUARTERLY":
+      return "۹۰ روزه";
+    case "SEMI_ANNUAL":
+      return "۱۸۰ روزه";
+    case "ANNUAL":
+      return "۳۶۵ روزه";
+    default:
+      return `${cycle} روزه`;
+  }
+}
 
 export const Route = createFileRoute("/customers/$id")({
   component: AdminCustomerProfileDetailPage,
@@ -72,6 +143,30 @@ function AdminCustomerProfileDetailPage() {
     queryFn: () => apiClient<any>(`/audit-logs?entityId=${id}&limit=20`),
   });
 
+  // Fetch All Created Services Catalog
+  const { data: allServicesData } = useQuery({
+    queryKey: ["admin", "services", "catalog"],
+    queryFn: () => apiClient<{ items: any[]; total: number }>("/services?limit=100"),
+  });
+
+  // Unique services created in the system catalog
+  const catalogServices = Array.from(
+    new Map(
+      (allServicesData?.items || []).map((s: any) => [
+        s.name?.trim(),
+        {
+          id: s.id,
+          name: s.name,
+          categorySlug: s.serviceType?.slug || "hosting",
+          serviceTypeId: s.serviceTypeId,
+          serviceType: s.serviceType,
+          description: s.description,
+          server: s.server,
+        },
+      ]),
+    ).values(),
+  );
+
   // Profile Edit Form State
   const [profileName, setProfileName] = useState("");
   const [profileDisplayName, setProfileDisplayName] = useState("");
@@ -89,20 +184,39 @@ function AdminCustomerProfileDetailPage() {
     setHasProfileInitialized(true);
   }
 
-  // Create Service Form State
-  const [newServiceName, setNewServiceName] = useState("");
-  const [newServicePrice, setNewServicePrice] = useState("2500000");
-  const [newServiceType, setNewServiceType] = useState("web-hosting");
-  const [newServiceStartDate, setNewServiceStartDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  // Assign Created Service Form State
+  const [selectedCatalogServiceId, setSelectedCatalogServiceId] = useState("");
+  const [serviceCustomName, setServiceCustomName] = useState("");
+  const [serviceQuantity, setServiceQuantity] = useState<number>(1000);
+  const [servicePrice, setServicePrice] = useState<string>("2500000");
+  const [serviceDurationDays, setServiceDurationDays] = useState<number>(30);
+  const [serviceAutoRenew, setServiceAutoRenew] = useState<boolean>(true);
+  const [serviceCreateInvoice, setServiceCreateInvoice] = useState<boolean>(true);
   const [newServiceRenewalDate, setNewServiceRenewalDate] = useState(
     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
   );
 
+  const activeSelectedService =
+    catalogServices.find((s: any) => s.id === selectedCatalogServiceId) ||
+    catalogServices[0] ||
+    null;
+
+  useEffect(() => {
+    if (activeSelectedService && !serviceCustomName) {
+      setServiceCustomName(activeSelectedService.name);
+    }
+  }, [activeSelectedService]);
+
+  // View Invoice Details State
+  const [viewingInvoice, setViewingInvoice] = useState<any>(null);
+  const [isViewInvoiceOpen, setIsViewInvoiceOpen] = useState(false);
+
   // Edit Service Form State
   const [editServiceName, setEditServiceName] = useState("");
   const [editServicePrice, setEditServicePrice] = useState("");
+  const [editServiceQuantity, setEditServiceQuantity] = useState<number>(1);
+  const [editServiceDurationDays, setEditServiceDurationDays] = useState<number>(30);
+  const [editServiceAutoRenew, setEditServiceAutoRenew] = useState(true);
   const [editServiceStatus, setEditServiceStatus] = useState("ACTIVE");
   const [editServiceRenewalDate, setEditServiceRenewalDate] = useState("");
 
@@ -135,6 +249,27 @@ function AdminCustomerProfileDetailPage() {
     },
   });
 
+  // Toggle Customer Status (Activate / Deactivate) Mutation
+  const toggleCustomerStatusMutation = useMutation({
+    mutationFn: (newStatus: "ACTIVE" | "INACTIVE") =>
+      apiClient(`/customers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      }),
+    onSuccess: (_, newStatus) => {
+      toast.success(
+        newStatus === "ACTIVE"
+          ? "مشتری با موفقیت فعال شد"
+          : "مشتری با موفقیت غیرفعال شد",
+      );
+      queryClient.invalidateQueries({ queryKey: ["admin", "customer", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در تغییر وضعیت مشتری");
+    },
+  });
+
   // Create Service Mutation
   const createServiceMutation = useMutation({
     mutationFn: (data: any) =>
@@ -143,11 +278,14 @@ function AdminCustomerProfileDetailPage() {
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      toast.success("سرویس جدید با موفقیت برای این مشتری ثبت شد");
+      toast.success("سرویس با موفقیت به این مشتری اختصاص داده شد و صورت‌حساب اولیه ثبت گردید");
       queryClient.invalidateQueries({ queryKey: ["admin", "customer", id] });
       queryClient.invalidateQueries({ queryKey: ["admin", "services"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
       setIsCreateServiceOpen(false);
-      setNewServiceName("");
+      setServiceCustomName("");
+      setServiceQuantity(1000);
     },
     onError: (err: any) => {
       toast.error(err.message || "خطا در ایجاد سرویس");
@@ -184,6 +322,7 @@ function AdminCustomerProfileDetailPage() {
       toast.success("صورت‌حساب جدید صادر شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "customer", id] });
       queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
       setIsCreateInvoiceOpen(false);
       setInvoiceItemTitle("");
     },
@@ -197,12 +336,12 @@ function AdminCustomerProfileDetailPage() {
     mutationFn: (invoiceId: string) =>
       apiClient(`/invoices/${invoiceId}/cancel`, {
         method: "PATCH",
-        body: JSON.stringify({ reason: "لغو شده توسط مدیر سیستم در پنل مشتری" }),
       }),
     onSuccess: () => {
-      toast.success("فاکتور مورد نظر لغو شد");
+      toast.success("فاکتور با موفقیت لغو شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "customer", id] });
       queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
     },
     onError: (err: any) => {
       toast.error(err.message || "خطا در لغو فاکتور");
@@ -229,28 +368,41 @@ function AdminCustomerProfileDetailPage() {
   // Handle Profile Update
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanPhone = profilePhone ? normalizePhoneNumber(profilePhone) : undefined;
     updateProfileMutation.mutate({
       name: profileName,
       displayName: profileDisplayName || undefined,
-      phone: profilePhone || undefined,
+      phone: cleanPhone,
       email: profileEmail || undefined,
       status: profileStatus,
     });
   };
 
-  // Handle Create Service Submit
+  // Handle Assign Service Submit
   const handleCreateServiceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newServiceName.trim()) {
-      toast.error("عنوان سرویس الزامی است");
+    if (!activeSelectedService) {
+      toast.error("لطفاً یک سرویس از سرویس‌های تعریف‌شده را انتخاب کنید");
       return;
     }
+    const isPackage = activeSelectedService.categorySlug === "package";
+    const qty = isPackage ? Math.max(1, Number(serviceQuantity) || 1) : undefined;
+    const finalPrice = Math.round(Number(servicePrice)) || 0;
+    const finalName = serviceCustomName.trim() || activeSelectedService.name;
+
     createServiceMutation.mutate({
-      customerId: id,
-      serviceTypeId: "type_standard_web",
-      name: newServiceName,
-      priceToman: Number(newServicePrice) || 0,
-      startDate: new Date(newServiceStartDate).toISOString(),
+      customerId: activeCustomer?.id || id,
+      serviceTypeId: activeSelectedService.serviceTypeId,
+      serviceTypeSlug: activeSelectedService.categorySlug,
+      name: finalName,
+      priceToman: finalPrice,
+      billingCycle: String(serviceDurationDays),
+      autoRenew: serviceAutoRenew,
+      quantity: qty,
+      description: isPackage
+        ? `بسته ${qty ? qty.toLocaleString("fa-IR") : "۱"} عددی`
+        : (activeSelectedService.description || undefined),
+      startDate: new Date().toISOString(),
       renewalDate: new Date(newServiceRenewalDate).toISOString(),
     });
   };
@@ -259,11 +411,15 @@ function AdminCustomerProfileDetailPage() {
   const handleEditServiceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedService) return;
+    const isPackage = selectedService.serviceType?.slug === "package";
     updateServiceMutation.mutate({
       serviceId: selectedService.id,
       data: {
         name: editServiceName,
-        priceToman: Number(editServicePrice) || 0,
+        priceToman: Math.round(Number(editServicePrice)) || 0,
+        billingCycle: String(editServiceDurationDays),
+        autoRenew: editServiceAutoRenew,
+        quantity: isPackage ? Math.max(1, Number(editServiceQuantity) || 1) : undefined,
         status: editServiceStatus,
         renewalDate: editServiceRenewalDate ? new Date(editServiceRenewalDate).toISOString() : undefined,
       },
@@ -273,16 +429,23 @@ function AdminCustomerProfileDetailPage() {
   // Handle Create Invoice Submit
   const handleCreateInvoiceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = Number(invoiceItemAmount) || 0;
+    const amount = Math.round(Number(invoiceItemAmount)) || 0;
+    if (amount <= 0) {
+      toast.error("مبلغ فاکتور باید بزرگتر از صفر باشد");
+      return;
+    }
+    const cleanDueDate = invoiceDueDate
+      ? new Date(invoiceDueDate).toISOString()
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
     createInvoiceMutation.mutate({
-      customerId: id,
-      dueDate: new Date(invoiceDueDate).toISOString(),
+      customerId: activeCustomer?.id || id,
+      dueDate: cleanDueDate,
       items: [
         {
           title: invoiceItemTitle || "تمدید دوره‌ای خدمات هاستینگ و زیرساخت",
           quantity: 1,
           unitPriceToman: amount,
-          totalToman: amount,
         },
       ],
     });
@@ -307,73 +470,37 @@ function AdminCustomerProfileDetailPage() {
     });
   };
 
-  // Fallback demo mock if server customer not found
-  const activeCustomer = customer || {
-    id: id,
-    name: "شرکت چوبینو گستر",
-    displayName: "چوبینو گستر ایرانیان",
-    phone: "09121112233",
-    email: "info@choobinooo.ir",
-    status: "ACTIVE",
-    createdAt: "2026-01-10T10:00:00.000Z",
-    services: [
-      {
-        id: "svc_101",
-        name: "هاست ابری پرسرعت اختصاصی",
-        priceToman: 2800000,
-        status: "ACTIVE",
-        startDate: "2026-01-10T00:00:00.000Z",
-        renewalDate: "2026-04-10T00:00:00.000Z",
-        serviceType: { name: "Web Hosting" },
-        server: { name: "Hetzner-Cloud-01", ipAddress: "159.69.120.45" },
-        endpoints: [
-          {
-            id: "ep_1",
-            label: "وبسایت اصلی",
-            url: "https://choobinooo.ir",
-            status: "UP",
-            uptimePercentage30d: 99.98,
-            responseTimeMs: 84,
-          },
-          {
-            id: "ep_2",
-            label: "سامانه مدیریت محتوا",
-            url: "https://cms.choobinooo.ir",
-            status: "UP",
-            uptimePercentage30d: 100.0,
-            responseTimeMs: 110,
-          },
-        ],
-      },
-    ],
-    invoices: [
-      {
-        id: "inv_201",
-        invoiceNumber: "INV-2026-088",
-        status: "PAID",
-        totalToman: 2800000,
-        issuedAt: "2026-01-10T10:00:00.000Z",
-        dueDate: "2026-01-17T10:00:00.000Z",
-        paidAt: "2026-01-11T12:30:00.000Z",
-        payment: {
-          id: "pay_1",
-          provider: "ZARINPAL",
-          gatewayRef: "TRX-98321045",
-          amountToman: 2800000,
-          paidAt: "2026-01-11T12:30:00.000Z",
-        },
-      },
-      {
-        id: "inv_202",
-        invoiceNumber: "INV-2026-092",
-        status: "UNPAID",
-        totalToman: 2800000,
-        issuedAt: "2026-03-25T10:00:00.000Z",
-        dueDate: "2026-04-05T10:00:00.000Z",
-        paidAt: null,
-      },
-    ],
-  };
+  const activeCustomer = customer;
+
+  if (isLoading) {
+    return (
+      <AppShell header={<AdminHeader />}>
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+          <RefreshCw className="h-8 w-8 animate-spin text-emerald-600" />
+          <span className="text-xs text-muted-foreground">در حال بارگذاری اطلاعات پرونده مشتری...</span>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!activeCustomer) {
+    return (
+      <AppShell header={<AdminHeader />}>
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 p-8 text-center">
+          <AlertCircle className="h-12 w-12 text-rose-500 opacity-80" />
+          <div>
+            <h2 className="text-base font-bold text-foreground">پرونده مشتری یافت نشد</h2>
+            <p className="text-xs text-muted-foreground mt-1">مشترکی با شناسه مشخص شده در پایگاه داده وجود ندارد.</p>
+          </div>
+          <Link to="/customers">
+            <Button size="sm" className="rounded-xl text-xs bg-emerald-600 hover:bg-emerald-500 text-white">
+              بازگشت به فهرست مشترکین
+            </Button>
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
 
   const servicesList = activeCustomer.services || [];
   const invoicesList = activeCustomer.invoices || [];
@@ -409,8 +536,33 @@ function AdminCustomerProfileDetailPage() {
               className="gap-1.5"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              بروزرسانی داده‌ها
+              بروزرسانی
             </Button>
+            {activeCustomer.status === "ACTIVE" ? (
+              <Button
+                key="btn-deactivate-header"
+                size="sm"
+                variant="outline"
+                onClick={() => toggleCustomerStatusMutation.mutate("INACTIVE")}
+                disabled={toggleCustomerStatusMutation.isPending}
+                className="gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-300 dark:border-rose-900/50 cursor-pointer"
+              >
+                <Ban className="h-3.5 w-3.5" />
+                <span>غیرفعال‌سازی مشتری</span>
+              </Button>
+            ) : (
+              <Button
+                key="btn-activate-header"
+                size="sm"
+                variant="outline"
+                onClick={() => toggleCustomerStatusMutation.mutate("ACTIVE")}
+                disabled={toggleCustomerStatusMutation.isPending}
+                className="gap-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 cursor-pointer"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>فعال‌سازی مشتری</span>
+              </Button>
+            )}
             <Button
               size="sm"
               variant="secondary"
@@ -418,13 +570,22 @@ function AdminCustomerProfileDetailPage() {
               className="gap-1.5"
             >
               <Send className="h-3.5 w-3.5" />
-              ارسال پیام / اعلان
+              ارسال پیام
             </Button>
           </div>
         </div>
 
-        {/* Customer Top Header Profile Card */}
-        <Card className="rounded-2xl border bg-card shadow-xs overflow-hidden">
+        {/* Main Content Area (Covered in Blur when Inactive) */}
+        <div className="relative">
+          <div
+            className={`flex flex-col gap-6 transition-all duration-300 ${
+              activeCustomer.status === "INACTIVE"
+                ? "filter blur-[3px] opacity-40 select-none pointer-events-none"
+                : ""
+            }`}
+          >
+            {/* Customer Top Header Profile Card */}
+            <Card className="rounded-2xl border bg-card shadow-xs overflow-hidden">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               {/* Avatar & Main Info */}
@@ -445,7 +606,7 @@ function AdminCustomerProfileDetailPage() {
                       }`}
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" />
-                      {activeCustomer.status === "ACTIVE" ? "حساب فعال" : "غیرفعال / معلق"}
+                      <span>{activeCustomer.status === "ACTIVE" ? "حساب فعال" : "غیرفعال / معلق"}</span>
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-1">
@@ -480,7 +641,7 @@ function AdminCustomerProfileDetailPage() {
                 <div className="text-left mt-2">
                   <span className="text-[11px] text-muted-foreground">تاریخ عضویت:</span>
                   <p className="text-xs text-foreground">
-                    {new Date(activeCustomer.createdAt).toLocaleDateString("fa-IR")}
+                    {formatJalaliDate(activeCustomer.createdAt)}
                   </p>
                 </div>
               </div>
@@ -723,7 +884,7 @@ function AdminCustomerProfileDetailPage() {
                 <div className="flex items-center justify-between py-2 border-b">
                   <span className="text-muted-foreground">عضویت از:</span>
                   <span className="text-foreground font-mono">
-                    {new Date(activeCustomer.createdAt).toLocaleDateString("fa-IR")}
+                    {formatJalaliDate(activeCustomer.createdAt)}
                   </span>
                 </div>
 
@@ -773,67 +934,117 @@ function AdminCustomerProfileDetailPage() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 gap-4">
-                {servicesList.map((svc: any) => (
-                  <Card key={svc.id} className="rounded-xl border bg-card shadow-xs overflow-hidden">
-                    <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b bg-muted/20">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
-                          <Server className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                svc.status === "ACTIVE"
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                              }`}
-                            >
-                              {svc.status === "ACTIVE" ? "فعال" : "معلق"}
+                {servicesList.map((svc: any) => {
+                  const catBadge = getServiceCategoryBadge(svc.serviceType?.slug);
+                  const CatIcon = catBadge.icon;
+                  const isPackage = svc.serviceType?.slug === "package" || svc.quantity;
+
+                  return (
+                    <Card key={svc.id} className="rounded-xl border bg-card shadow-xs overflow-hidden">
+                      <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b bg-muted/20">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                            <CatIcon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${catBadge.className}`}
+                              >
+                                <CatIcon className="h-3 w-3" />
+                                {catBadge.label}
+                              </span>
+                              {isPackage && svc.quantity && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-mono">
+                                  <Package className="h-3 w-3" />
+                                  {svc.quantity} عدد در بسته
+                                </span>
+                              )}
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                  svc.status === "ACTIVE"
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                }`}
+                              >
+                                {svc.status === "ACTIVE" ? "فعال" : "معلق"}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground font-mono mt-0.5 block">
+                              شناسه: {svc.id} • سرور: {svc.server?.name || "زیرساخت ابری جیکات"}
                             </span>
                           </div>
-                          <span className="text-[11px] text-muted-foreground font-mono mt-0.5 block">
-                            شناسه: {svc.id} • سرور: {svc.server?.name || "زیرساخت ابری گکوت"} ({svc.server?.ipAddress || "159.69.120.45"})
-                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-4">
+                          <div className="text-left">
+                            <span className="text-[11px] text-muted-foreground block">هزینه دوره:</span>
+                            <span className="font-bold text-sm text-foreground font-mono">
+                              {(svc.priceToman || 0).toLocaleString("fa-IR")} تومان
+                            </span>
+                          </div>
+                          <div className="text-left">
+                            <span className="text-[11px] text-muted-foreground block">دوره پرداخت:</span>
+                            <span className="font-semibold text-xs text-foreground">
+                              {getBillingCycleLabel(svc.billingCycle)}
+                            </span>
+                          </div>
+                          <div className="text-left">
+                            <span className="text-[11px] text-muted-foreground block">تمدید خودکار:</span>
+                            {svc.autoRenew !== false ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                                <Repeat className="h-3 w-3" />
+                                فعال
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground font-medium">
+                                غیرفعال
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-left">
+                            <span className="text-[11px] text-muted-foreground block">تاریخ سررسید:</span>
+                            <span className="font-mono text-xs text-foreground">
+                              {formatJalaliDate(svc.renewalDate)}
+                            </span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedService(svc);
+                              setEditServiceName(svc.name);
+                              setEditServicePrice(String(svc.priceToman || "0"));
+                              setEditServiceQuantity(svc.quantity || 1);
+                              setEditServiceAutoRenew(svc.autoRenew !== false);
+                              const rawCycle = Number(svc.billingCycle);
+                              const initialDays =
+                                !isNaN(rawCycle) && rawCycle > 0
+                                  ? rawCycle
+                                  : svc.billingCycle === "ANNUAL"
+                                  ? 365
+                                  : svc.billingCycle === "SEMI_ANNUAL"
+                                  ? 180
+                                  : svc.billingCycle === "QUARTERLY"
+                                  ? 90
+                                  : 30;
+                              setEditServiceDurationDays(initialDays);
+                              setEditServiceStatus(svc.status || "ACTIVE");
+                              setEditServiceRenewalDate(
+                                svc.renewalDate ? new Date(svc.renewalDate).toISOString().split("T")[0] : "",
+                              );
+                              setIsEditServiceOpen(true);
+                            }}
+                            className="gap-1.5"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                            ویرایش سرویس
+                          </Button>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
-                        <div className="text-left">
-                          <span className="text-[11px] text-muted-foreground block">هزینه دوره:</span>
-                          <span className="font-bold text-sm text-foreground">
-                            {(svc.priceToman || 0).toLocaleString("fa-IR")} تومان
-                          </span>
-                        </div>
-                        <div className="text-left">
-                          <span className="text-[11px] text-muted-foreground block">تاریخ تمدید:</span>
-                          <span className="font-mono text-xs text-foreground">
-                            {new Date(svc.renewalDate).toLocaleDateString("fa-IR")}
-                          </span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedService(svc);
-                            setEditServiceName(svc.name);
-                            setEditServicePrice(String(svc.priceToman || ""));
-                            setEditServiceStatus(svc.status || "ACTIVE");
-                            setEditServiceRenewalDate(
-                              svc.renewalDate ? new Date(svc.renewalDate).toISOString().split("T")[0] : "",
-                            );
-                            setIsEditServiceOpen(true);
-                          }}
-                          className="gap-1.5"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                          ویرایش سرویس
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Endpoints Sub-Section */}
+                      {/* Endpoints Sub-Section */}
                     <div className="p-4 bg-card">
                       <h5 className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
                         <Activity className="h-3.5 w-3.5 text-primary" />
@@ -878,7 +1089,8 @@ function AdminCustomerProfileDetailPage() {
                       )}
                     </div>
                   </Card>
-                ))}
+                );
+              })}
               </div>
             )}
           </div>
@@ -927,7 +1139,17 @@ function AdminCustomerProfileDetailPage() {
                       {invoicesList.map((inv: any) => (
                         <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
                           <td className="py-3.5 px-4 font-mono font-bold text-primary">
-                            {inv.invoiceNumber || inv.id}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewingInvoice(inv);
+                                setIsViewInvoiceOpen(true);
+                              }}
+                              className="font-bold text-primary hover:underline flex items-center gap-1"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              {inv.invoiceNumber || inv.id}
+                            </button>
                           </td>
                           <td className="py-3.5 px-4 font-semibold">
                             {(inv.totalToman || 0).toLocaleString("fa-IR")} تومان
@@ -950,10 +1172,10 @@ function AdminCustomerProfileDetailPage() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 font-mono text-[11px] text-muted-foreground">
-                            {new Date(inv.issuedAt || inv.createdAt).toLocaleDateString("fa-IR")}
+                            {formatJalaliDate(inv.issuedAt || inv.createdAt)}
                           </td>
                           <td className="py-3.5 px-4 font-mono text-[11px] text-muted-foreground">
-                            {new Date(inv.dueDate).toLocaleDateString("fa-IR")}
+                            {formatJalaliDate(inv.dueDate)}
                           </td>
                           <td className="py-3.5 px-4">
                             {inv.payment ? (
@@ -968,17 +1190,31 @@ function AdminCustomerProfileDetailPage() {
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            {inv.status === "UNPAID" && (
+                            <div className="flex items-center justify-center gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => cancelInvoiceMutation.mutate(inv.id)}
-                                disabled={cancelInvoiceMutation.isPending}
-                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-[11px] h-7 px-2"
+                                onClick={() => {
+                                  setViewingInvoice(inv);
+                                  setIsViewInvoiceOpen(true);
+                                }}
+                                className="text-primary hover:bg-primary/10 text-[11px] h-7 px-2 gap-1 font-medium"
                               >
-                                لغو فاکتور
+                                <Eye className="h-3.5 w-3.5" />
+                                مشاهده
                               </Button>
-                            )}
+                              {inv.status === "UNPAID" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => cancelInvoiceMutation.mutate(inv.id)}
+                                  disabled={cancelInvoiceMutation.isPending}
+                                  className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-[11px] h-7 px-2"
+                                >
+                                  لغو فاکتور
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1024,7 +1260,7 @@ function AdminCustomerProfileDetailPage() {
                             </div>
                           </div>
                           <span className="text-[10px] font-mono text-muted-foreground">
-                            {new Date(inv.payment.paidAt).toLocaleDateString("fa-IR")}
+                            {formatJalaliDate(inv.payment.paidAt)}
                           </span>
                         </div>
                       ))}
@@ -1062,7 +1298,7 @@ function AdminCustomerProfileDetailPage() {
                           </div>
                         </div>
                         <span className="font-mono text-[10px] text-muted-foreground shrink-0">
-                          {new Date(log.createdAt).toLocaleDateString("fa-IR")}
+                          {formatJalaliDateTime(log.createdAt)}
                         </span>
                       </div>
                     ))}
@@ -1075,7 +1311,7 @@ function AdminCustomerProfileDetailPage() {
                         <span>ارسال پیامک خوش‌آمدگویی و فعال‌سازی حساب کاربری</span>
                       </div>
                       <span className="text-[10px] text-muted-foreground font-mono">
-                        {new Date(activeCustomer.createdAt).toLocaleDateString("fa-IR")}
+                        {formatJalaliDate(activeCustomer.createdAt)}
                       </span>
                     </div>
 
@@ -1085,7 +1321,7 @@ function AdminCustomerProfileDetailPage() {
                         <span>ارسال اطلاعیه صدور صورت‌حساب دوره‌ای</span>
                       </div>
                       <span className="text-[10px] text-muted-foreground font-mono">
-                        {new Date().toLocaleDateString("fa-IR")}
+                        {formatJalaliDate(new Date())}
                       </span>
                     </div>
                   </div>
@@ -1168,8 +1404,40 @@ function AdminCustomerProfileDetailPage() {
             </Card>
           </div>
         )}
+          </div>
 
-        {/* MODAL 1: CREATE SERVICE FOR CUSTOMER */}
+          {/* Blur Deactivated Overlay */}
+          {activeCustomer.status === "INACTIVE" && (
+            <div key="customer-inactive-overlay" className="absolute inset-0 z-30 flex flex-col items-center justify-start pt-16 sm:pt-24 bg-background/25 backdrop-blur-xs rounded-3xl p-4 sm:p-6 pointer-events-auto">
+              <div className="sticky top-28 max-w-md w-full bg-card/95 border-2 border-rose-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-md text-center flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-200">
+                <div className="h-16 w-16 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-500/20 shadow-inner">
+                  <Ban className="h-8 w-8 stroke-[2.2]" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-foreground">
+                    حساب کاربری این مشتری غیرفعال است
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    تمامی خدمات، دسترسی‌ها و فرآیندهای مالی این مشتری در وضعیت تعلیق قرار گرفته‌اند و اطلاعات برای امنیت در حالت محو (Blur) نمایش داده می‌شوند.
+                  </p>
+                </div>
+                <Button
+                  key="btn-reactivate-overlay"
+                  onClick={() => toggleCustomerStatusMutation.mutate("ACTIVE")}
+                  disabled={toggleCustomerStatusMutation.isPending}
+                  className="w-full gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-md py-2.5 cursor-pointer transition-all"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>
+                    {toggleCustomerStatusMutation.isPending ? "در حال فعال‌سازی..." : "فعال‌سازی مجدد حساب مشتری"}
+                  </span>
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* MODAL 1: ASSIGN CREATED SERVICE TO CUSTOMER */}
         {isCreateServiceOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
             <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
@@ -1178,7 +1446,12 @@ function AdminCustomerProfileDetailPage() {
                   <div className="p-2 rounded-lg bg-primary/10 text-primary">
                     <Server className="h-5 w-5" />
                   </div>
-                  <h3 className="font-bold text-base">تعریف سرویس جدید برای {activeCustomer.name}</h3>
+                  <div>
+                    <h3 className="font-bold text-base">تخصیص سرویس به {activeCustomer.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      انتخاب از میان سرویس‌های تعریف‌شده در کاتالوگ
+                    </p>
+                  </div>
                 </div>
                 <Button
                   variant="ghost"
@@ -1189,80 +1462,202 @@ function AdminCustomerProfileDetailPage() {
                 </Button>
               </div>
 
-              <form onSubmit={handleCreateServiceSubmit} className="flex flex-col gap-4 mt-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">عنوان سرویس *</Label>
-                  <Input
-                    value={newServiceName}
-                    onChange={(e) => setNewServiceName(e.target.value)}
-                    placeholder="مثال: هاست لینوکس پرسرعت یا سرور اختصاصی"
-                    required
-                  />
+              {catalogServices.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center p-8 gap-3 my-2">
+                  <div className="p-3 rounded-full bg-muted text-muted-foreground">
+                    <Server className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold">هنوز هیچ سرویسی در سامانه تعریف نشده است</h4>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                      برای تخصیص سرویس به این مشتری، ابتدا باید از بخش سرویس‌ها یک سرویس تعریف نمایید.
+                    </p>
+                  </div>
+                  <Link to="/services">
+                    <Button size="sm" className="mt-2 gap-1.5">
+                      <Plus className="h-4 w-4" />
+                      تعریف سرویس جدید در سامانه
+                    </Button>
+                  </Link>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              ) : (
+                <form onSubmit={handleCreateServiceSubmit} className="flex flex-col gap-4 mt-4">
+                  {/* Service Selector */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">نوع سرویس</Label>
+                    <Label className="text-xs font-semibold">انتخاب سرویس تعریف‌شده *</Label>
                     <select
-                      value={newServiceType}
-                      onChange={(e) => setNewServiceType(e.target.value)}
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      value={activeSelectedService?.id || ""}
+                      onChange={(e) => setSelectedCatalogServiceId(e.target.value)}
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium"
+                      required
                     >
-                      <option value="web-hosting">هاست اشتراکی و ابری (Web Hosting)</option>
-                      <option value="vps">سرور مجازی (VPS)</option>
-                      <option value="dedicated">سرور اختصاصی (Dedicated Server)</option>
-                      <option value="cdn">شبکه توزیع محتوا (CDN)</option>
+                      {catalogServices.map((svc: any) => {
+                        const badge = getServiceCategoryBadge(svc.categorySlug);
+                        return (
+                          <option key={svc.id} value={svc.id}>
+                            {svc.name} ({badge.label})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
+                  {/* Name field for this customer */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">هزینه دوره (تومان) *</Label>
+                    <Label className="text-xs font-semibold">نام / عنوان سرویس برای این مشتری *</Label>
                     <Input
-                      type="number"
-                      value={newServicePrice}
-                      onChange={(e) => setNewServicePrice(e.target.value)}
-                      placeholder="2500000"
+                      value={serviceCustomName}
+                      onChange={(e) => setServiceCustomName(e.target.value)}
+                      placeholder={activeSelectedService?.name || "مثال: هاست وب‌سایت اصلی شرکت"}
                       required
                     />
+                    <p className="text-[11px] text-muted-foreground">
+                      نامی که برای این مشترک نمایش داده می‌شود. می‌توانید عنوان دلخواه بنویسید یا همان نام کاتالوگ را حفظ کنید.
+                    </p>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">تاریخ شروع</Label>
-                    <Input
-                      type="date"
-                      value={newServiceStartDate}
-                      onChange={(e) => setNewServiceStartDate(e.target.value)}
+                  {/* Selected Service Information Card */}
+                  {activeSelectedService && (
+                    <div className="p-3 rounded-xl border bg-muted/20 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between font-semibold">
+                        <span className="text-foreground">{activeSelectedService.name}</span>
+                        {(() => {
+                          const badge = getServiceCategoryBadge(activeSelectedService.categorySlug);
+                          const BadgeIcon = badge.icon;
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.className}`}>
+                              <BadgeIcon className="h-3 w-3" />
+                              {badge.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      {activeSelectedService.description && (
+                        <p className="text-muted-foreground text-[11px]">
+                          {activeSelectedService.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Conditional Fields based on Category */}
+                  {activeSelectedService?.categorySlug === "package" ? (
+                    <div className="space-y-3 p-3.5 rounded-xl border bg-amber-500/5 border-amber-500/20">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">تعداد (عدد در بسته) *</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={serviceQuantity}
+                            onChange={(e) => setServiceQuantity(Math.max(1, Number(e.target.value)))}
+                            placeholder="مثال: 5000"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">هزینه دوره (تومان) *</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={servicePrice}
+                            onChange={(e) => setServicePrice(e.target.value)}
+                            placeholder="2500000"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                        * برای دسته‌بندی بسته‌ها، تعداد و قیمت به صورت مستقل و آزادانه برای این مشتری تعیین می‌شوند.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">هزینه دوره (تومان) *</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={servicePrice}
+                        onChange={(e) => setServicePrice(e.target.value)}
+                        placeholder="مثال: 2500000"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  {/* Service Duration (Days) and Renewal Date */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">دوره سرویس (تعداد روز) *</Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={serviceDurationDays}
+                          onChange={(e) => {
+                            const days = Math.max(1, Number(e.target.value) || 1);
+                            setServiceDurationDays(days);
+                            const targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+                            setNewServiceRenewalDate(targetDate.toISOString().split("T")[0]);
+                          }}
+                          placeholder="مثال: 30"
+                          className="pl-12 font-mono"
+                          required
+                        />
+                        <span className="absolute left-3 top-2.5 text-xs text-muted-foreground pointer-events-none">
+                          روز
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">تاریخ سررسید تمدید</Label>
+                      <Input
+                        type="date"
+                        value={newServiceRenewalDate}
+                        onChange={(e) => setNewServiceRenewalDate(e.target.value)}
+                      />
+                      {newServiceRenewalDate && (
+                        <p className="text-[11px] text-primary font-medium">
+                          معادل شمسی: {formatJalaliDateWords(newServiceRenewalDate)} ({formatJalaliDate(newServiceRenewalDate)})
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Auto-renew checkbox */}
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={serviceAutoRenew}
+                      onChange={(e) => setServiceAutoRenew(e.target.checked)}
+                      className="rounded h-4 w-4 text-primary focus:ring-primary"
                     />
-                  </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-foreground">تمدید خودکار سرویس</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        در تاریخ سررسید، صورت‌حساب تمدید به صورت اتوماتیک صادر شود
+                      </span>
+                    </div>
+                  </label>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">تاریخ سررسید تمدید</Label>
-                    <Input
-                      type="date"
-                      value={newServiceRenewalDate}
-                      onChange={(e) => setNewServiceRenewalDate(e.target.value)}
-                    />
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCreateServiceOpen(false)}
+                    >
+                      انصراف
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createServiceMutation.isPending}
+                    >
+                      {createServiceMutation.isPending ? "در حال تخصیص..." : "تخصیص سرویس به مشتری"}
+                    </Button>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsCreateServiceOpen(false)}
-                  >
-                    انصراف
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createServiceMutation.isPending}
-                  >
-                    {createServiceMutation.isPending ? "در حال ایجاد..." : "ثبت سرویس"}
-                  </Button>
-                </div>
-              </form>
+                </form>
+              )}
             </div>
           </div>
         )}
@@ -1276,7 +1671,10 @@ function AdminCustomerProfileDetailPage() {
                   <div className="p-2 rounded-lg bg-primary/10 text-primary">
                     <Edit className="h-5 w-5" />
                   </div>
-                  <h3 className="font-bold text-base">ویرایش سرویس {selectedService.name}</h3>
+                  <div>
+                    <h3 className="font-bold text-base">ویرایش سرویس {selectedService.name}</h3>
+                    <p className="text-xs text-muted-foreground">تغییر هزینه دوره، تمدید خودکار و تنظیمات</p>
+                  </div>
                 </div>
                 <Button
                   variant="ghost"
@@ -1307,6 +1705,74 @@ function AdminCustomerProfileDetailPage() {
                     />
                   </div>
 
+                  {selectedService.serviceType?.slug === "package" || selectedService.quantity ? (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">تعداد در بسته</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={editServiceQuantity}
+                        onChange={(e) => setEditServiceQuantity(Math.max(1, Number(e.target.value)))}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">وضعیت سرویس</Label>
+                      <select
+                        value={editServiceStatus}
+                        onChange={(e) => setEditServiceStatus(e.target.value)}
+                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        <option value="ACTIVE">فعال (ACTIVE)</option>
+                        <option value="SUSPENDED">معلق (SUSPENDED)</option>
+                        <option value="INACTIVE">غیرفعال (INACTIVE)</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">دوره سرویس (تعداد روز) *</Label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={editServiceDurationDays}
+                        onChange={(e) => {
+                          const days = Math.max(1, Number(e.target.value) || 1);
+                          setEditServiceDurationDays(days);
+                          const base = selectedService?.startDate ? new Date(selectedService.startDate) : new Date();
+                          const targetDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+                          setEditServiceRenewalDate(targetDate.toISOString().split("T")[0]);
+                        }}
+                        placeholder="مثال: 30"
+                        className="pl-12 font-mono h-9 text-xs"
+                        required
+                      />
+                      <span className="absolute left-3 top-2 text-xs text-muted-foreground pointer-events-none">
+                        روز
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">تاریخ سررسید تمدید</Label>
+                    <Input
+                      type="date"
+                      value={editServiceRenewalDate}
+                      onChange={(e) => setEditServiceRenewalDate(e.target.value)}
+                      className="h-9 text-xs"
+                    />
+                    {editServiceRenewalDate && (
+                      <p className="text-[11px] text-primary font-medium">
+                        معادل شمسی: {formatJalaliDateWords(editServiceRenewalDate)} ({formatJalaliDate(editServiceRenewalDate)})
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {(selectedService.serviceType?.slug === "package" || selectedService.quantity) && (
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">وضعیت سرویس</Label>
                     <select
@@ -1319,16 +1785,17 @@ function AdminCustomerProfileDetailPage() {
                       <option value="INACTIVE">غیرفعال (INACTIVE)</option>
                     </select>
                   </div>
-                </div>
+                )}
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">تاریخ سررسید تمدید</Label>
-                  <Input
-                    type="date"
-                    value={editServiceRenewalDate}
-                    onChange={(e) => setEditServiceRenewalDate(e.target.value)}
+                <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editServiceAutoRenew}
+                    onChange={(e) => setEditServiceAutoRenew(e.target.checked)}
+                    className="rounded h-4 w-4 text-primary"
                   />
-                </div>
+                  <span className="text-xs font-semibold">تمدید خودکار سرویس فعال باشد</span>
+                </label>
 
                 <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
                   <Button
@@ -1349,6 +1816,7 @@ function AdminCustomerProfileDetailPage() {
             </div>
           </div>
         )}
+
 
         {/* MODAL 3: CREATE INVOICE */}
         {isCreateInvoiceOpen && (
@@ -1422,6 +1890,17 @@ function AdminCustomerProfileDetailPage() {
             </div>
           </div>
         )}
+
+        {/* MODAL 4: INVOICE DETAILS MODAL */}
+        <InvoiceDetailModal
+          invoice={viewingInvoice}
+          isOpen={isViewInvoiceOpen}
+          onClose={() => {
+            setIsViewInvoiceOpen(false);
+            setViewingInvoice(null);
+          }}
+          onCancel={(invId) => cancelInvoiceMutation.mutate(invId)}
+        />
       </div>
     </AppShell>
   );

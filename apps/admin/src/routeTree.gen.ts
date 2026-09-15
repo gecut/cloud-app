@@ -12,15 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServicesIndexRouteImport } from './routes/services/index'
-import { Route as ServiceGroupsIndexRouteImport } from './routes/service-groups/index'
 import { Route as ServersIndexRouteImport } from './routes/servers/index'
 import { Route as PaymentsIndexRouteImport } from './routes/payments/index'
 import { Route as InvoicesIndexRouteImport } from './routes/invoices/index'
 import { Route as EndpointsIndexRouteImport } from './routes/endpoints/index'
 import { Route as CustomersIndexRouteImport } from './routes/customers/index'
 import { Route as AuditLogsIndexRouteImport } from './routes/audit-logs/index'
+import { Route as AccountingIndexRouteImport } from './routes/accounting/index'
 import { Route as ServicesIdRouteImport } from './routes/services/$id'
-import { Route as ServiceGroupsIdRouteImport } from './routes/service-groups/$id'
 import { Route as ServersIdRouteImport } from './routes/servers/$id'
 import { Route as PaymentsIdRouteImport } from './routes/payments/$id'
 import { Route as InvoicesIdRouteImport } from './routes/invoices/$id'
@@ -41,11 +40,6 @@ const IndexRoute = IndexRouteImport.update({
 const ServicesIndexRoute = ServicesIndexRouteImport.update({
   id: '/services/',
   path: '/services/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ServiceGroupsIndexRoute = ServiceGroupsIndexRouteImport.update({
-  id: '/service-groups/',
-  path: '/service-groups/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ServersIndexRoute = ServersIndexRouteImport.update({
@@ -78,14 +72,14 @@ const AuditLogsIndexRoute = AuditLogsIndexRouteImport.update({
   path: '/audit-logs/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountingIndexRoute = AccountingIndexRouteImport.update({
+  id: '/accounting/',
+  path: '/accounting/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesIdRoute = ServicesIdRouteImport.update({
   id: '/services/$id',
   path: '/services/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ServiceGroupsIdRoute = ServiceGroupsIdRouteImport.update({
-  id: '/service-groups/$id',
-  path: '/service-groups/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ServersIdRoute = ServersIdRouteImport.update({
@@ -128,15 +122,14 @@ export interface FileRoutesByFullPath {
   '/invoices/$id': typeof InvoicesIdRoute
   '/payments/$id': typeof PaymentsIdRoute
   '/servers/$id': typeof ServersIdRoute
-  '/service-groups/$id': typeof ServiceGroupsIdRoute
   '/services/$id': typeof ServicesIdRoute
+  '/accounting/': typeof AccountingIndexRoute
   '/audit-logs/': typeof AuditLogsIndexRoute
   '/customers/': typeof CustomersIndexRoute
   '/endpoints/': typeof EndpointsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/payments/': typeof PaymentsIndexRoute
   '/servers/': typeof ServersIndexRoute
-  '/service-groups/': typeof ServiceGroupsIndexRoute
   '/services/': typeof ServicesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -148,15 +141,14 @@ export interface FileRoutesByTo {
   '/invoices/$id': typeof InvoicesIdRoute
   '/payments/$id': typeof PaymentsIdRoute
   '/servers/$id': typeof ServersIdRoute
-  '/service-groups/$id': typeof ServiceGroupsIdRoute
   '/services/$id': typeof ServicesIdRoute
+  '/accounting': typeof AccountingIndexRoute
   '/audit-logs': typeof AuditLogsIndexRoute
   '/customers': typeof CustomersIndexRoute
   '/endpoints': typeof EndpointsIndexRoute
   '/invoices': typeof InvoicesIndexRoute
   '/payments': typeof PaymentsIndexRoute
   '/servers': typeof ServersIndexRoute
-  '/service-groups': typeof ServiceGroupsIndexRoute
   '/services': typeof ServicesIndexRoute
 }
 export interface FileRoutesById {
@@ -169,15 +161,14 @@ export interface FileRoutesById {
   '/invoices/$id': typeof InvoicesIdRoute
   '/payments/$id': typeof PaymentsIdRoute
   '/servers/$id': typeof ServersIdRoute
-  '/service-groups/$id': typeof ServiceGroupsIdRoute
   '/services/$id': typeof ServicesIdRoute
+  '/accounting/': typeof AccountingIndexRoute
   '/audit-logs/': typeof AuditLogsIndexRoute
   '/customers/': typeof CustomersIndexRoute
   '/endpoints/': typeof EndpointsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/payments/': typeof PaymentsIndexRoute
   '/servers/': typeof ServersIndexRoute
-  '/service-groups/': typeof ServiceGroupsIndexRoute
   '/services/': typeof ServicesIndexRoute
 }
 export interface FileRouteTypes {
@@ -191,15 +182,14 @@ export interface FileRouteTypes {
     | '/invoices/$id'
     | '/payments/$id'
     | '/servers/$id'
-    | '/service-groups/$id'
     | '/services/$id'
+    | '/accounting/'
     | '/audit-logs/'
     | '/customers/'
     | '/endpoints/'
     | '/invoices/'
     | '/payments/'
     | '/servers/'
-    | '/service-groups/'
     | '/services/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -211,15 +201,14 @@ export interface FileRouteTypes {
     | '/invoices/$id'
     | '/payments/$id'
     | '/servers/$id'
-    | '/service-groups/$id'
     | '/services/$id'
+    | '/accounting'
     | '/audit-logs'
     | '/customers'
     | '/endpoints'
     | '/invoices'
     | '/payments'
     | '/servers'
-    | '/service-groups'
     | '/services'
   id:
     | '__root__'
@@ -231,15 +220,14 @@ export interface FileRouteTypes {
     | '/invoices/$id'
     | '/payments/$id'
     | '/servers/$id'
-    | '/service-groups/$id'
     | '/services/$id'
+    | '/accounting/'
     | '/audit-logs/'
     | '/customers/'
     | '/endpoints/'
     | '/invoices/'
     | '/payments/'
     | '/servers/'
-    | '/service-groups/'
     | '/services/'
   fileRoutesById: FileRoutesById
 }
@@ -252,15 +240,14 @@ export interface RootRouteChildren {
   InvoicesIdRoute: typeof InvoicesIdRoute
   PaymentsIdRoute: typeof PaymentsIdRoute
   ServersIdRoute: typeof ServersIdRoute
-  ServiceGroupsIdRoute: typeof ServiceGroupsIdRoute
   ServicesIdRoute: typeof ServicesIdRoute
+  AccountingIndexRoute: typeof AccountingIndexRoute
   AuditLogsIndexRoute: typeof AuditLogsIndexRoute
   CustomersIndexRoute: typeof CustomersIndexRoute
   EndpointsIndexRoute: typeof EndpointsIndexRoute
   InvoicesIndexRoute: typeof InvoicesIndexRoute
   PaymentsIndexRoute: typeof PaymentsIndexRoute
   ServersIndexRoute: typeof ServersIndexRoute
-  ServiceGroupsIndexRoute: typeof ServiceGroupsIndexRoute
   ServicesIndexRoute: typeof ServicesIndexRoute
 }
 
@@ -285,13 +272,6 @@ declare module '@tanstack/react-router' {
       path: '/services'
       fullPath: '/services/'
       preLoaderRoute: typeof ServicesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/service-groups/': {
-      id: '/service-groups/'
-      path: '/service-groups'
-      fullPath: '/service-groups/'
-      preLoaderRoute: typeof ServiceGroupsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/servers/': {
@@ -336,18 +316,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuditLogsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/accounting/': {
+      id: '/accounting/'
+      path: '/accounting'
+      fullPath: '/accounting/'
+      preLoaderRoute: typeof AccountingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services/$id': {
       id: '/services/$id'
       path: '/services/$id'
       fullPath: '/services/$id'
       preLoaderRoute: typeof ServicesIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/service-groups/$id': {
-      id: '/service-groups/$id'
-      path: '/service-groups/$id'
-      fullPath: '/service-groups/$id'
-      preLoaderRoute: typeof ServiceGroupsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/servers/$id': {
@@ -404,15 +384,14 @@ const rootRouteChildren: RootRouteChildren = {
   InvoicesIdRoute: InvoicesIdRoute,
   PaymentsIdRoute: PaymentsIdRoute,
   ServersIdRoute: ServersIdRoute,
-  ServiceGroupsIdRoute: ServiceGroupsIdRoute,
   ServicesIdRoute: ServicesIdRoute,
+  AccountingIndexRoute: AccountingIndexRoute,
   AuditLogsIndexRoute: AuditLogsIndexRoute,
   CustomersIndexRoute: CustomersIndexRoute,
   EndpointsIndexRoute: EndpointsIndexRoute,
   InvoicesIndexRoute: InvoicesIndexRoute,
   PaymentsIndexRoute: PaymentsIndexRoute,
   ServersIndexRoute: ServersIndexRoute,
-  ServiceGroupsIndexRoute: ServiceGroupsIndexRoute,
   ServicesIndexRoute: ServicesIndexRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import "dotenv/config";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import {
@@ -10,6 +11,7 @@ import { AppModule } from "./app.module";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 import { ObservabilityService } from "./infrastructure/observability/observability.service";
+import { ObserveInstrument } from "./infrastructure/observability/observe.config";
 
 async function bootstrap() {
   const adapter = new FastifyAdapter();
@@ -18,6 +20,7 @@ async function bootstrap() {
     adapter,
     {
       bufferLogs: true,
+      instrument: ObserveInstrument,
     },
   );
 
@@ -34,6 +37,7 @@ async function bootstrap() {
       "Authorization",
       "x-user-role",
       "x-user-id",
+      "x-request-id",
       "Origin",
       "X-Requested-With",
     ],
@@ -57,6 +61,7 @@ async function bootstrap() {
     .setDescription("G-Cloud Modular Monolith Backend API Documentation")
     .setVersion("1.0")
     .addTag("health")
+    .addTag("auth")
     .addTag("customers")
     .addTag("services")
     .addTag("invoices")

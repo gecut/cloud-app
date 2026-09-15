@@ -28,7 +28,22 @@ export class UpdateServiceHandler
     if (dto.startDate !== undefined) updateData.startDate = new Date(dto.startDate);
     if (dto.renewalDate !== undefined) updateData.renewalDate = new Date(dto.renewalDate);
     if (dto.serverId !== undefined) updateData.serverId = dto.serverId || null;
-    if (dto.serviceGroupId !== undefined) updateData.serviceGroupId = dto.serviceGroupId || null;
+    if (dto.customerId !== undefined) {
+      let finalCustomerId = dto.customerId;
+      const matchedCustomer = await this.prisma.customer.findFirst({
+        where: {
+          OR: [{ id: dto.customerId }, { userId: dto.customerId }],
+        },
+      });
+      if (matchedCustomer) {
+        finalCustomerId = matchedCustomer.id;
+      }
+      updateData.customerId = finalCustomerId;
+    }
+    if (dto.serviceTypeId !== undefined) updateData.serviceTypeId = dto.serviceTypeId;
+    if (dto.billingCycle !== undefined) updateData.billingCycle = dto.billingCycle;
+    if (dto.autoRenew !== undefined) updateData.autoRenew = dto.autoRenew;
+    if (dto.quantity !== undefined) updateData.quantity = dto.quantity;
     if (dto.serverVisibilityLevel !== undefined) updateData.serverVisibilityLevel = dto.serverVisibilityLevel;
 
     return this.prisma.service.update({

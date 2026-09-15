@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { apiClient } from "@/utils/api-client";
 import { Card, CardContent } from "@gecut-cloud/ui/components/card";
 import { Button } from "@gecut-cloud/ui/components/button";
+import { formatJalaliDateTime } from "@gecut-cloud/contracts";
 import {
   History,
   ShieldAlert,
@@ -19,56 +20,13 @@ export const Route = createFileRoute("/audit-logs/")({
   component: AdminAuditLogsListPage,
 });
 
-const DEFAULT_AUDIT_LOGS = [
-  {
-    id: "log_1",
-    actor: "admin_1",
-    role: "ADMIN",
-    action: "CREATE_INVOICE",
-    entityType: "Invoice",
-    entityId: "inv_102",
-    details: '{"totalToman":4800000,"customerId":"cust_1"}',
-    createdAt: "2026-05-12T14:22:00.000Z",
-  },
-  {
-    id: "log_2",
-    actor: "cust_1",
-    role: "CUSTOMER",
-    action: "PAYMENT_SUCCESS",
-    entityType: "Payment",
-    entityId: "pay_1",
-    details: '{"gatewayRef":"ZAR-98321044","amountToman":2500000}',
-    createdAt: "2026-05-02T11:20:00.000Z",
-  },
-  {
-    id: "log_3",
-    actor: "admin_1",
-    role: "ADMIN",
-    action: "CREATE_SERVICE",
-    entityType: "Service",
-    entityId: "svc_3",
-    details: '{"name":"اپلیکیشن فروشگاهی رایان","priceToman":3200000}',
-    createdAt: "2026-04-10T09:30:00.000Z",
-  },
-  {
-    id: "log_4",
-    actor: "admin_1",
-    role: "ADMIN",
-    action: "CANCEL_INVOICE",
-    entityType: "Invoice",
-    entityId: "inv_104",
-    details: '{"reason":"لغو توسط کاربر به دلیل تغییر پلن"}',
-    createdAt: "2026-03-01T10:15:00.000Z",
-  },
-];
-
 function AdminAuditLogsListPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin", "audit-logs"],
     queryFn: () => apiClient<{ items: any[]; total: number }>("/audit-logs?limit=50"),
   });
 
-  const logsList = data?.items?.length ? data.items : DEFAULT_AUDIT_LOGS;
+  const logsList = data?.items || [];
 
   return (
     <AppShell header={<AdminHeader />}>
@@ -101,42 +59,101 @@ function AdminAuditLogsListPage() {
                     <th className="py-3.5 px-4">کاربر / مجری</th>
                     <th className="py-3.5 px-4">نقش</th>
                     <th className="py-3.5 px-4">عملیات</th>
-                    <th className="py-3.5 px-4">موجودیت و شناسه</th>
-                    <th className="py-3.5 px-4">جزئیات تغییر</th>
+                    <th className="py-3.5 px-4">بخش سیستم</th>
+                    <th className="py-3.5 px-4">جزئیات و شرح عملیات</th>
                     <th className="py-3.5 px-4">زمان ثبت</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border font-mono text-[11px]">
-                  {logsList.map((log: any) => (
-                    <tr key={log.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="py-3.5 px-4 font-sans font-semibold text-foreground">
-                        {log.actor}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-sans font-medium ${
-                            log.role === "ADMIN"
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                          }`}
-                        >
-                          {log.role}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-foreground">
-                        {log.action}
-                      </td>
-                      <td className="py-3.5 px-4 text-muted-foreground">
-                        {log.entityType} ({log.entityId})
-                      </td>
-                      <td className="py-3.5 px-4 text-muted-foreground max-w-sm truncate">
-                        {typeof log.details === "object" ? JSON.stringify(log.details) : log.details}
-                      </td>
-                      <td className="py-3.5 px-4 text-muted-foreground font-sans">
-                        {new Date(log.createdAt).toLocaleString("fa-IR")}
+                <tbody className="divide-y divide-border text-[11px]">
+                  {logsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                        هنوز لاگی در سیستم ثبت نشده است
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    logsList.map((log: any) => {
+                      const actorName =
+                        log.actorDisplayNameSnapshot ||
+                        log.user?.name ||
+                        log.actor ||
+                        "مدیر سیستم";
+
+                      const roleLabel =
+                        log.actorRole === "ADMIN" || log.role === "ADMIN"
+                          ? "مدیر"
+                          : log.actorRole === "CUSTOMER" || log.role === "CUSTOMER"
+                          ? "مشتری"
+                          : "سیستم";
+
+                      const actionMap: Record<string, { label: string; color: string }> = {
+                        login: { label: "ورود به سامانه", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+                        "customer.create": { label: "تعریف مشتری", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+                        "customer.update": { label: "ویرایش مشتری", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+                        "invoice.create": { label: "صدور فاکتور", color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
+                        "invoice.update": { label: "ویرایش فاکتور", color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" },
+                        "invoice.cancel": { label: "لغو فاکتور", color: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
+                        "payment.record": { label: "پرداخت آنلاین", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+                        "service.create": { label: "تعریف/تخصیص سرویس", color: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+                        "service.assign": { label: "تخصیص بسته", color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400" },
+                      };
+
+                      const entityMap: Record<string, string> = {
+                        User: "حساب کاربری",
+                        Customer: "مشتری",
+                        Invoice: "فاکتور مالی",
+                        Payment: "تراکنش مالی",
+                        Service: "سرویس ابری",
+                        Server: "سرور زیرساخت",
+                      };
+
+                      const actionInfo = actionMap[log.action] || {
+                        label: log.action || "عملیات",
+                        color: "bg-muted text-muted-foreground",
+                      };
+
+                      const detailsText =
+                        log.reason ||
+                        (typeof log.after === "object"
+                          ? JSON.stringify(log.after)
+                          : typeof log.details === "object"
+                          ? JSON.stringify(log.details)
+                          : log.details || "—");
+
+                      return (
+                        <tr key={log.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="py-3.5 px-4 font-semibold text-foreground">
+                            {actorName}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                                roleLabel === "مدیر"
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                              }`}
+                            >
+                              {roleLabel}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${actionInfo.color}`}>
+                              {actionInfo.label}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-muted-foreground">
+                            {entityMap[log.entityType] || log.entityType || "—"}
+                          </td>
+                          <td className="py-3.5 px-4 text-foreground font-medium max-w-md truncate">
+                            {detailsText}
+                          </td>
+                          <td className="py-3.5 px-4 text-muted-foreground font-mono text-[10px]">
+                            {formatJalaliDateTime(log.createdAt)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>

@@ -27,6 +27,15 @@ export class ListCustomersHandler implements IQueryHandler<ListCustomersQuery> {
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
+          services: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              renewalDate: true,
+              priceToman: true,
+            },
+          },
           _count: {
             select: { services: true, invoices: true },
           },

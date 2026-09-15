@@ -32,10 +32,23 @@ export class CreateInvoiceItemDto {
   @Min(1)
   quantity: number;
 
-  @ApiProperty({ description: "Unit Price in Toman (integer)" })
+  @ApiPropertyOptional({ description: "Unit Price in Toman (integer)" })
   @IsInt()
   @Min(0)
-  unitPriceToman: number;
+  @IsOptional()
+  unitPriceToman?: number;
+
+  @ApiPropertyOptional({ description: "Amount in Toman (alias for unitPriceToman)" })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  amountToman?: number;
+
+  @ApiPropertyOptional({ description: "Total in Toman" })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  totalToman?: number;
 }
 
 export class CreateInvoiceDto {

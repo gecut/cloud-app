@@ -12,7 +12,6 @@ export class AuthService {
   async sendOtp(dto: SendOtpDto) {
     const { phone } = dto;
     
-    // Generate 4-digit OTP
     const code = "1234"; // Fixed demo code or random in production
     const expiresAt = Date.now() + 2 * 60 * 1000; // 2 minutes
 

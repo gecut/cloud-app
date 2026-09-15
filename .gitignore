@@ -53,4 +53,6 @@ temp
 # Local Reports & Overview Docs
 DEMO_INTEGRATION_REPORT.md
 BACKEND_SETUP_REPORT.md
+report-task.md
 *_REPORT.md
+apps/server/data/

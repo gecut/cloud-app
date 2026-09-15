@@ -1,1 +1,102 @@
 @import "@gecut-cloud/ui/globals.css";
+
+@font-face {
+  font-family: "peyda";
+  src: url("./fonts/PEYDA-MEDIUM.TTF") format("woff2-variations");
+  font-weight: 100 900;
+  font-stretch: 75% 125%;
+  font-display: swap;
+}
+
+*,
+body,
+button,
+input,
+select,
+textarea,
+span,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+table {
+  font-family: "peyda", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  letter-spacing: -0.015em;
+}
+
+.font-mono {
+  font-family: "peyda", sans-serif !important;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Smooth Entrance Animations */
+@keyframes fadeInSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeInStagger {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.04);
+  }
+}
+
+.animate-entrance {
+  animation: fadeInSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-stagger-1 {
+  animation: fadeInStagger 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+}
+
+.animate-stagger-2 {
+  animation: fadeInStagger 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.animate-stagger-3 {
+  animation: fadeInStagger 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+/* Minimalist Glassmorphism Utilities */
+.admin-glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.dark .admin-glass-card {
+  background: rgba(24, 24, 27, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}

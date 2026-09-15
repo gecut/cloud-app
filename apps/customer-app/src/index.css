@@ -6,6 +6,25 @@
   font-display: swap; /* Recommended for better performance */
 }
 
-body {
-  font-family: "peyda", sans-serif;
+*,
+body,
+button,
+input,
+select,
+textarea,
+span,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+table {
+  font-family: "peyda", sans-serif !important;
+}
+
+.font-mono {
+  font-family: "peyda", sans-serif !important;
+  font-feature-settings: "tnum" 1;
 }

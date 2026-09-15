@@ -1,37 +1,37 @@
 import { useState, useEffect } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
 import { toast } from "@heroui/react";
+import { normalizePhoneNumber, toEnglishDigits } from "@/lib/phone";
 import {
   apiClient,
-  DEMO_USERS,
-  setActiveCustomerUser,
-  type DemoUser,
+  setAuthSession,
+  validateSession,
 } from "@/lib/api-client";
 import { ModeToggle } from "@/app/components/mode-toggle";
+import { Brand3DBadge } from "@/app/components/common/brand-3d-badge";
 
 export const Route = createFileRoute("/login")({
-  component: CustomerAuthPage,
+  beforeLoad: async () => {
+    const isValid = await validateSession();
+    if (isValid) {
+      throw redirect({ to: "/" });
+    }
+  },
+  component: CustomerLoginPage,
 });
 
-type AuthTab = "otp" | "password" | "register";
+type LoginMethod = "password" | "otp";
 
-function CustomerAuthPage() {
+export function CustomerLoginPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<AuthTab>("otp");
 
-  // OTP State
+  // State
   const [phone, setPhone] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [countdown, setCountdown] = useState(120);
   const [loading, setLoading] = useState(false);
-
-  // Password State
-  const [password, setPassword] = useState("");
-
-  // Register State
-  const [fullName, setFullName] = useState("");
-  const [company, setCompany] = useState("");
+  const [demoCode, setDemoCode] = useState<string | null>(null);
 
   // Countdown timer for OTP
   useEffect(() => {
@@ -44,29 +44,27 @@ function CustomerAuthPage() {
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !phone.startsWith("09") || phone.length !== 11) {
-      toast.danger("شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود");
+    const cleanPhone = normalizePhoneNumber(phone);
+    if (!cleanPhone || !cleanPhone.startsWith("09") || cleanPhone.length !== 11) {
+      toast.danger("شماره موبایل باید ۱۱ رقمی و با 09 شروع شود");
       return;
     }
 
     setLoading(true);
     try {
       const res = await apiClient<{ success: boolean; message: string; demoCode?: string }>(
-        "/auth/send-otp",
+        "/auth/otp/request",
         {
           method: "POST",
-          body: JSON.stringify({ phone }),
+          body: JSON.stringify({ phone: cleanPhone }),
         },
-      ).catch(() => ({
-        success: true,
-        message: "کد تایید ارسال شد (حالت دمو: 1234)",
-        demoCode: "1234",
-      }));
+      );
 
       setOtpSent(true);
       setCountdown(120);
-      toast.success(res.message || "کد تایید پیامکی ارسال شد");
+      toast.success(res.message || "کد تایید ارسال شد");
       if (res.demoCode) {
+        setDemoCode(res.demoCode);
         setOtpCode(res.demoCode);
       }
     } catch (err: any) {
@@ -78,8 +76,10 @@ function CustomerAuthPage() {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!otpCode || otpCode.length < 4) {
-      toast.danger("لطفاً کد تایید ۴ رقمی را وارد کنید");
+    const cleanPhone = normalizePhoneNumber(phone);
+    const cleanCode = toEnglishDigits(otpCode).trim();
+    if (!cleanCode || cleanCode.length < 4) {
+      toast.danger("لطفاً کد تایید را به درستی وارد کنید");
       return;
     }
 
@@ -87,31 +87,27 @@ function CustomerAuthPage() {
     try {
       const res = await apiClient<{
         success: boolean;
-        token: string;
-        user: { id: string; name: string; phone: string; role: "ADMIN" | "CUSTOMER" };
-      }>("/auth/verify-otp", {
-        method: "POST",
-        body: JSON.stringify({ phone, code: otpCode, name: fullName || undefined }),
-      }).catch(() => ({
-        success: true,
-        token: "demo-token-cust",
+        tokens: { accessToken: string; refreshToken: string; expiresIn?: number };
         user: {
-          id: "cust_1",
-          name: fullName || "شرکت چوبینو",
-          phone,
-          role: "CUSTOMER" as const,
-        },
-      }));
+          id: string;
+          name: string;
+          phone: string;
+          role: "ADMIN" | "CUSTOMER";
+          email?: string | null;
+          customerId?: string | null;
+        };
+        message?: string;
+      }>("/auth/otp/verify", {
+        method: "POST",
+        body: JSON.stringify({ phone: cleanPhone, code: cleanCode }),
+      });
 
-      const activeUser: DemoUser = {
-        id: res.user.id,
-        name: res.user.name,
-        role: res.user.role,
-        email: `${phone}@customer.cloud`,
-      };
+      if (!res?.tokens?.accessToken || !res?.tokens?.refreshToken) {
+        throw new Error("پاسخ سرور فاقد توکن‌های احراز هویت معتبر است");
+      }
 
-      setActiveCustomerUser(activeUser);
-      toast.success("با موفقیت وارد حساب کاربری شدید");
+      setAuthSession(res.tokens, res.user);
+      toast.success(res.message || "با موفقیت وارد حساب کاربری شدید");
       navigate({ to: "/" });
     } catch (err: any) {
       toast.danger(err.message || "کد تایید نامعتبر است");
@@ -120,405 +116,143 @@ function CustomerAuthPage() {
     }
   };
 
-  const handlePasswordLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone || !password) {
-      toast.danger("شماره موبایل و رمز عبور الزامی است");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await apiClient<{
-        success: boolean;
-        token: string;
-        user: { id: string; name: string; phone: string; role: "ADMIN" | "CUSTOMER" };
-      }>("/auth/login-password", {
-        method: "POST",
-        body: JSON.stringify({ phone, password }),
-      }).catch(() => ({
-        success: true,
-        token: "demo-token-cust",
-        user: {
-          id: "cust_1",
-          name: "شرکت چوبینو",
-          phone,
-          role: "CUSTOMER" as const,
-        },
-      }));
-
-      const activeUser: DemoUser = {
-        id: res.user.id,
-        name: res.user.name,
-        role: res.user.role,
-        email: `${phone}@customer.cloud`,
-      };
-
-      setActiveCustomerUser(activeUser);
-      toast.success("خوش آمدید! ورود با موفقیت انجام شد");
-      navigate({ to: "/" });
-    } catch (err: any) {
-      toast.danger(err.message || "اطلاعات ورود نادرست است");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName || !phone) {
-      toast.danger("نام و شماره موبایل الزامی است");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await apiClient<{
-        success: boolean;
-        token: string;
-        user: { id: string; name: string; phone: string; role: "ADMIN" | "CUSTOMER" };
-      }>("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          name: fullName,
-          phone,
-          password: password || undefined,
-          company: company || undefined,
-        }),
-      }).catch(() => ({
-        success: true,
-        token: "demo-token-registered",
-        user: {
-          id: `cust_${Date.now().toString().slice(-4)}`,
-          name: fullName,
-          phone,
-          role: "CUSTOMER" as const,
-        },
-      }));
-
-      const activeUser: DemoUser = {
-        id: res.user.id,
-        name: res.user.name,
-        role: res.user.role,
-        email: `${phone}@customer.cloud`,
-      };
-
-      setActiveCustomerUser(activeUser);
-      toast.success("حساب کاربری جدید با موفقیت ایجاد شد");
-      navigate({ to: "/" });
-    } catch (err: any) {
-      toast.danger(err.message || "خطا در ثبت‌نام");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickDemoLogin = (user: DemoUser) => {
-    setActiveCustomerUser(user);
-    toast.success(`به عنوان ${user.name} وارد شدید`);
-    navigate({ to: "/" });
-  };
-
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between p-4 max-w-md mx-auto relative">
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between p-4 max-w-md mx-auto relative select-none">
       {/* Top Bar */}
       <div className="flex items-center justify-between py-2">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl bg-accent text-accent-foreground font-black flex items-center justify-center text-sm shadow-xs">
-            GC
-          </div>
-          <span className="font-bold text-sm">گکوت کلود</span>
+        <div className="text-xs text-muted-foreground font-medium">
+          سامانه اختصاصی مشترکین
         </div>
-        <ModeToggle />
+        <div className="flex items-center gap-2">
+          <ModeToggle />
+        </div>
       </div>
 
-      {/* Main Container */}
-      <div className="my-auto py-6 flex flex-col gap-6">
-        <div className="text-center flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight">ورود به پنل کاربری</h1>
-          <p className="text-xs text-muted-foreground">
-            مدیریت سرویس‌های هاستینگ، تمدید و فاکتورهای آنلاین
-          </p>
-        </div>
+      {/* Main Content */}
+      <div className="my-auto py-2 flex flex-col gap-6">
+        {/* 3D Floating Badge */}
+        <Brand3DBadge
+          title="ورود مشترکین به جیکات کلود"
+          subtitle="مشاهده و مدیریت سرویس‌ها، هاستینگ و صورت‌حساب‌ها"
+        />
 
-        {/* Tab Navigation */}
-        <div className="grid grid-cols-3 p-1 rounded-xl bg-surface border border-border text-xs font-medium text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setTab("otp");
-              setOtpSent(false);
-            }}
-            className={`py-2 rounded-lg transition-all ${
-              tab === "otp"
-                ? "bg-accent text-accent-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            کد یکبار مصرف (OTP)
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("password")}
-            className={`py-2 rounded-lg transition-all ${
-              tab === "password"
-                ? "bg-accent text-accent-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            رمز عبور
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("register")}
-            className={`py-2 rounded-lg transition-all ${
-              tab === "register"
-                ? "bg-accent text-accent-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            ثبت‌نام
-          </button>
-        </div>
-
-        {/* TAB 1: OTP FLOW */}
-        {tab === "otp" && (
-          <div className="flex flex-col gap-4 bg-surface p-5 rounded-2xl border border-border">
-            {!otpSent ? (
-              <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="phone" className="text-xs font-medium text-muted-foreground">
-                    شماره موبایل
-                  </label>
-                  <input
-                    id="phone"
-                    type="tel"
-                    dir="ltr"
-                    placeholder="09121234567"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="h-11 px-3 rounded-xl border border-border bg-background text-sm font-mono text-center focus:outline-hidden focus:ring-2 focus:ring-accent"
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="h-11 rounded-xl bg-accent text-accent-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
-                >
-                  {loading ? "در حال ارسال کد..." : "دریافت کد تایید"}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>کد به شماره <strong className="text-foreground font-mono">{phone}</strong> ارسال شد</span>
-                  <button
-                    type="button"
-                    onClick={() => setOtpSent(false)}
-                    className="text-accent underline font-medium cursor-pointer"
-                  >
-                    ویرایش
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="otp" className="text-xs font-medium text-muted-foreground">
-                    کد تایید ۴ رقمی
-                  </label>
-                  <input
-                    id="otp"
-                    type="text"
-                    dir="ltr"
-                    maxLength={4}
-                    placeholder="1234"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    className="h-12 px-3 rounded-xl border border-border bg-background text-lg font-mono tracking-widest text-center focus:outline-hidden focus:ring-2 focus:ring-accent"
-                    required
-                    autoFocus
-                  />
-                  <span className="text-[11px] text-muted-foreground text-center mt-0.5">
-                    (کد تایید دمو: <code className="text-foreground font-bold">1234</code>)
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  {countdown > 0 ? (
-                    <span>ارسال مجدد تا {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, "0")} دیگر</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleSendOtp}
-                      className="text-accent underline font-medium cursor-pointer"
-                    >
-                      ارسال مجدد کد تایید
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="h-11 rounded-xl bg-accent text-accent-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
-                >
-                  {loading ? "در حال بررسی..." : "تایید و ورود به پنل"}
-                </button>
-              </form>
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: PASSWORD LOGIN */}
-        {tab === "password" && (
-          <form
-            onSubmit={handlePasswordLogin}
-            className="flex flex-col gap-4 bg-surface p-5 rounded-2xl border border-border"
-          >
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="pphone" className="text-xs font-medium text-muted-foreground">
-                شماره موبایل
+        {!otpSent ? (
+          /* STEP 1: ENTER PHONE NUMBER */
+          <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="login-phone" className="text-xs font-semibold text-foreground">
+                شماره موبایل ثبت‌شده شما در سامانه
               </label>
               <input
-                id="pphone"
+                id="login-phone"
                 type="tel"
                 dir="ltr"
-                placeholder="09121234567"
+                placeholder="09123456789"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="h-11 px-3 rounded-xl border border-border bg-background text-sm font-mono text-center focus:outline-hidden focus:ring-2 focus:ring-accent"
+                onChange={(e) => setPhone(toEnglishDigits(e.target.value))}
+                className="w-full h-12 px-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800 focus:border-emerald-500/80 focus:ring-2 focus:ring-emerald-500/20 text-sm font-mono text-center placeholder:text-muted-foreground/40 transition-all outline-hidden"
                 required
+                autoFocus
+              />
+              <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">
+                کد تایید یکبار مصرف (OTP) به شماره موبایل شما ارسال خواهد شد.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-12 mt-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all duration-200 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center cursor-pointer"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                "دریافت کد تایید یکبار مصرف"
+              )}
+            </button>
+          </form>
+        ) : (
+          /* STEP 2: ENTER OTP CODE */
+          <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
+            <div className="p-3.5 rounded-2xl bg-zinc-900/50 border border-zinc-800 flex items-center justify-between text-xs">
+              <div className="flex flex-col">
+                <span className="text-muted-foreground text-[11px]">ارسال کد به:</span>
+                <span className="font-mono font-bold text-foreground text-sm">{phone}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtpCode("");
+                  setDemoCode(null);
+                }}
+                className="text-xs text-emerald-500 hover:underline cursor-pointer"
+              >
+                تغییر شماره
+              </button>
+            </div>
+
+            {demoCode && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                <span className="text-xs text-emerald-400 font-mono">
+                  کد تایید تست سیستم: <strong className="text-white text-sm">{demoCode}</strong>
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="otp-code" className="text-xs font-semibold text-foreground">
+                کد تایید ۴ رقمی
+              </label>
+              <input
+                id="otp-code"
+                type="text"
+                dir="ltr"
+                maxLength={6}
+                placeholder="— — — —"
+                value={otpCode}
+                onChange={(e) => setOtpCode(toEnglishDigits(e.target.value))}
+                className="w-full h-14 rounded-2xl bg-zinc-900/60 border border-zinc-800 focus:border-emerald-500/80 focus:ring-2 focus:ring-emerald-500/20 text-center text-xl font-mono tracking-widest outline-hidden transition-all"
+                required
+                autoFocus
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="pass" className="text-xs font-medium text-muted-foreground">
-                رمز عبور
-              </label>
-              <input
-                id="pass"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11 px-3 rounded-xl border border-border bg-background text-sm text-center focus:outline-hidden focus:ring-2 focus:ring-accent"
-                required
-              />
-              <span className="text-[11px] text-muted-foreground text-center">
-                (رمز پیش‌فرض دمو: <code className="text-foreground font-bold">12345678</code>)
+            <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+              <span>
+                {countdown > 0 ? (
+                  `ارسال مجدد کد تا ${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, "0")}`
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSendOtp}
+                    className="text-emerald-500 hover:underline cursor-pointer font-medium"
+                  >
+                    ارسال مجدد کد تایید
+                  </button>
+                )}
               </span>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="h-11 rounded-xl bg-accent text-accent-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
+              className="w-full h-12.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white font-bold text-sm shadow-[0_4px_25px_rgba(16,185,129,0.35)] hover:shadow-[0_6px_30px_rgba(16,185,129,0.5)] active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer mt-1 flex items-center justify-center gap-2"
             >
-              {loading ? "در حال بررسی..." : "ورود با رمز عبور"}
+              {loading ? "در حال بررسی..." : "تایید و ورود به پنل"}
             </button>
           </form>
         )}
 
-        {/* TAB 3: REGISTER */}
-        {tab === "register" && (
-          <form
-            onSubmit={handleRegister}
-            className="flex flex-col gap-3 bg-surface p-5 rounded-2xl border border-border"
-          >
-            <div className="flex flex-col gap-1">
-              <label htmlFor="rname" className="text-xs font-medium text-muted-foreground">
-                نام و نام خانوادگی *
-              </label>
-              <input
-                id="rname"
-                type="text"
-                placeholder="مثال: علی محمدی"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="h-10 px-3 rounded-xl border border-border bg-background text-xs focus:outline-hidden focus:ring-2 focus:ring-accent"
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="rphone" className="text-xs font-medium text-muted-foreground">
-                شماره موبایل *
-              </label>
-              <input
-                id="rphone"
-                type="tel"
-                dir="ltr"
-                placeholder="09121234567"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="h-10 px-3 rounded-xl border border-border bg-background text-xs font-mono text-center focus:outline-hidden focus:ring-2 focus:ring-accent"
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="rcomp" className="text-xs font-medium text-muted-foreground">
-                نام شرکت یا برند (اختیاری)
-              </label>
-              <input
-                id="rcomp"
-                type="text"
-                placeholder="مثال: پیشگامان فناور"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                className="h-10 px-3 rounded-xl border border-border bg-background text-xs focus:outline-hidden focus:ring-2 focus:ring-accent"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="rpass" className="text-xs font-medium text-muted-foreground">
-                رمز عبور دلخواه (اختیاری)
-              </label>
-              <input
-                id="rpass"
-                type="password"
-                placeholder="حداقل ۶ کاراکتر"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-10 px-3 rounded-xl border border-border bg-background text-xs text-center focus:outline-hidden focus:ring-2 focus:ring-accent"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="h-11 rounded-xl bg-accent text-accent-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer mt-1"
-            >
-              {loading ? "در حال ثبت‌نام..." : "تکمیل ثبت‌نام و ورود"}
-            </button>
-          </form>
-        )}
-
-        {/* Quick Demo Login Cards */}
-        <div className="flex flex-col gap-2 pt-2 border-t border-border">
-          <span className="text-[11px] text-muted-foreground font-medium text-center">
-            یا انتخاب حساب تست دمو (تک‌کلیک):
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            {DEMO_USERS.filter((u) => u.role === "CUSTOMER").map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                onClick={() => handleQuickDemoLogin(user)}
-                className="p-2.5 rounded-xl border border-border bg-surface hover:bg-surface/60 transition-colors text-right flex flex-col gap-0.5 cursor-pointer"
-              >
-                <span className="text-xs font-semibold text-foreground truncate">{user.name}</span>
-                <span className="text-[10px] text-muted-foreground font-mono">{user.email}</span>
-              </button>
-            ))}
-          </div>
+        {/* Informative Note */}
+        <div className="p-3 rounded-2xl bg-zinc-900/40 border border-zinc-800 text-center text-xs text-muted-foreground leading-relaxed">
+          حساب‌های کاربری مشترکین توسط مدیریت سیستم ایجاد و فعال می‌شوند.
         </div>
       </div>
 
       {/* Footer */}
       <div className="text-center py-2 text-[11px] text-muted-foreground">
-        سامانه خدمات مشتریان گکوت وب | نسخه آزمایشی دمو
+        سامانه یکپارچه ابری و مشتریان جیکات وب
       </div>
     </div>
   );

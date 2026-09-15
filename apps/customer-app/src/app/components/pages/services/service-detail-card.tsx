@@ -14,6 +14,17 @@ interface ServiceDetailCardProps {
   showIcon?: boolean;
 }
 
+function formatCycleDays(cycle?: string | number, totalDays?: number) {
+  const num = Number(cycle);
+  if (!isNaN(num) && num > 0) {
+    return `${num.toLocaleString("fa-IR")} روزه`;
+  }
+  if (totalDays && totalDays > 0) {
+    return `${totalDays.toLocaleString("fa-IR")} روزه`;
+  }
+  return "۳۰ روزه";
+}
+
 export function ServiceDetailCard({
   serviceDetail,
   showIcon = true,
@@ -24,18 +35,30 @@ export function ServiceDetailCard({
     SUSPENDED: "bg-yellow-400",
   };
 
+  const startDate =
+    serviceDetail.startDate instanceof Date
+      ? serviceDetail.startDate
+      : new Date(serviceDetail.startDate || Date.now());
+
+  const renewalDate =
+    serviceDetail.renewalDate instanceof Date
+      ? serviceDetail.renewalDate
+      : new Date(serviceDetail.renewalDate || Date.now());
+
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-  const totalDays =
-    (serviceDetail.renewalDate.getTime() - serviceDetail.startDate.getTime()) /
-    MS_PER_DAY;
+  const isPackage = serviceDetail.type === "PACKAGE" || (serviceDetail.quantity && serviceDetail.quantity > 0);
+  const totalQty = serviceDetail.quantity || 1;
+  const remainedQty = serviceDetail.remainedQuantity ?? serviceDetail.quantity ?? 1;
+  const quantityPercent = Math.min(Math.max((remainedQty / totalQty) * 100, 0), 100);
 
-  const passedDays =
-    (Date.now() - serviceDetail.startDate.getTime()) / MS_PER_DAY;
+  const rawTotalDays = (renewalDate.getTime() - startDate.getTime()) / MS_PER_DAY;
+  const totalDays = Math.max(1, Math.round(rawTotalDays));
+  const rawDaysLeft = (renewalDate.getTime() - Date.now()) / MS_PER_DAY;
+  const daysLeft = Math.max(0, Math.ceil(rawDaysLeft));
 
-  const totalMonths = Math.round(totalDays / 30);
-  const passedMonths = Math.round(passedDays / 30);
-  const progressPercent = Math.min((passedDays / totalDays) * 100, 100);
+  const remainingDaysPercent = Math.min(Math.max((daysLeft / totalDays) * 100, 0), 100);
+  const displayProgress = isPackage ? quantityPercent : remainingDaysPercent;
 
   return (
     <div className="w-full">
@@ -51,12 +74,12 @@ export function ServiceDetailCard({
               ) : null)}
 
             <div className="flex flex-col gap-2">
-              <span className="leading-none text-md">
-                {serviceDetail.serviceType.name}
+              <span className="leading-none text-md font-bold">
+                {serviceDetail.name || serviceDetail.serviceType?.name || "سرویس ابری"}
               </span>
 
-              <span className="text-xs leading-none">
-                {serviceDetail.description}
+              <span className="text-xs leading-none text-muted-foreground">
+                {serviceDetail.description || serviceDetail.serviceType?.name}
               </span>
             </div>
           </div>
@@ -91,24 +114,35 @@ export function ServiceDetailCard({
 
         <div className="flex w-full flex-col gap-1 text-xs">
           <div className="flex items-center justify-between">
-            <span>مدت زمان باقی مانده</span>
+            <span>{isPackage ? "سهمیه / باقی‌مانده بسته" : "مدت زمان باقی‌مانده"}</span>
 
-            {passedMonths >= totalMonths ? (
-              <span>نیاز به تمدید</span>
+            {isPackage ? (
+              <div className="flex items-center gap-1 font-mono">
+                <span className="font-semibold text-foreground">
+                  {remainedQty.toLocaleString("fa-IR")} از {totalQty.toLocaleString("fa-IR")} عدد
+                </span>
+                <span className="text-muted-foreground text-[11px]">
+                  ({Math.round(quantityPercent).toLocaleString("fa-IR")}٪ باقی‌مانده)
+                </span>
+              </div>
+            ) : daysLeft <= 0 ? (
+              <span className="text-rose-500 font-medium">نیاز به تمدید</span>
             ) : (
               <div className="flex items-center gap-1">
-                <span>{passedMonths.toLocaleString("fa-IR")} روز</span>/
-                <span>{totalMonths.toLocaleString("fa-IR")} روز</span>
+                <span className="font-medium text-foreground font-mono">{daysLeft.toLocaleString("fa-IR")} روز مانده</span>
+                <span className="text-muted-foreground text-[11px]">
+                  ({Math.round(remainingDaysPercent).toLocaleString("fa-IR")}٪ از {totalDays.toLocaleString("fa-IR")} روز)
+                </span>
               </div>
             )}
           </div>
-          <Progress progress={progressPercent} />
+          <Progress progress={displayProgress} />
         </div>
 
         <Table
           data={{
-            Date: serviceDetail.renewalDate,
-            cycle: "ماهانه",
+            Date: renewalDate,
+            cycle: formatCycleDays(serviceDetail.billingCycle, totalDays),
             price: serviceDetail.priceToman,
           }}
         />
@@ -117,8 +151,11 @@ export function ServiceDetailCard({
           variant="primary"
           size="lg"
           className="w-full rounded-md font-light"
+          onPress={() => {
+            window.location.href = "/payments";
+          }}
         >
-          مدیریت سرویس
+          مدیریت و پرداخت صورت‌حساب
         </Button>
       </div>
     </div>

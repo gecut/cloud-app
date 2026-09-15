@@ -1,6 +1,6 @@
 import { Subscription } from "@/app/data";
 import { ProgressCircle } from "@heroui/react";
-import { GalleryWide } from "@solar-icons/react-perf/category/video/LineDuotone";
+import { LayersMinimalistic } from "@solar-icons/react-perf/category/tools/BoldDuotone";
 import { Table } from "./_table";
 
 interface SubscriptionCardProps {
@@ -8,42 +8,46 @@ interface SubscriptionCardProps {
 }
 
 export function SubscriptionCard({ data }: SubscriptionCardProps) {
-  const remain =
-    ((data?.remainedVolume ?? NaN) / (data?.totalVolume ?? NaN)) * 100;
+  const total = Number(data?.totalVolume) || 1;
+  const remained = Number(data?.remainedVolume) ?? total;
+  const remainPercent = Math.min(Math.max(Math.round((remained / total) * 100), 0), 100);
+
   return (
-    <div className="w-full flex flex-col items-center gap-4  bg-surface rounded-2xl p-6">
+    <div className="w-full flex flex-col items-center gap-4 bg-surface rounded-2xl p-6 border border-border/40 shadow-xs">
       <div className="w-full flex items-center justify-between">
-        <div className="flex flex-col gap-2">
-          <span className="text-md font-semibold">{data.title}</span>
-          <span className="text-sm text-yellow-400">{data.subTitle}</span>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-base font-bold text-foreground">{data.title}</span>
+          <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{data.subTitle}</span>
         </div>
 
-        <GalleryWide size={48} />
+        <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <LayersMinimalistic size={32} />
+        </div>
       </div>
 
-      <div className="w-full bg-surface-secondary pl-2 py-2 rounded-2xl flex items-center justify-around gap-4">
+      <div className="w-full bg-surface-secondary/70 p-3 rounded-2xl flex items-center justify-between gap-4 border border-border/30">
         <Table
           data={{
             date: data.buyData,
             price: data.price,
-            totalVolume: data.totalVolume,
+            totalVolume: total,
           }}
         />
 
-        <div className="flex flex-col items-center gap-2 ml-4">
-          <ProgressCircle aria-label="Loading" value={remain}>
+        <div className="flex flex-col items-center gap-1.5 px-3">
+          <ProgressCircle aria-label="باقی‌مانده بسته" value={remainPercent} className="text-amber-500">
             <ProgressCircle.Track className="size-16">
               <ProgressCircle.TrackCircle />
               <ProgressCircle.FillCircle />
             </ProgressCircle.Track>
 
-            <span className="absolute z-10 text-md">
-              {remain.toLocaleString("fa-IR")}%
+            <span className="absolute z-10 text-xs font-bold font-mono">
+              {remainPercent.toLocaleString("fa-IR")}%
             </span>
           </ProgressCircle>
 
-          <label className="text-xs whitespace-nowrap">
-            مانده {remain.toLocaleString("fa-IR")}
+          <label className="text-[11px] whitespace-nowrap font-medium text-muted-foreground font-mono">
+            {remained.toLocaleString("fa-IR")} عدد مانده
           </label>
         </div>
       </div>

@@ -12,6 +12,16 @@ export class CreateInvoiceHandler
     const { dto } = command;
 
     return this.prisma.$transaction(async (tx) => {
+      let effectiveCustomerId = dto.customerId;
+      const matchedCustomer = await tx.customer.findFirst({
+        where: {
+          OR: [{ id: dto.customerId }, { userId: dto.customerId }],
+        },
+      });
+      if (matchedCustomer) {
+        effectiveCustomerId = matchedCustomer.id;
+      }
+
       const year = new Date().getFullYear();
       const seq = await tx.invoiceSequence.upsert({
         where: { year },
@@ -45,14 +55,15 @@ export class CreateInvoiceHandler
             }
           }
 
-          const totalToman = item.quantity * item.unitPriceToman;
+          const unitPrice = item.unitPriceToman ?? item.amountToman ?? 0;
+          const totalToman = item.totalToman ?? item.quantity * unitPrice;
 
           return {
             serviceId: item.serviceId || null,
             title: item.title,
             description: item.description || null,
             quantity: item.quantity,
-            unitPriceToman: item.unitPriceToman,
+            unitPriceToman: unitPrice,
             totalToman,
             ...serviceSnapshot,
           };
@@ -67,7 +78,7 @@ export class CreateInvoiceHandler
 
       const invoice = await tx.invoice.create({
         data: {
-          customerId: dto.customerId,
+          customerId: effectiveCustomerId,
           invoiceNumber,
           status: "UNPAID",
           subtotalToman,
@@ -83,6 +94,21 @@ export class CreateInvoiceHandler
           customer: true,
         },
       });
+
+      await tx.auditLog
+        .create({
+          data: {
+            actorType: "USER",
+            actorRole: "ADMIN",
+            actorDisplayNameSnapshot: "مدیر مالی سیستم",
+            action: "invoice.create",
+            entityType: "Invoice",
+            entityId: invoice.id,
+            reason: `صدور فاکتور ${invoiceNumber} به مبلغ ${totalToman.toLocaleString("fa-IR")} تومان برای ${invoice.customer?.name || "مشتری"}`,
+            after: { invoiceNumber, totalToman, customerId: dto.customerId },
+          },
+        })
+        .catch(() => {});
 
       return invoice;
     });

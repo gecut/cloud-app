@@ -22,7 +22,7 @@ export class CancelInvoiceHandler
       throw new BadRequestException("Cannot cancel a paid invoice");
     }
 
-    return this.prisma.invoice.update({
+    const updated = await this.prisma.invoice.update({
       where: { id: command.invoiceId },
       data: {
         status: "CANCELLED",
@@ -32,5 +32,22 @@ export class CancelInvoiceHandler
           : invoice.notes,
       },
     });
+
+    await this.prisma.auditLog
+      .create({
+        data: {
+          actorType: "USER",
+          actorRole: "ADMIN",
+          actorDisplayNameSnapshot: "مدیر مالی سیستم",
+          action: "invoice.cancel",
+          entityType: "Invoice",
+          entityId: invoice.id,
+          reason: `لغو فاکتور ${invoice.invoiceNumber}${command.reason ? `: ${command.reason}` : ""}`,
+          after: { status: "CANCELLED" },
+        },
+      })
+      .catch(() => {});
+
+    return updated;
   }
 }

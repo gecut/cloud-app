@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
@@ -9,6 +9,7 @@ import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
+import { formatJalaliDate } from "@gecut-cloud/contracts";
 import {
   FileText,
   Plus,
@@ -19,54 +20,15 @@ import {
   Ban,
   User,
   AlertCircle,
+  Eye,
 } from "lucide-react";
+import { InvoiceDetailModal } from "@/components/invoices/invoice-detail-modal";
 
 export const Route = createFileRoute("/invoices/")({
   component: AdminInvoicesListPage,
 });
 
-const DEFAULT_INVOICES = [
-  {
-    id: "inv_101",
-    invoiceNumber: "INV-2026-001",
-    totalToman: 2500000,
-    status: "PAID",
-    dueDate: "2026-05-10T00:00:00.000Z",
-    customerId: "cust_1",
-    customer: { name: "شرکت چوبینو" },
-    items: [{ title: "میزبانی ابری و نگهداری سرور", amountToman: 2500000, quantity: 1 }],
-  },
-  {
-    id: "inv_102",
-    invoiceNumber: "INV-2026-002",
-    totalToman: 4800000,
-    status: "UNPAID",
-    dueDate: "2026-08-20T00:00:00.000Z",
-    customerId: "cust_1",
-    customer: { name: "شرکت چوبینو" },
-    items: [{ title: "سرور اختصاصی دانلود ماهانه", amountToman: 4800000, quantity: 1 }],
-  },
-  {
-    id: "inv_103",
-    invoiceNumber: "INV-2026-003",
-    totalToman: 3200000,
-    status: "UNPAID",
-    dueDate: "2026-04-15T00:00:00.000Z",
-    customerId: "cust_2",
-    customer: { name: "آژانس دیجیتال رایان" },
-    items: [{ title: "بک‌اند اپلیکیشن فروشگاهی", amountToman: 3200000, quantity: 1 }],
-  },
-  {
-    id: "inv_104",
-    invoiceNumber: "INV-2026-004",
-    totalToman: 1200000,
-    status: "CANCELLED",
-    dueDate: "2026-03-01T00:00:00.000Z",
-    customerId: "cust_2",
-    customer: { name: "آژانس دیجیتال رایان" },
-    items: [{ title: "مشاوره زیرساخت کلود (لغو شده)", amountToman: 1200000, quantity: 1 }],
-  },
-];
+
 
 function AdminInvoicesListPage() {
   const queryClient = useQueryClient();
@@ -74,15 +36,41 @@ function AdminInvoicesListPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   // Form states
-  const [customerId, setCustomerId] = useState("cust_1");
+  const [customerId, setCustomerId] = useState("");
   const [itemTitle, setItemTitle] = useState("");
   const [amountToman, setAmountToman] = useState<number>(2500000);
   const [dueDays, setDueDays] = useState<number>(7);
+
+  // Edit states
+  const [editingInvoice, setEditingInvoice] = useState<any>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editAmount, setEditAmount] = useState<number>(0);
+  const [editDueDays, setEditDueDays] = useState<number>(7);
+  const [editNotes, setEditNotes] = useState("");
+  const [editStatus, setEditStatus] = useState<string>("UNPAID");
+
+  // View Details states
+  const [viewingInvoice, setViewingInvoice] = useState<any>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+
+  const handleOpenView = (inv: any) => {
+    setViewingInvoice(inv);
+    setIsViewOpen(true);
+  };
 
   const { data: customersData } = useQuery({
     queryKey: ["admin", "customers"],
     queryFn: () => apiClient<{ items: any[] }>("/customers?limit=100"),
   });
+
+  const customerOptions = customersData?.items || [];
+
+  useEffect(() => {
+    if (customerOptions.length > 0 && (!customerId || !customerOptions.some((c: any) => c.id === customerId))) {
+      setCustomerId(customerOptions[0].id);
+    }
+  }, [customerOptions, customerId]);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin", "invoices", selectedStatus],
@@ -101,12 +89,31 @@ function AdminInvoicesListPage() {
     onSuccess: () => {
       toast.success("فاکتور جدید با موفقیت صادر شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
       setIsCreateOpen(false);
       setItemTitle("");
       setAmountToman(2500000);
     },
     onError: (err: any) => {
       toast.error(err.message || "خطا در صدور فاکتور");
+    },
+  });
+
+  const updateInvoiceMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: any }) =>
+      apiClient(`/invoices/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      toast.success("فاکتور با موفقیت بروزرسانی شد");
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+      setIsEditOpen(false);
+      setEditingInvoice(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در بروزرسانی فاکتور");
     },
   });
 
@@ -119,6 +126,7 @@ function AdminInvoicesListPage() {
     onSuccess: () => {
       toast.success("فاکتور با موفقیت لغو شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
     },
     onError: (err: any) => {
       toast.error(err.message || "خطا در لغو فاکتور");
@@ -140,25 +148,59 @@ function AdminInvoicesListPage() {
       items: [
         {
           title: itemTitle,
-          amountToman: Number(amountToman),
+          unitPriceToman: Number(amountToman),
           quantity: 1,
         },
       ],
     });
   };
 
-  const invoicesList = data?.items?.length ? data.items : DEFAULT_INVOICES;
+  const handleOpenEdit = (inv: any) => {
+    setEditingInvoice(inv);
+    setEditTitle(inv.items?.[0]?.title || "");
+    setEditAmount(inv.totalToman || 0);
+    setEditNotes(inv.notes || "");
+    setEditStatus(inv.status || "UNPAID");
+    const remainingDays = inv.dueDate
+      ? Math.max(1, Math.round((new Date(inv.dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+      : 7;
+    setEditDueDays(remainingDays);
+    setIsEditOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInvoice) return;
+    if (!editTitle.trim()) {
+      toast.error("عنوان ردیف فاکتور الزامی است");
+      return;
+    }
+
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + Number(editDueDays));
+
+    updateInvoiceMutation.mutate({
+      id: editingInvoice.id,
+      payload: {
+        status: editStatus,
+        dueDate: dueDate.toISOString(),
+        notes: editNotes,
+        items: [
+          {
+            title: editTitle,
+            unitPriceToman: Number(editAmount),
+            quantity: 1,
+          },
+        ],
+      },
+    });
+  };
+
+  const invoicesList = data?.items || [];
   const filteredList =
     selectedStatus === "ALL"
       ? invoicesList
       : invoicesList.filter((inv: any) => inv.status === selectedStatus);
-
-  const customerOptions = customersData?.items?.length
-    ? customersData.items
-    : [
-        { id: "cust_1", name: "شرکت چوبینو" },
-        { id: "cust_2", name: "آژانس دیجیتال رایان" },
-      ];
 
   return (
     <AppShell header={<AdminHeader />}>
@@ -290,6 +332,118 @@ function AdminInvoicesListPage() {
           </div>
         )}
 
+        {/* Edit Invoice Modal */}
+        {isEditOpen && editingInvoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-4 border-b">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base">ویرایش فاکتور {editingInvoice.invoiceNumber}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      مشتری: {editingInvoice.customer?.name || "نامشخص"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="flex flex-col gap-4 mt-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="etitle" className="text-xs font-semibold">
+                    شرح خدمت یا عنوان ردیف فاکتور *
+                  </Label>
+                  <Input
+                    id="etitle"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="eamount" className="text-xs font-semibold">
+                      مبلغ کل (تومان) *
+                    </Label>
+                    <Input
+                      id="eamount"
+                      type="number"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(Number(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edays" className="text-xs font-semibold">
+                      مهلت پرداخت از امروز (روز)
+                    </Label>
+                    <Input
+                      id="edays"
+                      type="number"
+                      value={editDueDays}
+                      onChange={(e) => setEditDueDays(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="enotes" className="text-xs font-semibold">
+                    یادداشت و توضیحات فاکتور
+                  </Label>
+                  <Input
+                    id="enotes"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="توضیحات اختیاری درباره فاکتور"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="estatus" className="text-xs font-semibold">
+                    وضعیت فاکتور
+                  </Label>
+                  <select
+                    id="estatus"
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring font-medium"
+                  >
+                    <option value="UNPAID">در انتظار پرداخت</option>
+                    <option value="PAID">تسویه‌شده (پرداخت شده)</option>
+                    <option value="CANCELLED">لغو شده</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsEditOpen(false)}
+                  >
+                    انصراف
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updateInvoiceMutation.isPending}
+                  >
+                    {updateInvoiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات فاکتور"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Status Tabs */}
         <div className="flex items-center gap-2">
           {[
@@ -330,7 +484,14 @@ function AdminInvoicesListPage() {
                   {filteredList.map((inv: any) => (
                     <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
                       <td className="py-3.5 px-4 font-medium font-mono text-foreground">
-                        {inv.invoiceNumber || inv.id}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenView(inv)}
+                          className="font-bold text-primary hover:underline hover:text-primary/80 transition-colors flex items-center gap-1"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          {inv.invoiceNumber || inv.id}
+                        </button>
                       </td>
                       <td className="py-3.5 px-4 font-medium">
                         <div className="flex items-center gap-1.5">
@@ -373,22 +534,39 @@ function AdminInvoicesListPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-muted-foreground font-mono text-[11px]">
-                        {inv.dueDate
-                          ? new Date(inv.dueDate).toLocaleDateString("fa-IR")
-                          : "---"}
+                        {formatJalaliDate(inv.dueDate)}
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        {inv.status === "UNPAID" && (
+                        <div className="flex items-center justify-center gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => cancelInvoiceMutation.mutate(inv.id)}
-                            disabled={cancelInvoiceMutation.isPending}
-                            className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 h-7 text-[11px]"
+                            onClick={() => handleOpenView(inv)}
+                            className="text-primary hover:bg-primary/10 h-7 text-[11px] font-medium gap-1"
                           >
-                            لغو فاکتور
+                            <Eye className="h-3.5 w-3.5" />
+                            مشاهده
                           </Button>
-                        )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenEdit(inv)}
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:bg-blue-500/10 h-7 text-[11px] font-medium"
+                          >
+                            ویرایش
+                          </Button>
+                          {inv.status === "UNPAID" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => cancelInvoiceMutation.mutate(inv.id)}
+                              disabled={cancelInvoiceMutation.isPending}
+                              className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 h-7 text-[11px]"
+                            >
+                              لغو فاکتور
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -397,6 +575,18 @@ function AdminInvoicesListPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Dedicated Invoice Details Modal */}
+        <InvoiceDetailModal
+          invoice={viewingInvoice}
+          isOpen={isViewOpen}
+          onClose={() => {
+            setIsViewOpen(false);
+            setViewingInvoice(null);
+          }}
+          onEdit={(inv) => handleOpenEdit(inv)}
+          onCancel={(invId) => cancelInvoiceMutation.mutate(invId)}
+        />
       </div>
     </AppShell>
   );

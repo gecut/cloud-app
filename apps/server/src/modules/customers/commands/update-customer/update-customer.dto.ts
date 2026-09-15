@@ -12,6 +12,11 @@ export class UpdateCustomerDto {
   @IsOptional()
   displayName?: string;
 
+  @ApiPropertyOptional({ example: "شرکت چوبینو" })
+  @IsString()
+  @IsOptional()
+  company?: string;
+
   @ApiPropertyOptional({ example: "09121112233" })
   @IsString()
   @IsOptional()

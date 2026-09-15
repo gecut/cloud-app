@@ -1,3 +1,5 @@
+import { formatJalaliDate } from "@gecut-cloud/contracts";
+
 interface TableProps {
   data: { date: Date; totalVolume: number; price: number };
 }
@@ -11,7 +13,7 @@ export function Table({ data }: TableProps) {
 
       <div className="flex items-center justify-between p-2.5 px-4 rounded-l-xl bg-surface">
         <span className="text-xs text-muted-foreground">تاریخ خرید</span>
-        <span>{data.date.toLocaleDateString("fa-IR")}</span>
+        <span>{formatJalaliDate(data.date)}</span>
       </div>
 
       <div className="flex items-center justify-between pt-2 px-4">

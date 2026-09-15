@@ -9,6 +9,7 @@ import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
+import { formatJalaliDateTime } from "@gecut-cloud/contracts";
 import {
   CreditCard,
   Plus,
@@ -24,32 +25,7 @@ export const Route = createFileRoute("/payments/")({
   component: AdminPaymentsListPage,
 });
 
-const DEFAULT_PAYMENTS = [
-  {
-    id: "pay_1",
-    invoiceId: "inv_101",
-    amountToman: 2500000,
-    gatewayRef: "ZAR-98321044",
-    provider: "ZARINPAL",
-    paidAt: "2026-05-02T11:20:00.000Z",
-    invoice: {
-      invoiceNumber: "INV-2026-001",
-      customer: { name: "شرکت چوبینو" },
-    },
-  },
-  {
-    id: "pay_2",
-    invoiceId: "inv_100",
-    amountToman: 1800000,
-    gatewayRef: "PAY-55192088",
-    provider: "MANUAL_BANK_TRANSFER",
-    paidAt: "2026-04-18T16:45:00.000Z",
-    invoice: {
-      invoiceNumber: "INV-2026-000",
-      customer: { name: "آژانس دیجیتال رایان" },
-    },
-  },
-];
+
 
 function AdminPaymentsListPage() {
   const queryClient = useQueryClient();
@@ -104,7 +80,7 @@ function AdminPaymentsListPage() {
     });
   };
 
-  const paymentsList = data?.items?.length ? data.items : DEFAULT_PAYMENTS;
+  const paymentsList = data?.items || [];
   const unpaidInvoices = invoicesData?.items || [];
 
   return (
@@ -287,7 +263,7 @@ function AdminPaymentsListPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-muted-foreground font-mono text-[11px]">
-                        {pay.paidAt ? new Date(pay.paidAt).toLocaleString("fa-IR") : "---"}
+                        {formatJalaliDateTime(pay.paidAt)}
                       </td>
                       <td className="py-3.5 px-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">

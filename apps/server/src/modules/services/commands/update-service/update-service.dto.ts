@@ -43,6 +43,29 @@ export class UpdateServiceDto {
   @IsOptional()
   serviceGroupId?: string;
 
+  @ApiPropertyOptional({ description: "Customer ID" })
+  @IsString()
+  @IsOptional()
+  customerId?: string;
+
+  @ApiPropertyOptional({ description: "Service Type ID" })
+  @IsString()
+  @IsOptional()
+  serviceTypeId?: string;
+
+  @ApiPropertyOptional({ description: "Billing Cycle (MONTHLY, QUARTERLY, SEMI_ANNUAL, ANNUAL)" })
+  @IsString()
+  @IsOptional()
+  billingCycle?: string;
+
+  @ApiPropertyOptional({ description: "Auto Renew flag" })
+  @IsOptional()
+  autoRenew?: boolean;
+
+  @ApiPropertyOptional({ description: "Package quantity" })
+  @IsOptional()
+  quantity?: number;
+
   @ApiPropertyOptional({ enum: ["NONE", "BASIC", "DETAILED"] })
   @IsEnum(["NONE", "BASIC", "DETAILED"])
   @IsOptional()

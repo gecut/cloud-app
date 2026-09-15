@@ -58,6 +58,25 @@ export class RecordPaymentHandler
         },
       });
 
+      await tx.auditLog
+        .create({
+          data: {
+            actorType: "USER",
+            actorRole: "CUSTOMER",
+            actorDisplayNameSnapshot: invoice.customer?.name || "مشتری",
+            action: "payment.record",
+            entityType: "Payment",
+            entityId: payment.id,
+            reason: `پرداخت آنلاین فاکتور ${invoice.invoiceNumber} به مبلغ ${payment.amountToman.toLocaleString("fa-IR")} تومان (کد پیگیری: ${dto.gatewayRef})`,
+            after: {
+              invoiceId: invoice.id,
+              amountToman: payment.amountToman,
+              gatewayRef: dto.gatewayRef,
+            },
+          },
+        })
+        .catch(() => {});
+
       return payment;
     });
   }

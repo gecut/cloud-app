@@ -38,7 +38,7 @@ export class LoginPasswordDto {
   @ApiProperty({ example: "12345678", description: "رمز عبور" })
   @IsString()
   @IsNotEmpty()
-  @MinLength(6)
+  @MinLength(8)
   password: string;
 }
 

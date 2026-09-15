@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { ModeToggle } from "@/app/components/mode-toggle";
-import { Avatar } from "@heroui/react";
-import { getActiveCustomerUser, type DemoUser } from "@/lib/api-client";
+import { Avatar, toast } from "@heroui/react";
+import {
+  getActiveCustomerUser,
+  clearAuth,
+  apiClient,
+  type DemoUser,
+} from "@/lib/api-client";
 
 export function Header({
   profileImage = "/hello.png",
@@ -11,6 +16,7 @@ export function Header({
   profileImage?: string;
   profileName?: string;
 }) {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<DemoUser>(getActiveCustomerUser());
 
   useEffect(() => {
@@ -21,6 +27,16 @@ export function Header({
     return () => window.removeEventListener("auth-change", handleAuth);
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await apiClient("/auth/logout", { method: "POST" }).catch(() => {});
+    } finally {
+      clearAuth();
+      toast.success("با موفقیت از حساب خارج شدید");
+      navigate({ to: "/login" });
+    }
+  };
+
   const displayName = profileName || currentUser.name;
 
   return (
@@ -28,16 +44,8 @@ export function Header({
       <nav className="w-full max-w-md mx-auto flex items-center justify-between px-4 h-full">
         <div className="flex items-center gap-2">
           <ModeToggle />
-          <a
-            href="http://localhost:3001"
-            target="_blank"
-            rel="noreferrer"
-            className="text-[11px] text-primary hover:underline bg-primary/10 px-2 py-1 rounded-md font-medium"
-          >
-            پنل ادمین
-          </a>
         </div>
-        <Link to="/login" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+        <div className="flex items-center gap-2">
           <div className="flex flex-col text-left">
             <span className="text-xs font-semibold text-foreground max-w-[120px] truncate">
               {displayName}
@@ -52,8 +60,27 @@ export function Header({
               {displayName?.slice(0, 2).toUpperCase()}
             </Avatar.Fallback>
           </Avatar>
-        </Link>
-
+          <button
+            type="button"
+            onClick={handleLogout}
+            title="خروج از حساب کاربری"
+            className="p-1.5 text-muted-foreground hover:text-red-500 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+          </button>
+        </div>
       </nav>
     </header>
   );

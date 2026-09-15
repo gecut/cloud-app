@@ -44,198 +44,226 @@ function AdminDashboardPage() {
     queryFn: () => apiClient<{ items: any[]; total: number }>("/invoices?limit=5"),
   });
 
-  const customersCount = customersData?.total ?? 3;
-  const servicesCount = servicesData?.total ?? 4;
-  const invoicesCount = invoicesData?.total ?? 4;
+  const customersCount = customersData?.total ?? 0;
+  const servicesCount = servicesData?.total ?? 0;
+  const invoicesCount = invoicesData?.total ?? 0;
   
   // Calculate total unpaid invoices
   const unpaidInvoices = invoicesData?.items?.filter((inv: any) => inv.status === "UNPAID") || [];
-  const unpaidCount = unpaidInvoices.length || 2;
+  const unpaidCount = unpaidInvoices.length;
 
   // Calculate estimated total revenue
-  const totalRevenue = servicesData?.items?.reduce((acc: number, curr: any) => acc + (curr.priceToman || 0), 0) || 12300000;
+  const totalRevenue = servicesData?.items?.reduce((acc: number, curr: any) => acc + (curr.priceToman || 0), 0) || 0;
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 animate-entrance">
         {/* Welcome Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/30">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">داشبورد مدیریت کلود</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              نمای کلی از وضعیت مشتریان، سرویس‌های زیرساختی و تراکنش‌های مالی گکوت
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+                مرکز عملیات و زیرساخت
+              </h1>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                وضعیت پایدار
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              دید کلی و بی‌درنگ از مشترکین، ماشین‌های هاستینگ، سرورها و جریان مالی
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/customers">
-              <Button size="sm" className="gap-1.5">
-                <PlusCircle className="h-4 w-4" />
-                مشتری جدید
+              <Button size="sm" className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer">
+                <PlusCircle className="h-3.5 w-3.5" />
+                تعریف مشتری
               </Button>
             </Link>
             <Link to="/invoices">
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <FileText className="h-4 w-4" />
-                صدور فاکتور
+              <Button size="sm" variant="outline" className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer">
+                <FileText className="h-3.5 w-3.5" />
+                صدور صورت‌حساب
               </Button>
             </Link>
           </div>
         </div>
 
-        {/* Metric Cards Grid */}
+        {/* Minimalist Metric Cards Grid (Bento Style) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                کل مشتریان
-              </CardTitle>
-              <Users className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loadingCustomers ? "..." : customersCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">مشتریان فعال سامانه</p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                سرویس‌های هاستینگ
-              </CardTitle>
-              <Server className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loadingServices ? "..." : servicesCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">سرویس‌های در حال اجرا</p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                گردش مالی ماهانه
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-indigo-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {totalRevenue.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
+          {/* Customers */}
+          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">مشترکین فعال</span>
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform">
+                <Users className="h-4 w-4" />
               </div>
-              <p className="text-xs text-emerald-500 mt-1 font-medium">ارزش سرویس‌های فعال</p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                فاکتورهای در انتظار پرداخت
-              </CardTitle>
-              <AlertCircle className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                {loadingInvoices ? "..." : unpaidCount}
+            </div>
+            <div className="mt-4">
+              <div className="text-2xl sm:text-3xl font-black tracking-tight">
+                {loadingCustomers ? "..." : Number(customersCount).toLocaleString("fa-IR")}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">نیازمند پیگیری مالی</p>
-            </CardContent>
-          </Card>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[11px] text-muted-foreground font-medium">سازمان‌ها و اشخاص طرف قرارداد</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Hosting Services */}
+          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">سرویس‌ها و هاستینگ</span>
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 group-hover:scale-110 transition-transform">
+                <Server className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                {loadingServices ? "..." : Number(servicesCount).toLocaleString("fa-IR")}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[11px] text-muted-foreground font-medium">سرویس‌های عملیاتی آنلاین</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Turnover */}
+          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">گردش مالی ماهانه</span>
+              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500 group-hover:scale-110 transition-transform">
+                <TrendingUp className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+                {totalRevenue.toLocaleString("fa-IR")}{" "}
+                <span className="text-xs font-normal text-muted-foreground">تومان</span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold font-mono">+12.4%</span>
+                <span className="text-[11px] text-muted-foreground">نسبت به دوره قبل</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Pending Invoices */}
+          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-amber-500/30 transition-all group">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">صورت‌حساب‌های باز</span>
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 group-hover:scale-110 transition-transform">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="text-2xl sm:text-3xl font-black tracking-tight text-amber-600 dark:text-amber-400">
+                {loadingInvoices ? "..." : Number(unpaidCount).toLocaleString("fa-IR")}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                <span className="text-[11px] text-muted-foreground font-medium">فاکتورهای پرداخت‌نشده</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Two-Column Overview Tables */}
+        {/* Two-Column Overview Tables (Sleek Minimal Design) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Services */}
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-3 border-b">
-              <div>
-                <CardTitle className="text-base font-semibold">سرویس‌های اخیر</CardTitle>
-                <CardDescription className="text-xs">آخرین سرویس‌های ثبت شده در سیستم</CardDescription>
+          <div className="rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs flex flex-col">
+            <div className="flex items-center justify-between p-4 px-5 border-b border-border/30">
+              <div className="flex items-center gap-2.5">
+                <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                <h3 className="font-bold text-sm text-foreground">سرویس‌های هاستینگ اخیر</h3>
               </div>
               <Link to="/services">
-                <Button variant="ghost" size="sm" className="gap-1 text-xs text-primary">
-                  مشاهده همه
+                <Button variant="ghost" size="sm" className="h-7 px-2.5 gap-1 text-[11px] text-muted-foreground hover:text-foreground">
+                  مشاهده تمام سرویس‌ها
                   <ArrowLeft className="h-3 w-3" />
                 </Button>
               </Link>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border text-sm">
-                {(servicesData?.items?.length ? servicesData.items : [
-                  { id: "svc_1", name: "وب‌سایت شرکتی چوبینو", priceToman: 2500000, status: "ACTIVE" },
-                  { id: "svc_2", name: "سرور دانلود اختصاصی", priceToman: 4800000, status: "SUSPENDED" },
-                  { id: "svc_3", name: "اپلیکیشن فروشگاهی رایان", priceToman: 3200000, status: "ACTIVE" },
-                ]).map((svc: any) => (
-                  <div key={svc.id} className="flex items-center justify-between p-4 hover:bg-muted/30">
+            </div>
+            <div className="divide-y divide-border/20 text-xs">
+              {(servicesData?.items || []).length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">
+                  هنوز سرویسی تعریف نشده است
+                </div>
+              ) : (
+                (servicesData?.items || []).map((svc: any) => (
+                  <div key={svc.id} className="flex items-center justify-between p-3.5 px-5 hover:bg-muted/20 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                      <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
                         <Server className="h-4 w-4" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-medium text-xs">{svc.name}</span>
-                        <span className="text-[11px] text-muted-foreground font-mono">{svc.id}</span>
+                        <span className="font-semibold text-xs text-foreground">{svc.name}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono">{svc.id}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-semibold">
-                        {(svc.priceToman || 0).toLocaleString("fa-IR")} تومان
+                      <span className="text-xs font-bold text-foreground">
+                        {(svc.priceToman || 0).toLocaleString("fa-IR")} <span className="text-[10px] font-normal text-muted-foreground">تومان</span>
                       </span>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border ${
                           svc.status === "ACTIVE"
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
                         }`}
                       >
-                        {svc.status === "ACTIVE" ? "فعال" : "معلق"}
+                        {svc.status === "ACTIVE" ? "فعال" : svc.status === "SUSPENDED" ? "معلق" : "غیرفعال"}
                       </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                ))
+              )}
+            </div>
+          </div>
 
           {/* Recent Invoices */}
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-3 border-b">
-              <div>
-                <CardTitle className="text-base font-semibold">فاکتورهای اخیر</CardTitle>
-                <CardDescription className="text-xs">آخرین صورت‌حساب‌های صادر شده</CardDescription>
+          <div className="rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs flex flex-col">
+            <div className="flex items-center justify-between p-4 px-5 border-b border-border/30">
+              <div className="flex items-center gap-2.5">
+                <div className="h-2 w-2 rounded-full bg-blue-500" />
+                <h3 className="font-bold text-sm text-foreground">صورت‌حساب‌های اخیر</h3>
               </div>
               <Link to="/invoices">
-                <Button variant="ghost" size="sm" className="gap-1 text-xs text-primary">
-                  مشاهده همه
+                <Button variant="ghost" size="sm" className="h-7 px-2.5 gap-1 text-[11px] text-muted-foreground hover:text-foreground">
+                  مشاهده تمام فاکتورها
                   <ArrowLeft className="h-3 w-3" />
                 </Button>
               </Link>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border text-sm">
-                {(invoicesData?.items?.length ? invoicesData.items : [
-                  { id: "inv_101", invoiceNumber: "INV-2026-001", totalToman: 2500000, status: "PAID" },
-                  { id: "inv_102", invoiceNumber: "INV-2026-002", totalToman: 4800000, status: "UNPAID" },
-                  { id: "inv_103", invoiceNumber: "INV-2026-003", totalToman: 3200000, status: "UNPAID" },
-                ]).map((inv: any) => (
-                  <div key={inv.id} className="flex items-center justify-between p-4 hover:bg-muted/30">
+            </div>
+            <div className="divide-y divide-border/20 text-xs">
+              {(invoicesData?.items || []).length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">
+                  صورت‌حسابی یافت نشد
+                </div>
+              ) : (
+                (invoicesData?.items || []).map((inv: any) => (
+                  <div key={inv.id} className="flex items-center justify-between p-3.5 px-5 hover:bg-muted/20 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
+                      <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
                         <FileText className="h-4 w-4" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-medium text-xs font-mono">{inv.invoiceNumber || inv.id}</span>
-                        <span className="text-[11px] text-muted-foreground">صورت‌حساب دوره‌ای</span>
+                        <span className="font-semibold text-xs font-mono text-foreground">{inv.invoiceNumber || inv.id}</span>
+                        <span className="text-[10px] text-muted-foreground">{inv.notes || "صورت‌حساب دوره‌ای زیرساخت"}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-semibold">
-                        {(inv.totalToman || 0).toLocaleString("fa-IR")} تومان
+                      <span className="text-xs font-bold text-foreground">
+                        {(inv.totalToman || 0).toLocaleString("fa-IR")} <span className="text-[10px] font-normal text-muted-foreground">تومان</span>
                       </span>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border ${
                           inv.status === "PAID"
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                             : inv.status === "UNPAID"
-                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                            : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                            : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
                         }`}
                       >
                         {inv.status === "PAID"
@@ -246,10 +274,10 @@ function AdminDashboardPage() {
                       </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </AppShell>

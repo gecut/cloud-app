@@ -1,3 +1,6 @@
+import { setupDOMPatch } from "@/lib/dom-patch";
+setupDOMPatch();
+
 import { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 

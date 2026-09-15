@@ -11,7 +11,20 @@ export class ListServicesHandler implements IQueryHandler<ListServicesQuery> {
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (customerId) where.customerId = customerId;
+    if (customerId) {
+      // Support finding by either customerId or userId
+      const matchedCustomer = await this.prisma.customer.findFirst({
+        where: {
+          OR: [{ id: customerId }, { userId: customerId }],
+        },
+      });
+
+      if (matchedCustomer) {
+        where.customerId = matchedCustomer.id;
+      } else {
+        where.customerId = customerId;
+      }
+    }
     if (status) where.status = status;
 
     const [items, total] = await Promise.all([
