@@ -10,13 +10,17 @@ export class GetServiceHandler implements IQueryHandler<GetServiceQuery> {
   async execute(query: GetServiceQuery) {
     const service = await this.prisma.service.findUnique({
       where: { id: query.id },
-      include: {
-        customer: true,
-        serviceType: true,
-        serviceGroup: true,
-        server: true,
-        endpoints: true,
-      },
+        include: {
+          customer: true,
+          serviceType: true,
+          serviceGroup: true,
+          server: true,
+          endpoints: true,
+          parentService: true,
+          childServices: {
+            include: { customer: true, endpoints: true },
+          },
+        },
     });
 
     if (!service) {

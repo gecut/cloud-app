@@ -129,31 +129,42 @@ export class SuppliersController {
       supplierId: string;
       name: string;
       type: string;
-      monthlyExpenseToman: number;
+      priceToman?: number;
+      monthlyExpenseToman?: number;
+      purchaseDate?: string;
       renewalDate?: string;
+      billingCycleDays?: number;
+      status?: string;
       notes?: string;
     },
   ) {
     const id = `supsvc_${Date.now()}`;
+    const amount = Number(body.priceToman ?? body.monthlyExpenseToman) || 0;
+    const now = new Date();
     const newService = {
       id,
       supplierId: body.supplierId,
       name: body.name,
       type: body.type || "HOSTING",
-      monthlyExpenseToman: Number(body.monthlyExpenseToman) || 0,
-      renewalDate: body.renewalDate ? new Date(body.renewalDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      priceToman: amount,
+      monthlyExpenseToman: amount,
+      purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : now,
+      renewalDate: body.renewalDate ? new Date(body.renewalDate) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+      billingCycleDays: Number(body.billingCycleDays) || 30,
       notes: body.notes || null,
-      status: "ACTIVE",
-      createdAt: new Date(),
+      status: body.status || "ACTIVE",
+      createdAt: now,
+      updatedAt: now,
     };
     this.prisma.memSupplierServices.set(id, newService);
 
     // Update supplier payable
     const sup = this.prisma.memSuppliers.get(body.supplierId);
     if (sup) {
-      sup.totalPayableToman = (sup.totalPayableToman || 0) + newService.monthlyExpenseToman;
+      sup.totalPayableToman = (sup.totalPayableToman || 0) + amount;
     }
 
+    this.prisma.saveToDisk();
     return newService;
   }
 
@@ -167,6 +178,7 @@ export class SuppliersController {
     const sup = this.prisma.memSuppliers.get(id);
     if (sup) {
       Object.assign(sup, body, { updatedAt: new Date() });
+      this.prisma.saveToDisk();
       return sup;
     }
     return null;
@@ -177,6 +189,13 @@ export class SuppliersController {
   @ApiOperation({ summary: "Delete supplier" })
   async deleteSupplier(@Param("id") id: string) {
     this.prisma.memSuppliers.delete(id);
+    // Delete attached services too
+    for (const [svcId, svc] of Array.from(this.prisma.memSupplierServices.entries())) {
+      if (svc.supplierId === id) {
+        this.prisma.memSupplierServices.delete(svcId);
+      }
+    }
+    this.prisma.saveToDisk();
     return { success: true };
   }
 
@@ -189,7 +208,15 @@ export class SuppliersController {
   ) {
     const s = this.prisma.memSupplierServices.get(serviceId);
     if (s) {
-      Object.assign(s, body);
+      if (body.priceToman !== undefined || body.monthlyExpenseToman !== undefined) {
+        const amt = Number(body.priceToman ?? body.monthlyExpenseToman) || 0;
+        body.priceToman = amt;
+        body.monthlyExpenseToman = amt;
+      }
+      if (body.purchaseDate) body.purchaseDate = new Date(body.purchaseDate);
+      if (body.renewalDate) body.renewalDate = new Date(body.renewalDate);
+      Object.assign(s, body, { updatedAt: new Date() });
+      this.prisma.saveToDisk();
       return s;
     }
     return null;
@@ -200,6 +227,7 @@ export class SuppliersController {
   @ApiOperation({ summary: "Delete supplier service" })
   async deleteSupplierService(@Param("serviceId") serviceId: string) {
     this.prisma.memSupplierServices.delete(serviceId);
+    this.prisma.saveToDisk();
     return { success: true };
   }
 

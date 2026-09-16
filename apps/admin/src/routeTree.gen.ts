@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as CategoryRouteImport } from './routes/category'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServicesIndexRouteImport } from './routes/services/index'
 import { Route as ServersIndexRouteImport } from './routes/servers/index'
@@ -17,6 +18,7 @@ import { Route as PaymentsIndexRouteImport } from './routes/payments/index'
 import { Route as InvoicesIndexRouteImport } from './routes/invoices/index'
 import { Route as EndpointsIndexRouteImport } from './routes/endpoints/index'
 import { Route as CustomersIndexRouteImport } from './routes/customers/index'
+import { Route as CategoriesIndexRouteImport } from './routes/categories/index'
 import { Route as AuditLogsIndexRouteImport } from './routes/audit-logs/index'
 import { Route as AccountingIndexRouteImport } from './routes/accounting/index'
 import { Route as ServicesIdRouteImport } from './routes/services/$id'
@@ -30,6 +32,11 @@ import { Route as AuditLogsIdRouteImport } from './routes/audit-logs/$id'
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoryRoute = CategoryRouteImport.update({
+  id: '/category',
+  path: '/category',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -65,6 +72,11 @@ const EndpointsIndexRoute = EndpointsIndexRouteImport.update({
 const CustomersIndexRoute = CustomersIndexRouteImport.update({
   id: '/customers/',
   path: '/customers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoriesIndexRoute = CategoriesIndexRouteImport.update({
+  id: '/categories/',
+  path: '/categories/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuditLogsIndexRoute = AuditLogsIndexRouteImport.update({
@@ -115,6 +127,7 @@ const AuditLogsIdRoute = AuditLogsIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/category': typeof CategoryRoute
   '/login': typeof LoginRoute
   '/audit-logs/$id': typeof AuditLogsIdRoute
   '/customers/$id': typeof CustomersIdRoute
@@ -125,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/services/$id': typeof ServicesIdRoute
   '/accounting/': typeof AccountingIndexRoute
   '/audit-logs/': typeof AuditLogsIndexRoute
+  '/categories/': typeof CategoriesIndexRoute
   '/customers/': typeof CustomersIndexRoute
   '/endpoints/': typeof EndpointsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
@@ -134,6 +148,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/category': typeof CategoryRoute
   '/login': typeof LoginRoute
   '/audit-logs/$id': typeof AuditLogsIdRoute
   '/customers/$id': typeof CustomersIdRoute
@@ -144,6 +159,7 @@ export interface FileRoutesByTo {
   '/services/$id': typeof ServicesIdRoute
   '/accounting': typeof AccountingIndexRoute
   '/audit-logs': typeof AuditLogsIndexRoute
+  '/categories': typeof CategoriesIndexRoute
   '/customers': typeof CustomersIndexRoute
   '/endpoints': typeof EndpointsIndexRoute
   '/invoices': typeof InvoicesIndexRoute
@@ -154,6 +170,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/category': typeof CategoryRoute
   '/login': typeof LoginRoute
   '/audit-logs/$id': typeof AuditLogsIdRoute
   '/customers/$id': typeof CustomersIdRoute
@@ -164,6 +181,7 @@ export interface FileRoutesById {
   '/services/$id': typeof ServicesIdRoute
   '/accounting/': typeof AccountingIndexRoute
   '/audit-logs/': typeof AuditLogsIndexRoute
+  '/categories/': typeof CategoriesIndexRoute
   '/customers/': typeof CustomersIndexRoute
   '/endpoints/': typeof EndpointsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
@@ -175,6 +193,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/category'
     | '/login'
     | '/audit-logs/$id'
     | '/customers/$id'
@@ -185,6 +204,7 @@ export interface FileRouteTypes {
     | '/services/$id'
     | '/accounting/'
     | '/audit-logs/'
+    | '/categories/'
     | '/customers/'
     | '/endpoints/'
     | '/invoices/'
@@ -194,6 +214,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/category'
     | '/login'
     | '/audit-logs/$id'
     | '/customers/$id'
@@ -204,6 +225,7 @@ export interface FileRouteTypes {
     | '/services/$id'
     | '/accounting'
     | '/audit-logs'
+    | '/categories'
     | '/customers'
     | '/endpoints'
     | '/invoices'
@@ -213,6 +235,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/category'
     | '/login'
     | '/audit-logs/$id'
     | '/customers/$id'
@@ -223,6 +246,7 @@ export interface FileRouteTypes {
     | '/services/$id'
     | '/accounting/'
     | '/audit-logs/'
+    | '/categories/'
     | '/customers/'
     | '/endpoints/'
     | '/invoices/'
@@ -233,6 +257,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CategoryRoute: typeof CategoryRoute
   LoginRoute: typeof LoginRoute
   AuditLogsIdRoute: typeof AuditLogsIdRoute
   CustomersIdRoute: typeof CustomersIdRoute
@@ -243,6 +268,7 @@ export interface RootRouteChildren {
   ServicesIdRoute: typeof ServicesIdRoute
   AccountingIndexRoute: typeof AccountingIndexRoute
   AuditLogsIndexRoute: typeof AuditLogsIndexRoute
+  CategoriesIndexRoute: typeof CategoriesIndexRoute
   CustomersIndexRoute: typeof CustomersIndexRoute
   EndpointsIndexRoute: typeof EndpointsIndexRoute
   InvoicesIndexRoute: typeof InvoicesIndexRoute
@@ -258,6 +284,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/category': {
+      id: '/category'
+      path: '/category'
+      fullPath: '/category'
+      preLoaderRoute: typeof CategoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -307,6 +340,13 @@ declare module '@tanstack/react-router' {
       path: '/customers'
       fullPath: '/customers/'
       preLoaderRoute: typeof CustomersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/categories/': {
+      id: '/categories/'
+      path: '/categories'
+      fullPath: '/categories/'
+      preLoaderRoute: typeof CategoriesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/audit-logs/': {
@@ -377,6 +417,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CategoryRoute: CategoryRoute,
   LoginRoute: LoginRoute,
   AuditLogsIdRoute: AuditLogsIdRoute,
   CustomersIdRoute: CustomersIdRoute,
@@ -387,6 +428,7 @@ const rootRouteChildren: RootRouteChildren = {
   ServicesIdRoute: ServicesIdRoute,
   AccountingIndexRoute: AccountingIndexRoute,
   AuditLogsIndexRoute: AuditLogsIndexRoute,
+  CategoriesIndexRoute: CategoriesIndexRoute,
   CustomersIndexRoute: CustomersIndexRoute,
   EndpointsIndexRoute: EndpointsIndexRoute,
   InvoicesIndexRoute: InvoicesIndexRoute,

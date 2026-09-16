@@ -20,6 +20,9 @@ import {
   LogOut,
   Menu,
   X,
+  Database,
+  AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { navItems } from "./app-shell";
@@ -30,6 +33,9 @@ export function AdminHeader() {
   const currentPath = routerState?.location?.pathname || "/";
   const [currentUser, setCurrentUser] = useState<DemoUser>(getActiveUser());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isPurgeModalOpen, setIsPurgeModalOpen] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
+  const [confirmKeyword, setConfirmKeyword] = useState("");
 
   useEffect(() => {
     const handleAuth = () => {
@@ -38,6 +44,22 @@ export function AdminHeader() {
     window.addEventListener("auth-change", handleAuth);
     return () => window.removeEventListener("auth-change", handleAuth);
   }, []);
+
+  const handlePurgeDatabase = async () => {
+    setIsPurging(true);
+    try {
+      const res: any = await apiClient("/system/reset-database", { method: "POST" });
+      toast.success(res?.message || "تمامی داده‌ها با موفقیت پاکسازی شدند");
+      setIsPurgeModalOpen(false);
+      setTimeout(() => {
+        window.location.reload();
+      }, 600);
+    } catch (err: any) {
+      toast.error(err.message || "خطا در پاکسازی دیتابیس");
+    } finally {
+      setIsPurging(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -106,12 +128,27 @@ export function AdminHeader() {
             </span>
           </div>
 
+          {/* Direct Purge Database Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setConfirmKeyword("");
+              setIsPurgeModalOpen(true);
+            }}
+            className="gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-300 dark:border-rose-900/50 rounded-xl cursor-pointer shadow-xs"
+            title="پاکسازی تمام داده‌ها و رکوردهای دیتابیس"
+          >
+            <Database className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">پاکسازی دیتابیس</span>
+          </Button>
+
           {/* Direct Logout Button */}
           <Button
             variant="outline"
             size="sm"
             onClick={handleLogout}
-            className="gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-300 dark:border-rose-900/50 rounded-xl cursor-pointer shadow-xs"
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border-border rounded-xl cursor-pointer shadow-xs"
             title="خروج از سامانه مدیریت"
           >
             <LogOut className="h-3.5 w-3.5" />
@@ -205,6 +242,20 @@ export function AdminHeader() {
               </a>
 
               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setConfirmKeyword("");
+                  setIsPurgeModalOpen(true);
+                }}
+                className="w-full gap-2 rounded-xl text-xs font-semibold h-9 text-rose-600 border-rose-300 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+              >
+                <Database className="h-3.5 w-3.5" />
+                <span>پاکسازی کامل دیتابیس</span>
+              </Button>
+
+              <Button
                 variant="destructive"
                 size="sm"
                 onClick={handleLogout}
@@ -212,6 +263,64 @@ export function AdminHeader() {
               >
                 <LogOut className="h-3.5 w-3.5" />
                 <span>خروج از حساب</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Purge Database Confirmation Modal */}
+      {isPurgeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md rounded-2xl border border-destructive/40 bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-destructive mb-3">
+              <div className="p-2.5 rounded-xl bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-foreground">پاکسازی کامل محتوای دیتابیس</h3>
+                <p className="text-xs text-muted-foreground">حذف رکوردهای محتوایی بدون تغییر ساختار مدل‌ها</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 py-3 text-xs text-muted-foreground leading-relaxed border-y border-border/50 my-3">
+              <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20 text-foreground font-medium flex flex-col gap-1.5">
+                <span className="text-destructive font-bold text-xs flex items-center gap-1.5">
+                  <Trash2 className="h-3.5 w-3.5" />
+                  موارد زیر به طور کامل حذف خواهند شد:
+                </span>
+                <ul className="list-disc list-inside space-y-1 text-[11px] text-muted-foreground pr-1">
+                  <li>تمام مشتریان (پروفایل‌ها و اطلاعات تماس)</li>
+                  <li>تمام سرویس‌ها و پکیج‌های تخصیص‌یافته</li>
+                  <li>تمام فاکتورها، اقلام و صورت‌حساب‌ها</li>
+                  <li>تمام تراکنش‌ها، پرداخت‌ها و رسیدها</li>
+                  <li>تمام تامین‌کنندگان و سرورها</li>
+                  <li>تمام لاگ‌های سیستمی و مانیتورینگ</li>
+                </ul>
+              </div>
+              <p className="text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
+                ✓ حساب کاربری ادمین ({currentUser.name}) و ساختار تمام مدل‌ها و جداول دست‌نخورده حفظ می‌شوند.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsPurgeModalOpen(false)}
+                disabled={isPurging}
+                className="rounded-xl text-xs"
+              >
+                انصراف
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handlePurgeDatabase}
+                disabled={isPurging}
+                className="gap-1.5 rounded-xl text-xs font-bold shadow-md cursor-pointer"
+              >
+                {isPurging ? "در حال پاکسازی..." : "بله، همه داده‌ها پاک شوند"}
               </Button>
             </div>
           </div>

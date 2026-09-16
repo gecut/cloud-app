@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
-import { NotFoundException } from "@nestjs/common";
+import { NotFoundException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
 import { normalizePhoneNumber } from "../../../../common/utils/phone.util";
 import { OtpService } from "../../services/otp.service";
@@ -51,6 +51,27 @@ export class RequestOtpHandler implements ICommandHandler<RequestOtpCommand> {
     if (!existingUser) {
       throw new NotFoundException(
         "شماره همراه وارد شده در سامانه ثبت نشده است. لطفاً جهت ایجاد حساب کاربری با مدیریت تماس بگیرید.",
+      );
+    }
+
+    const matchedCustomer = await this.prisma.customer.findFirst({
+      where: {
+        OR: [
+          { userId: existingUser.id },
+          { id: existingUser.id },
+          { phone: cleanPhone },
+          { phone: phone },
+        ],
+      },
+    });
+
+    if (
+      matchedCustomer &&
+      (matchedCustomer.status === "INACTIVE" ||
+        matchedCustomer.status === "SUSPENDED")
+    ) {
+      throw new ForbiddenException(
+        "حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.",
       );
     }
 

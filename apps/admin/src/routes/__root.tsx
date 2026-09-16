@@ -27,7 +27,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
       });
     }
   },
-  errorComponent: ({ reset }) => (
+  errorComponent: ({ reset, error }: any) => (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background text-foreground text-center dir-rtl">
       <div className="max-w-md w-full p-6 rounded-2xl border bg-card shadow-lg flex flex-col items-center gap-4">
         <div className="h-12 w-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center">
@@ -38,6 +38,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
             سیستم در به‌روزرسانی یا رندر اطلاعات با خطای موقت مواجه شد. لطفاً دوباره تلاش کنید.
           </p>
+          {error?.message && (
+            <p className="mt-3 text-[11px] text-rose-500/90 font-mono bg-rose-500/5 p-2 rounded border border-rose-500/20 text-left dir-ltr break-all">
+              {String(error.message)}
+            </p>
+          )}
         </div>
         <div className="flex gap-2 w-full">
           <Button

@@ -29,7 +29,7 @@ export class CreateInvoiceHandler
         update: { lastNumber: { increment: 1 } },
       });
 
-      const invoiceNumber = `INV-${year}-${seq.lastNumber.toString().padStart(5, "0")}`;
+      const invoiceNumber = (30000 + seq.lastNumber).toString();
 
       const processedItems = await Promise.all(
         dto.items.map(async (item) => {

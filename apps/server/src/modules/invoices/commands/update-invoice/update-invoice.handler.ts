@@ -25,8 +25,46 @@ export class UpdateInvoiceHandler
 
     if (dto.status) {
       updateData.status = dto.status;
-      if (dto.status === "PAID" && !invoice.paidAt) {
-        updateData.paidAt = new Date();
+      if (dto.status === "PAID" && invoice.status !== "PAID") {
+        const now = new Date();
+        updateData.paidAt = now;
+        const existingPayment = await this.prisma.payment.findFirst({
+          where: { invoiceId },
+        });
+        if (!existingPayment) {
+          const paymentAmount = updateData.totalToman ?? invoice.totalToman;
+          const newPayment = await this.prisma.payment.create({
+            data: {
+              invoiceId,
+              amountToman: paymentAmount,
+              provider: "MANUAL_TRANSFER",
+              gatewayRef: `ADMIN-CONFIRMED-${Date.now().toString().slice(-6)}`,
+              paidAt: now,
+            },
+          });
+          const customerName =
+            invoice.customer?.displayName || invoice.customer?.name || "مشتری";
+          await this.prisma.auditLog
+            .create({
+              data: {
+                actorType: "USER",
+                actorRole: "ADMIN",
+                actorDisplayNameSnapshot: "مدیر مالی سیستم",
+                action: "payment.record",
+                entityType: "Payment",
+                entityId: newPayment.id,
+                reason: `تایید و تسویه دستی فاکتور ${invoice.invoiceNumber} به مبلغ ${paymentAmount.toLocaleString("fa-IR")} تومان توسط مدیر سیستم برای ${customerName}`,
+                after: {
+                  invoiceId: invoice.id,
+                  invoiceNumber: invoice.invoiceNumber,
+                  amountToman: paymentAmount,
+                  confirmedBy: "ADMIN",
+                  provider: "MANUAL_TRANSFER",
+                },
+              },
+            })
+            .catch(() => {});
+        }
       } else if (dto.status === "CANCELLED" && !invoice.cancelledAt) {
         updateData.cancelledAt = new Date();
       } else if (dto.status === "UNPAID") {
@@ -74,6 +112,21 @@ export class UpdateInvoiceHandler
       where: { id: invoiceId },
       data: updateData,
     });
+
+    // If the invoice is PAID and total amount changed, keep the payment record amount synchronized
+    if (updated.status === "PAID" && updateData.totalToman !== undefined) {
+      try {
+        const payment = await this.prisma.payment.findFirst({
+          where: { invoiceId },
+        });
+        if (payment && payment.amountToman !== updated.totalToman) {
+          await this.prisma.payment.update({
+            where: { id: payment.id },
+            data: { amountToman: updated.totalToman },
+          });
+        }
+      } catch {}
+    }
 
     // Record audit log
     await this.prisma.auditLog

@@ -23,6 +23,16 @@ export class UpdateServiceDto {
   @IsOptional()
   priceToman?: number;
 
+  @ApiPropertyOptional({ description: "Purchase Date (ISO string)" })
+  @IsDateString()
+  @IsOptional()
+  purchaseDate?: string;
+
+  @ApiPropertyOptional({ description: "Tracking Type (TIME, QUANTITY, HYBRID)" })
+  @IsString()
+  @IsOptional()
+  trackingType?: string;
+
   @ApiPropertyOptional({ description: "Start Date (ISO string)" })
   @IsDateString()
   @IsOptional()
@@ -48,10 +58,20 @@ export class UpdateServiceDto {
   @IsOptional()
   customerId?: string;
 
+  @ApiPropertyOptional({ description: "Parent Catalog Service ID" })
+  @IsString()
+  @IsOptional()
+  parentServiceId?: string;
+
   @ApiPropertyOptional({ description: "Service Type ID" })
   @IsString()
   @IsOptional()
   serviceTypeId?: string;
+
+  @ApiPropertyOptional({ description: "Service Type Slug (e.g. domain, hosting, server, etc.)" })
+  @IsString()
+  @IsOptional()
+  serviceTypeSlug?: string;
 
   @ApiPropertyOptional({ description: "Billing Cycle (MONTHLY, QUARTERLY, SEMI_ANNUAL, ANNUAL)" })
   @IsString()
@@ -65,6 +85,10 @@ export class UpdateServiceDto {
   @ApiPropertyOptional({ description: "Package quantity" })
   @IsOptional()
   quantity?: number;
+
+  @ApiPropertyOptional({ description: "Consumed / used quantity" })
+  @IsOptional()
+  usedQuantity?: number;
 
   @ApiPropertyOptional({ enum: ["NONE", "BASIC", "DETAILED"] })
   @IsEnum(["NONE", "BASIC", "DETAILED"])

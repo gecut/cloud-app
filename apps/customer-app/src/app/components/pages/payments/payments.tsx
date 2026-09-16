@@ -27,7 +27,7 @@ export function Payments() {
         `/invoices${queryParam ? `?${queryParam}&` : "?"}limit=50`,
       );
     },
-    enabled: !!(activeUser?.id || activeUser?.customerId),
+    enabled: true,
   });
 
   const { data: paymentsData, isLoading: isLoadingPayments } = useQuery({
@@ -42,7 +42,7 @@ export function Payments() {
         `/payments${queryParam ? `?${queryParam}&` : "?"}limit=50`,
       );
     },
-    enabled: !!(activeUser?.id || activeUser?.customerId),
+    enabled: true,
   });
 
   const { data: servicesData } = useQuery({
@@ -57,7 +57,7 @@ export function Payments() {
         `/services${queryParam ? `?${queryParam}&` : "?"}limit=50`,
       );
     },
-    enabled: !!(activeUser?.id || activeUser?.customerId),
+    enabled: true,
   });
 
   const isLoading = isLoadingInvoices || isLoadingPayments;

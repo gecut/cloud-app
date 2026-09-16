@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, UnauthorizedException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { AuthenticatedUser } from "../types/authenticated-user.type";
 
@@ -79,12 +79,19 @@ export class SessionService {
       );
     }
 
+    if (user.customer && (user.customer.status === "INACTIVE" || user.customer.status === "SUSPENDED")) {
+      throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
+    }
+
     let customerId = user.customer?.id || (user as any).customerId || null;
     if (!customerId) {
       const cust = await this.prisma.customer.findFirst({
         where: { userId: user.id },
       });
       if (cust) {
+        if (cust.status === "INACTIVE" || cust.status === "SUSPENDED") {
+          throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
+        }
         customerId = cust.id;
       }
     }
@@ -143,12 +150,19 @@ export class SessionService {
       throw new UnauthorizedException("کاربر یافت نشد");
     }
 
+    if (user.customer && (user.customer.status === "INACTIVE" || user.customer.status === "SUSPENDED")) {
+      throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
+    }
+
     let customerId = user.customer?.id || (user as any).customerId || null;
     if (!customerId) {
       const cust = await this.prisma.customer.findFirst({
         where: { userId: user.id },
       });
       if (cust) {
+        if (cust.status === "INACTIVE" || cust.status === "SUSPENDED") {
+          throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
+        }
         customerId = cust.id;
       }
     }

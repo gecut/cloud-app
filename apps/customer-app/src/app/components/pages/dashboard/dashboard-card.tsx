@@ -25,9 +25,13 @@ export function DashboardCard({ data }: DashboardCardProps) {
 
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-  const isPackage = Boolean(data.type === "PACKAGE" || (data.quantity && data.quantity > 0));
+  const trackingType = (data.trackingType || "HYBRID").toUpperCase();
+  const showDays = trackingType === "TIME" || trackingType === "HYBRID";
+  const showQty = trackingType === "QUANTITY" || trackingType === "HYBRID";
+  const isPackage = trackingType === "QUANTITY" || data.type === "PACKAGE";
+
   const totalQty = data.quantity || 1;
-  const remainedQty = data.remainedQuantity ?? data.quantity ?? 1;
+  const remainedQty = data.remainedQuantity ?? Math.max(0, totalQty - (data.usedQuantity || 0));
   const quantityPercent = Math.min(Math.max((remainedQty / totalQty) * 100, 0), 100);
 
   const rawTotalDays = (renewalDate.getTime() - startDate.getTime()) / MS_PER_DAY;
@@ -36,13 +40,10 @@ export function DashboardCard({ data }: DashboardCardProps) {
   const rawDaysLeft = (renewalDate.getTime() - Date.now()) / MS_PER_DAY;
   const daysLeft = Math.max(0, Math.ceil(rawDaysLeft));
 
-  // Remaining days progress (showing remaining, not elapsed)
   const remainingDaysPercent = Math.min(
     Math.max((daysLeft / totalDays) * 100, 0),
     100,
   );
-
-  const displayProgress = isPackage ? quantityPercent : remainingDaysPercent;
 
   const statusStyle: Record<Service["status"], string> = {
     ACTIVE: "bg-green-400",
@@ -134,37 +135,48 @@ export function DashboardCard({ data }: DashboardCardProps) {
           </div>
         </div>
 
-        <div className="w-full flex flex-col gap-2">
-          <div className="flex items-center justify-between text-xs">
-            <span>{isPackage ? "سهمیه / باقی‌مانده بسته" : "مدت زمان باقی‌مانده"}</span>
-
-            <div className="flex items-center gap-1">
-              {isPackage ? (
-                <>
-                  <span className="font-semibold text-foreground font-mono">
-                    {remainedQty.toLocaleString("fa-IR")} از {totalQty.toLocaleString("fa-IR")} عدد
-                  </span>
-                  <span className="text-muted-foreground font-mono text-[11px]">
-                    ({Math.round(quantityPercent).toLocaleString("fa-IR")}٪ باقی‌مانده)
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="font-semibold text-foreground font-mono">
+        <div className="w-full flex flex-col gap-3">
+          {/* Days Remaining Progress (TIME & HYBRID) */}
+          {showDays && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span>مدت زمان باقی‌مانده</span>
+                <div className="flex items-center gap-1 font-mono">
+                  <span className="font-semibold text-foreground">
                     {daysLeft.toLocaleString("fa-IR")} روز مانده
                   </span>
                   <span className="text-muted-foreground text-[11px]">
                     ({Math.round(remainingDaysPercent).toLocaleString("fa-IR")}٪ از {totalDays.toLocaleString("fa-IR")} روز)
                   </span>
-                </>
-              )}
+                </div>
+              </div>
+              <Progress progress={remainingDaysPercent} />
             </div>
-          </div>
-          <Progress progress={displayProgress} />
+          )}
+
+          {/* Quantity Remaining Progress (QUANTITY & HYBRID) */}
+          {showQty && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span>سهمیه / باقی‌مانده بسته</span>
+                <div className="flex items-center gap-1 font-mono">
+                  <span className="font-semibold text-foreground">
+                    {remainedQty.toLocaleString("fa-IR")} از {totalQty.toLocaleString("fa-IR")} عدد
+                  </span>
+                  <span className="text-muted-foreground text-[11px]">
+                    ({Math.round(quantityPercent).toLocaleString("fa-IR")}٪ باقی‌مانده)
+                  </span>
+                </div>
+              </div>
+              <Progress progress={quantityPercent} />
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-xs pt-3 border-t border-border/40 mt-1">
-            <span className="text-muted-foreground">هزینه دوره سرویس</span>
-            <span className="font-semibold text-foreground">
+            <span className="text-muted-foreground">
+              {trackingType === "QUANTITY" ? "مبلغ بسته" : "هزینه دوره سرویس"}
+            </span>
+            <span className="font-semibold text-foreground font-mono">
               {Number(data.priceToman || 0).toLocaleString("fa-IR")}{" "}
               <span className="text-[10px] text-muted-foreground font-normal">تومان</span>
             </span>

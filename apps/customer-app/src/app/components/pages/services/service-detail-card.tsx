@@ -47,18 +47,19 @@ export function ServiceDetailCard({
 
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-  const isPackage = serviceDetail.type === "PACKAGE" || (serviceDetail.quantity && serviceDetail.quantity > 0);
+  const trackingType = (serviceDetail.trackingType || "HYBRID").toUpperCase();
+  const showDays = trackingType === "TIME" || trackingType === "HYBRID";
+  const showQty = trackingType === "QUANTITY" || trackingType === "HYBRID";
+
   const totalQty = serviceDetail.quantity || 1;
-  const remainedQty = serviceDetail.remainedQuantity ?? serviceDetail.quantity ?? 1;
+  const remainedQty = serviceDetail.remainedQuantity ?? Math.max(0, totalQty - (serviceDetail.usedQuantity || 0));
   const quantityPercent = Math.min(Math.max((remainedQty / totalQty) * 100, 0), 100);
 
   const rawTotalDays = (renewalDate.getTime() - startDate.getTime()) / MS_PER_DAY;
   const totalDays = Math.max(1, Math.round(rawTotalDays));
   const rawDaysLeft = (renewalDate.getTime() - Date.now()) / MS_PER_DAY;
   const daysLeft = Math.max(0, Math.ceil(rawDaysLeft));
-
   const remainingDaysPercent = Math.min(Math.max((daysLeft / totalDays) * 100, 0), 100);
-  const displayProgress = isPackage ? quantityPercent : remainingDaysPercent;
 
   return (
     <div className="w-full">
@@ -112,11 +113,31 @@ export function ServiceDetailCard({
           )}
         </div>
 
-        <div className="flex w-full flex-col gap-1 text-xs">
-          <div className="flex items-center justify-between">
-            <span>{isPackage ? "سهمیه / باقی‌مانده بسته" : "مدت زمان باقی‌مانده"}</span>
+        {/* Days Left Progress (TIME & HYBRID) */}
+        {showDays && (
+          <div className="flex w-full flex-col gap-1 text-xs">
+            <div className="flex items-center justify-between">
+              <span>مدت زمان باقی‌مانده</span>
+              {daysLeft <= 0 ? (
+                <span className="text-rose-500 font-medium">نیاز به تمدید</span>
+              ) : (
+                <div className="flex items-center gap-1 font-mono">
+                  <span className="font-medium text-foreground">{daysLeft.toLocaleString("fa-IR")} روز مانده</span>
+                  <span className="text-muted-foreground text-[11px]">
+                    ({Math.round(remainingDaysPercent).toLocaleString("fa-IR")}٪ از {totalDays.toLocaleString("fa-IR")} روز)
+                  </span>
+                </div>
+              )}
+            </div>
+            <Progress progress={remainingDaysPercent} />
+          </div>
+        )}
 
-            {isPackage ? (
+        {/* Quantity Remaining Progress (QUANTITY & HYBRID) */}
+        {showQty && (
+          <div className="flex w-full flex-col gap-1 text-xs">
+            <div className="flex items-center justify-between">
+              <span>سهمیه / باقی‌مانده بسته</span>
               <div className="flex items-center gap-1 font-mono">
                 <span className="font-semibold text-foreground">
                   {remainedQty.toLocaleString("fa-IR")} از {totalQty.toLocaleString("fa-IR")} عدد
@@ -125,24 +146,18 @@ export function ServiceDetailCard({
                   ({Math.round(quantityPercent).toLocaleString("fa-IR")}٪ باقی‌مانده)
                 </span>
               </div>
-            ) : daysLeft <= 0 ? (
-              <span className="text-rose-500 font-medium">نیاز به تمدید</span>
-            ) : (
-              <div className="flex items-center gap-1">
-                <span className="font-medium text-foreground font-mono">{daysLeft.toLocaleString("fa-IR")} روز مانده</span>
-                <span className="text-muted-foreground text-[11px]">
-                  ({Math.round(remainingDaysPercent).toLocaleString("fa-IR")}٪ از {totalDays.toLocaleString("fa-IR")} روز)
-                </span>
-              </div>
-            )}
+            </div>
+            <Progress progress={quantityPercent} />
           </div>
-          <Progress progress={displayProgress} />
-        </div>
+        )}
 
         <Table
           data={{
-            Date: renewalDate,
-            cycle: formatCycleDays(serviceDetail.billingCycle, totalDays),
+            Date: trackingType === "QUANTITY" ? "بدون انقضای زمانی" : renewalDate,
+            cycle:
+              trackingType === "QUANTITY"
+                ? "شارژ مصرفی / بسته اعتباری"
+                : formatCycleDays(serviceDetail.billingCycle, totalDays),
             price: serviceDetail.priceToman,
           }}
         />

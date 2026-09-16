@@ -7,6 +7,11 @@ export class CreateServiceDto {
   @IsOptional()
   customerId?: string;
 
+  @ApiPropertyOptional({ description: "Parent Catalog Service ID" })
+  @IsString()
+  @IsOptional()
+  parentServiceId?: string;
+
   @ApiPropertyOptional({ description: "Service Group ID" })
   @IsString()
   @IsOptional()
@@ -55,6 +60,16 @@ export class CreateServiceDto {
   @ApiPropertyOptional({ description: "Package quantity" })
   @IsOptional()
   quantity?: number;
+
+  @ApiPropertyOptional({ description: "Tracking Type (TIME, QUANTITY, HYBRID)" })
+  @IsString()
+  @IsOptional()
+  trackingType?: string;
+
+  @ApiPropertyOptional({ description: "Purchase Date (ISO string)" })
+  @IsDateString()
+  @IsOptional()
+  purchaseDate?: string;
 
   @ApiPropertyOptional({ description: "Start Date (ISO string)" })
   @IsDateString()

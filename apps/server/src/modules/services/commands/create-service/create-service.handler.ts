@@ -71,9 +71,28 @@
         }
       }
 
+      const purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : startDate;
+      const trackingType = dto.trackingType || "HYBRID";
+
+      let parentServiceId: string | null = dto.parentServiceId || null;
+      if (parentServiceId) {
+        const parentService = await this.prisma.service.findUnique({
+          where: { id: parentServiceId },
+        });
+        if (parentService) {
+          if (!serviceTypeId) {
+            serviceTypeId = parentService.serviceTypeId;
+          }
+          if (!dto.serverId && parentService.serverId) {
+            dto.serverId = parentService.serverId;
+          }
+        }
+      }
+
       const service = await this.prisma.service.create({
         data: {
-          customerId: (customerId as any) || undefined,
+          customerId: customerId || null,
+          parentServiceId: parentServiceId || null,
           serviceGroupId: dto.serviceGroupId || null,
           serviceTypeId,
           serverId: dto.serverId || null,
@@ -82,7 +101,10 @@
           priceToman: dto.priceToman || 0,
           billingCycle: dto.billingCycle || "MONTHLY",
           autoRenew: dto.autoRenew !== undefined ? dto.autoRenew : true,
-          quantity: dto.quantity !== undefined ? dto.quantity : null,
+          quantity: Math.max(1, Number(dto.quantity) || 1),
+          usedQuantity: 0,
+          trackingType,
+          purchaseDate,
           startDate,
           renewalDate,
           status: "ACTIVE",
@@ -93,6 +115,10 @@
           serviceGroup: true,
           server: true,
           endpoints: true,
+          parentService: true,
+          childServices: {
+            include: { customer: true },
+          },
         },
       });
 
@@ -105,12 +131,12 @@
             create: { year, lastNumber: 1 },
             update: { lastNumber: { increment: 1 } },
           });
-          const invoiceNumber = `INV-${year}-${seq.lastNumber.toString().padStart(5, "0")}`;
-          const isPackage = Boolean(dto.quantity && dto.quantity > 0);
-          const pkgQty = dto.quantity || 1;
-          const itemTitle = isPackage
-            ? `${service.name} (${pkgQty.toLocaleString("fa-IR")} عدد در بسته)`
-            : `صورت‌حساب سرویس ${service.name}`;
+          const invoiceNumber = (30000 + seq.lastNumber).toString();
+          const qty = dto.quantity && dto.quantity > 0 ? dto.quantity : 1;
+          const itemTitle =
+            dto.quantity && dto.quantity > 1
+              ? `${service.name} (تعداد: ${qty.toLocaleString("fa-IR")})`
+              : `صورت‌حساب سرویس ${service.name}`;
 
           await this.prisma.invoice.create({
             data: {
@@ -127,7 +153,7 @@
                     serviceId: service.id,
                     title: itemTitle,
                     description: service.description || `سرویس فعال ${service.name}`,
-                    quantity: pkgQty,
+                    quantity: qty,
                     unitPriceToman: service.priceToman,
                     totalToman: service.priceToman,
                     serviceNameSnapshot: service.name,

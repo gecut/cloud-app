@@ -173,7 +173,7 @@ model ServiceGroup {
 
 model Service {
   id                    String                @id @default(cuid())
-  customerId            String
+  customerId            String?
   serviceGroupId        String?
   serviceTypeId         String
   serverId              String?
@@ -181,13 +181,20 @@ model Service {
   description           String?
   status                ServiceStatus         @default(ACTIVE)
   priceToman            Int
+  quantity              Int                   @default(1)
+  usedQuantity          Int                   @default(0)
+  trackingType          String                @default("HYBRID")
+  purchaseDate          DateTime?
   startDate             DateTime
   renewalDate           DateTime
   serverVisibilityLevel ServerVisibilityLevel @default(NONE)
-  customer              Customer              @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  parentServiceId       String?
+  customer              Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   serviceGroup          ServiceGroup?         @relation(fields: [serviceGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   serviceType           ServiceType           @relation(fields: [serviceTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   server                Server?               @relation(fields: [serverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  parentService         Service?              @relation("ServiceHierarchy", fields: [parentServiceId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  childServices         Service[]             @relation("ServiceHierarchy")
   endpoints             Endpoint[]
   invoiceItems          InvoiceItem[]
   createdAt             DateTime              @default(now())
@@ -196,6 +203,7 @@ model Service {
   @@index([customerId, status])
   @@index([serverId])
   @@index([serviceTypeId])
+  @@index([parentServiceId])
   @@index([renewalDate])
 }
 

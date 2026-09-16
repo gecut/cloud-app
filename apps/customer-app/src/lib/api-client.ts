@@ -242,6 +242,9 @@ export async function validateSession(): Promise<boolean> {
         };
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser));
         localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(currentUser));
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("auth-change"));
+        }
         return true;
       }
     }
@@ -258,17 +261,21 @@ export async function validateSession(): Promise<boolean> {
         });
         if (retryRes.ok) {
           const data = await retryRes.json();
-          if (data?.id) {
+          const userData = data?.user || data;
+          if (userData?.id) {
             const currentUser: DemoUser = {
-              id: data.id,
-              name: data.name,
-              phone: data.phone,
-              email: data.email,
-              role: data.role,
-              customerId: data.customerId || null,
+              id: userData.id,
+              name: userData.name,
+              phone: userData.phone,
+              email: userData.email,
+              role: userData.role,
+              customerId: userData.customerId || null,
             };
             localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser));
             localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(currentUser));
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("auth-change"));
+            }
             return true;
           }
         }
@@ -318,7 +325,7 @@ export async function apiClient<T>(
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(options.body ? { "Content-Type": "application/json" } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -346,6 +353,10 @@ export async function apiClient<T>(
     }
   }
 
+  if (res.status === 204) {
+    return {} as T;
+  }
+
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(
@@ -353,5 +364,14 @@ export async function apiClient<T>(
     );
   }
 
-  return res.json();
+  const text = await res.text();
+  if (!text || text.trim() === "") {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text as unknown as T;
+  }
 }

@@ -47,9 +47,21 @@ export class PaymentsController {
       const custId = user.customerId || user.id;
       if (invoice.customerId !== custId) {
         const customer = await this.prisma.customer.findFirst({
-          where: { OR: [{ id: custId }, { userId: custId }] },
+          where: {
+            OR: [
+              { id: custId },
+              { userId: custId },
+              { id: invoice.customerId },
+              { userId: invoice.customerId },
+            ],
+          },
         });
-        if (!customer || invoice.customerId !== customer.id) {
+        const isOwner =
+          customer &&
+          (customer.id === invoice.customerId ||
+            customer.userId === user.id ||
+            customer.id === user.customerId);
+        if (!isOwner) {
           throw new ForbiddenException("شما مجاز به پرداخت این فاکتور نیستید");
         }
       }

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
@@ -27,6 +28,7 @@ import {
   Server,
   AlertTriangle,
   Ban,
+  Trash2,
 } from "lucide-react";
 
 import { normalizePhoneNumber } from "@/utils/phone";
@@ -93,6 +95,23 @@ function AdminCustomersListPage() {
     },
   });
 
+  const [customerToDelete, setCustomerToDelete] = useState<any>(null);
+
+  const deleteCustomerMutation = useMutation({
+    mutationFn: (customerId: string) =>
+      apiClient(`/customers/${customerId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      toast.success("مشتری و اطلاعات وابسته با موفقیت حذف گردید");
+      queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
+      setCustomerToDelete(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در حذف مشتری");
+    },
+  });
+
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -108,6 +127,14 @@ function AdminCustomersListPage() {
     });
   };
 
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name_asc" | "name_desc">("newest");
+  const [page, setPage] = useState(1);
+  const PAGE_LIMIT = 12;
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, sortBy]);
+
   const customersList = data?.items || [];
   const filteredList = customersList.filter(
     (c: any) =>
@@ -116,6 +143,25 @@ function AdminCustomersListPage() {
       c.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.phone?.includes(searchTerm),
   );
+
+  const sortedList = [...filteredList].sort((a: any, b: any) => {
+    if (sortBy === "newest") {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    }
+    if (sortBy === "oldest") {
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+    }
+    if (sortBy === "name_asc") {
+      return (a.name || "").localeCompare(b.name || "", "fa");
+    }
+    if (sortBy === "name_desc") {
+      return (b.name || "").localeCompare(a.name || "", "fa");
+    }
+    return 0;
+  });
+
+  const totalPages = Math.ceil(sortedList.length / PAGE_LIMIT) || 1;
+  const paginatedList = sortedList.slice((page - 1) * PAGE_LIMIT, page * PAGE_LIMIT);
 
   const getNearestExpiringService = (services?: any[]) => {
     if (!services || services.length === 0) return null;
@@ -166,10 +212,10 @@ function AdminCustomersListPage() {
           </div>
         </div>
 
-        {/* Modal / Create Drawer */}
-        {isCreateOpen && (
+        {/* Modal / Create Customer (Portal to Body for 100% viewport centering) */}
+        {isCreateOpen && typeof document !== "undefined" && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-lg rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="relative w-full max-w-lg rounded-2xl border border-border/60 bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-border/40">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -267,12 +313,13 @@ function AdminCustomersListPage() {
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {/* Filters & Search */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
+        {/* Filters & Search & Sort */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-[240px] max-w-sm">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground opacity-70" />
             <Input
               placeholder="جستجو بر اساس نام، شرکت یا شماره تماس..."
@@ -281,10 +328,24 @@ function AdminCustomersListPage() {
               className="pr-9 h-9 text-xs rounded-xl border-border/60 bg-card/40 backdrop-blur-xs focus:border-emerald-500/50 focus:ring-emerald-500/20"
             />
           </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-medium">مرتب‌سازی:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="h-9 rounded-xl border border-input bg-card/60 px-3 text-xs font-medium text-foreground shadow-xs focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+            >
+              <option value="newest">جدیدترین</option>
+              <option value="oldest">قدیمی‌ترین</option>
+              <option value="name_asc">نام (الف - ی)</option>
+              <option value="name_desc">نام (ی - الف)</option>
+            </select>
+          </div>
         </div>
 
         {/* Customer Cards Grid */}
-        {filteredList.length === 0 ? (
+        {sortedList.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border/60 bg-card/20 p-12 text-center flex flex-col items-center justify-center gap-3">
             <div className="p-3 rounded-2xl bg-muted/40 text-muted-foreground">
               <Users className="h-8 w-8" />
@@ -304,7 +365,7 @@ function AdminCustomersListPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {filteredList.map((customer: any) => {
+            {paginatedList.map((customer: any) => {
               const nearestService = getNearestExpiringService(customer.services);
               const servicesCount = customer.services?.length ?? customer._count?.services ?? 0;
               const invoicesCount = customer.invoices?.length ?? customer._count?.invoices ?? 0;
@@ -500,10 +561,101 @@ function AdminCustomersListPage() {
                         <span className="hidden sm:inline">فعال</span>
                       </Button>
                     )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCustomerToDelete(customer)}
+                      disabled={deleteCustomerMutation.isPending}
+                      className="h-9 px-2.5 rounded-xl text-xs font-semibold gap-1 text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:border-rose-900/40 cursor-pointer transition-colors"
+                      title="حذف پرونده مشتری"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Pagination Bar */}
+        {sortedList.length > PAGE_LIMIT && (
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border/30 text-xs">
+            <span className="text-muted-foreground">
+              نمایش {(page - 1) * PAGE_LIMIT + 1} تا {Math.min(page * PAGE_LIMIT, sortedList.length)} از {sortedList.length} مشتری
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="h-8 px-3 rounded-xl text-xs gap-1 cursor-pointer"
+              >
+                قبلی
+              </Button>
+              <span className="px-2 font-mono font-medium text-foreground">
+                صفحه {page} از {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="h-8 px-3 rounded-xl text-xs gap-1 cursor-pointer"
+              >
+                بعدی
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Customer Confirmation Modal */}
+        {customerToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+            <div className="relative w-full max-w-md rounded-2xl border border-rose-500/20 bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/40">
+                <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-foreground">حذف پرونده مشتری</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{customerToDelete.name}</p>
+                </div>
+              </div>
+
+              <div className="py-4 text-xs text-muted-foreground leading-relaxed space-y-2">
+                <p>
+                  آیا از حذف کامل مشتری <strong className="text-foreground font-semibold">{customerToDelete.name}</strong> اطمینان دارید؟
+                </p>
+                <p className="text-rose-500/90 font-medium">
+                  توجه: کلیه سرویس‌ها، فاکتورها و سوابق ثبت‌شده برای این مشتری نیز به صورت خودکار لغو یا پاکسازی خواهند شد و این عملیات غیرقابل بازگشت است.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/40">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCustomerToDelete(null)}
+                  disabled={deleteCustomerMutation.isPending}
+                  className="rounded-xl text-xs"
+                >
+                  انصراف
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => deleteCustomerMutation.mutate(customerToDelete.id)}
+                  disabled={deleteCustomerMutation.isPending}
+                  className="rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold gap-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {deleteCustomerMutation.isPending ? "در حال حذف..." : "تأیید و حذف مشتری"}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>

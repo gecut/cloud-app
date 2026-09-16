@@ -38,6 +38,11 @@ export const navItems = [
     icon: Server,
   },
   {
+    to: "/categories",
+    label: "دسته‌بندی‌ها",
+    icon: Layers,
+  },
+  {
     to: "/invoices",
     label: "فاکتورها",
     icon: FileText,

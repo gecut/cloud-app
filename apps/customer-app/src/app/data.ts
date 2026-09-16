@@ -9,7 +9,11 @@ export type Service = {
   priceToman: number;
   startDate: Date;
   renewalDate: Date;
+  purchaseDate?: Date;
+  createdAt?: Date;
+  trackingType?: "HYBRID" | "TIME" | "QUANTITY";
   quantity?: number;
+  usedQuantity?: number;
   remainedQuantity?: number;
   billingCycle?: string;
   autoRenew?: boolean;

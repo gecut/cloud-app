@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
-import { UnauthorizedException } from "@nestjs/common";
+import { UnauthorizedException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
 import { PasswordService } from "../../services/password.service";
 import { SessionService } from "../../services/session.service";
@@ -26,6 +26,10 @@ export class LoginPasswordHandler implements ICommandHandler<LoginPasswordComman
 
     if (!user) {
       throw new UnauthorizedException("کاربری با این شماره موبایل یافت نشد");
+    }
+
+    if (user.customer && (user.customer.status === "INACTIVE" || user.customer.status === "SUSPENDED")) {
+      throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
     }
 
     const isPasswordValid = await this.passwordService.compare(

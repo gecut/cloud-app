@@ -11,6 +11,7 @@ import {
   User,
   ShieldCheck,
 } from "lucide-react";
+import { formatInvoiceNumber } from "@/utils/format";
 import { Button } from "@gecut-cloud/ui/components/button";
 import { formatJalaliDate, formatJalaliDateTime } from "@gecut-cloud/contracts";
 
@@ -49,14 +50,99 @@ export function InvoiceDetailModal({
   const total = invoice.totalToman || subtotal;
 
   const handlePrint = () => {
-    window.print();
+    const printContent = document.getElementById("isolated-invoice-printable");
+    if (!printContent) {
+      window.print();
+      return;
+    }
+    const printWindow = window.open("", "_blank", "width=850,height=950");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html dir="rtl" lang="fa">
+        <head>
+          <meta charset="utf-8">
+          <title>فاکتور ${formatInvoiceNumber(invoice.invoiceNumber || invoice.id)}</title>
+          <style>
+            @page { size: A4 portrait; margin: 12mm; }
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+            body { background: white; color: #0f172a; direction: rtl; padding: 24px; font-size: 12px; line-height: 1.5; }
+            .print\\:hidden, .print-hidden { display: none !important; }
+            table { width: 100%; border-collapse: collapse; margin-top: 12px; margin-bottom: 12px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: right; }
+            th { background-color: #f1f5f9; font-weight: 700; color: #334155; }
+            .border { border: 1px solid #e2e8f0; }
+            .rounded-xl { border-radius: 12px; }
+            .rounded-lg { border-radius: 8px; }
+            .p-4 { padding: 16px; }
+            .p-5 { padding: 20px; }
+            .mb-4 { margin-bottom: 16px; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .gap-3 { gap: 12px; }
+            .gap-4 { gap: 16px; }
+            .font-bold { font-weight: bold; }
+            .font-semibold { font-weight: 600; }
+            .text-sm { font-size: 13px; }
+            .text-xs { font-size: 11px; }
+            .text-muted-foreground { color: #64748b; }
+            .bg-muted\\/20, .bg-muted\\/10 { background-color: #f8fafc; }
+          </style>
+        </head>
+        <body>
+          <div style="max-width: 800px; margin: 0 auto;">
+            ${printContent.innerHTML}
+          </div>
+          <script>
+            window.onload = () => {
+              window.focus();
+              window.print();
+              setTimeout(() => { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto print:p-0 print:bg-white print:static">
-      <div className="relative w-full max-w-3xl rounded-2xl border bg-card p-6 sm:p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200 my-auto print:shadow-none print:border-none print:max-w-none print:p-6 print:text-black">
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #isolated-invoice-printable, #isolated-invoice-printable * {
+            visibility: visible !important;
+          }
+          #isolated-invoice-printable {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 10mm !important;
+            background: white !important;
+            color: black !important;
+            box-shadow: none !important;
+            border: none !important;
+          }
+          .print-hidden, .print\\:hidden {
+            display: none !important;
+          }
+        }
+      `}</style>
+      <div
+        id="isolated-invoice-printable"
+        className="relative w-full max-w-3xl rounded-2xl border bg-card p-6 sm:p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200 my-auto print:shadow-none print:border-none print:max-w-none print:p-6 print:text-black"
+      >
         {/* Top Actions Bar (Hidden on Print) */}
-        <div className="flex items-center justify-between pb-4 border-b mb-6 print:hidden">
+        <div className="flex items-center justify-between pb-4 border-b mb-6 print-hidden print:hidden">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-primary/10 text-primary">
               <FileText className="h-5 w-5" />
@@ -64,7 +150,7 @@ export function InvoiceDetailModal({
             <div>
               <h3 className="font-bold text-base text-foreground">جزئیات صورت‌حساب</h3>
               <p className="text-xs text-muted-foreground">
-                شماره فاکتور: {invoice.invoiceNumber || invoice.id}
+                شماره فاکتور: {formatInvoiceNumber(invoice.invoiceNumber || invoice.id)}
               </p>
             </div>
           </div>
@@ -123,7 +209,7 @@ export function InvoiceDetailModal({
               <div className="flex items-center gap-1.5 font-mono">
                 <span className="text-muted-foreground">شماره صورت‌حساب:</span>
                 <span className="font-bold text-foreground text-sm">
-                  {invoice.invoiceNumber || invoice.id}
+                  {formatInvoiceNumber(invoice.invoiceNumber || invoice.id)}
                 </span>
               </div>
               <div className="flex items-center gap-2">

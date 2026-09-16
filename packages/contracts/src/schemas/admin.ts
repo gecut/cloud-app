@@ -93,6 +93,8 @@ export const adminServiceCreateInputSchema = z.object({
   priceToman: moneySchema,
   startDate: z.coerce.date(),
   renewalDate: z.coerce.date(),
+  quantity: z.number().int().min(1).default(1),
+  usedQuantity: z.number().int().min(0).default(0).optional(),
   serverVisibilityLevel: serverVisibilityLevelSchema.default("NONE"),
 });
 
@@ -105,6 +107,8 @@ export const adminServiceUpdateInputSchema = z.object({
   description: z.string().nullable().optional(),
   status: serviceStatusSchema.optional(),
   priceToman: moneySchema.optional(),
+  quantity: z.number().int().min(1).optional(),
+  usedQuantity: z.number().int().min(0).optional(),
   startDate: z.coerce.date().optional(),
   renewalDate: z.coerce.date().optional(),
   serverVisibilityLevel: serverVisibilityLevelSchema.optional(),

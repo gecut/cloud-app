@@ -18,6 +18,7 @@ export class RecordPaymentHandler
     return this.prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUnique({
         where: { id: dto.invoiceId },
+        include: { customer: true, items: true },
       });
 
       if (!invoice) {
@@ -58,20 +59,37 @@ export class RecordPaymentHandler
         },
       });
 
+      const customer =
+        (invoice as any).customer ||
+        (invoice.customerId
+          ? await tx.customer.findFirst({
+              where: {
+                OR: [{ id: invoice.customerId }, { userId: invoice.customerId }],
+              },
+            })
+          : null);
+      const customerName = customer?.displayName || customer?.name || "مشتری";
+
       await tx.auditLog
         .create({
           data: {
             actorType: "USER",
             actorRole: "CUSTOMER",
-            actorDisplayNameSnapshot: invoice.customer?.name || "مشتری",
+            actorDisplayNameSnapshot: customerName,
+            userId: customer?.userId || customer?.id,
             action: "payment.record",
             entityType: "Payment",
             entityId: payment.id,
-            reason: `پرداخت آنلاین فاکتور ${invoice.invoiceNumber} به مبلغ ${payment.amountToman.toLocaleString("fa-IR")} تومان (کد پیگیری: ${dto.gatewayRef})`,
+            reason: `پرداخت آنلاین فاکتور ${invoice.invoiceNumber} به مبلغ ${payment.amountToman.toLocaleString("fa-IR")} تومان توسط ${customerName} (کد پیگیری: ${dto.gatewayRef})`,
             after: {
               invoiceId: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              customerName,
+              customerId: invoice.customerId,
               amountToman: payment.amountToman,
               gatewayRef: dto.gatewayRef,
+              provider: dto.provider,
+              paidAt: now.toISOString(),
             },
           },
         })

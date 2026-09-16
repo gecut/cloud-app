@@ -36,8 +36,24 @@ export class CreateCustomerHandler
         });
       }
 
+      // Generate sequential numeric system ID starting from 30001
+      const allCustomers = await tx.customer.findMany({
+        select: { id: true },
+      });
+      let maxNum = 30000;
+      for (const c of allCustomers) {
+        if (/^30\d+$/.test(c.id)) {
+          const n = parseInt(c.id, 10);
+          if (!isNaN(n) && n > maxNum) {
+            maxNum = n;
+          }
+        }
+      }
+      const nextCustomerId = (maxNum + 1).toString();
+
       const customer = await tx.customer.create({
         data: {
+          id: nextCustomerId,
           userId: user.id,
           name: dto.name,
           displayName: dto.displayName || dto.company || null,

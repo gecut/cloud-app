@@ -23,34 +23,44 @@ export function Services() {
         ? `customerId=${activeUser.id}`
         : "";
       return apiClient<{ items: any[]; total: number }>(
-        `/services${queryParam ? `?${queryParam}&` : "?"}limit=50`,
+        `/services${queryParam ? `?${queryParam}&` : "?"}limit=100`,
       );
     },
-    enabled: !!(activeUser?.id || activeUser?.customerId),
+    enabled: true,
   });
 
   // Map real backend services without any fake mock fallbacks
   const allServices: Service[] = (apiServices?.items || []).map((item: any, idx: number) => {
-    const typeName = item.serviceType?.name || item.name || "سرویس ابری";
     const slug = (item.serviceType?.slug || "").toLowerCase();
-    const lowerCombined = (typeName + " " + slug + " " + (item.name || "")).toLowerCase();
-    const isPackage = slug === "package" || item.quantity;
+    const name = (item.name || "").toLowerCase();
+    const typeName = (item.serviceType?.name || "").toLowerCase();
+    const trackingType = (item.trackingType || "HYBRID").toUpperCase() as "HYBRID" | "TIME" | "QUANTITY";
 
     let detectedType: ServiceType = "SERVICE";
-    if (isPackage) {
-      detectedType = "PACKAGE";
-    } else if (lowerCombined.includes("domain") || lowerCombined.includes("دامنه")) {
+    if (slug === "domain" || name.includes("domain") || name.includes("دامنه") || typeName.includes("دامنه")) {
       detectedType = "DOMAIN";
     } else if (
-      lowerCombined.includes("server") ||
-      lowerCombined.includes("سرور") ||
-      lowerCombined.includes("hosting") ||
-      lowerCombined.includes("هاست") ||
-      lowerCombined.includes("میزبانی") ||
-      lowerCombined.includes("vps")
+      slug === "server" ||
+      slug === "hosting" ||
+      name.includes("server") ||
+      name.includes("سرور") ||
+      name.includes("hosting") ||
+      name.includes("هاست") ||
+      name.includes("میزبانی") ||
+      name.includes("vps") ||
+      typeName.includes("سرور") ||
+      typeName.includes("هاست")
     ) {
       detectedType = "SERVER";
+    } else if (slug === "package" || trackingType === "QUANTITY" || (trackingType === "HYBRID" && Number(item.quantity) > 1)) {
+      detectedType = "PACKAGE";
+    } else {
+      detectedType = "SERVICE";
     }
+
+    const totalQty = Number(item.quantity) || 1;
+    const usedQty = Number(item.usedQuantity) || 0;
+    const remainedQty = Math.max(0, totalQty - usedQty);
 
     return {
       id: item.id || `svc_${idx}`,
@@ -59,11 +69,15 @@ export function Services() {
       description: item.description || item.serviceType?.name || "سرویس فعال زیرساخت ابری جیکات",
       status: (item.status || "ACTIVE") as Service["status"],
       priceToman: Number(item.priceToman ?? item.price ?? 0),
-      quantity: item.quantity ? Number(item.quantity) : undefined,
-      remainedQuantity: item.quantity ? Number(item.quantity) : undefined,
+      trackingType,
+      quantity: totalQty,
+      usedQuantity: usedQty,
+      remainedQuantity: remainedQty,
       billingCycle: item.billingCycle || "MONTHLY",
       autoRenew: item.autoRenew !== false,
       startDate: item.startDate ? new Date(item.startDate) : new Date(),
+      purchaseDate: item.purchaseDate ? new Date(item.purchaseDate) : undefined,
+      createdAt: item.createdAt ? new Date(item.createdAt) : undefined,
       renewalDate: item.renewalDate
         ? new Date(item.renewalDate)
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
@@ -78,7 +92,9 @@ export function Services() {
   const cloudServices = allServices.filter((s) => s.type === "SERVICE");
   const domainServices = allServices.filter((s) => s.type === "DOMAIN");
   const hostingServices = allServices.filter((s) => s.type === "SERVER");
-  const packageServices = allServices.filter((s) => s.type === "PACKAGE" || (s.quantity && s.quantity > 0));
+  const packageServices = allServices.filter(
+    (s) => s.type === "PACKAGE" || s.trackingType === "QUANTITY" || (s.trackingType === "HYBRID" && (s.quantity || 1) > 1),
+  );
 
   const subscriptionsList = packageServices.map((s) => ({
     id: s.id,
@@ -86,7 +102,7 @@ export function Services() {
     subTitle: s.description || `بسته تعدادی (${(s.quantity || 1).toLocaleString("fa-IR")} عدد)`,
     totalVolume: s.quantity || 1,
     remainedVolume: s.remainedQuantity ?? s.quantity ?? 1,
-    buyData: s.startDate,
+    buyData: s.purchaseDate || s.startDate,
     price: s.priceToman,
   }));
 

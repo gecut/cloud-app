@@ -42,14 +42,14 @@ export class ListInvoicesHandler implements IQueryHandler<ListInvoicesQuery> {
 
           if (existingItems.length === 0) {
             const year = new Date().getFullYear();
-            let invoiceNumber = `INV-${year}-${Math.floor(10000 + Math.random() * 90000)}`;
+            let invoiceNumber = (30001 + Math.floor(Math.random() * 89999)).toString();
             try {
               const seq = await this.prisma.invoiceSequence.upsert({
                 where: { year },
                 create: { year, lastNumber: 1 },
                 update: { lastNumber: { increment: 1 } },
               });
-              invoiceNumber = `INV-${year}-${seq.lastNumber.toString().padStart(5, "0")}`;
+              invoiceNumber = (30000 + seq.lastNumber).toString();
             } catch {}
 
             const svcQuantity = (svc as any).quantity;
@@ -61,7 +61,7 @@ export class ListInvoicesHandler implements IQueryHandler<ListInvoicesQuery> {
 
             await this.prisma.invoice.create({
               data: {
-                customerId: svc.customerId,
+                customerId: svc.customerId || resolvedCustomerId,
                 invoiceNumber,
                 status: "UNPAID",
                 subtotalToman: svc.priceToman,

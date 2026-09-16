@@ -37,6 +37,7 @@ export class ListPaymentsHandler implements IQueryHandler<ListPaymentsQuery> {
           invoice: {
             include: {
               customer: true,
+              items: true,
             },
           },
         },

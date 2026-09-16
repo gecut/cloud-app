@@ -239,7 +239,7 @@ export async function apiClient<T>(
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(options.body ? { "Content-Type": "application/json" } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -268,11 +268,27 @@ export async function apiClient<T>(
   }
 
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(
-      errorData.message || `درخواست با کد وضعیت ${res.status} ناموفق بود`,
-    );
+    const errorText = await res.text().catch(() => "");
+    let errorMessage = `درخواست با کد وضعیت ${res.status} ناموفق بود`;
+    try {
+      const parsed = JSON.parse(errorText);
+      if (parsed.message) errorMessage = parsed.message;
+    } catch {}
+    throw new Error(errorMessage);
   }
 
-  return res.json();
+  if (res.status === 204) {
+    return {} as T;
+  }
+
+  const text = await res.text().catch(() => "");
+  if (!text || text.trim() === "") {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {} as T;
+  }
 }

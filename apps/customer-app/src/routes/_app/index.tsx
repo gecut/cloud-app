@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ServicesSlider } from "@/app/components/pages/dashboard/banner";
 import { DashboardList } from "@/app/components/pages/dashboard/dashboard-list";
 import { apiClient, getActiveCustomerUser } from "@/lib/api-client";
+import { ServiceType } from "@/app/data";
 
 export const Route = createFileRoute("/_app/")({
   component: DashboardPage,
@@ -20,27 +21,46 @@ export function DashboardPage() {
         ? `customerId=${activeUser.id}`
         : "";
       return apiClient<{ items: any[]; total: number }>(
-        `/services${queryParam ? `?${queryParam}&` : "?"}limit=50`,
+        `/services${queryParam ? `?${queryParam}&` : "?"}limit=100`,
       );
     },
-    enabled: !!(activeUser?.id || activeUser?.customerId),
+    enabled: true,
   });
 
   // Map real backend services created by admin, NO fake mock fallback
   const servicesList =
     apiServices?.items && apiServices.items.length > 0
       ? apiServices.items.map((item: any, idx: number) => {
-          const typeName = item.serviceType?.name || item.name || "هاست ابری";
           const slug = (item.serviceType?.slug || "").toLowerCase();
-          const lowerType = (typeName + " " + slug + " " + (item.name || "")).toLowerCase();
-          const isPackage = slug === "package" || item.quantity;
-          const detectedType = isPackage
-            ? "PACKAGE"
-            : lowerType.includes("domain") || lowerType.includes("دامنه")
-            ? "DOMAIN"
-            : lowerType.includes("server") || lowerType.includes("سرور") || lowerType.includes("میزبانی") || lowerType.includes("هاست")
-            ? "SERVER"
-            : "SERVICE";
+          const name = (item.name || "").toLowerCase();
+          const typeName = (item.serviceType?.name || "").toLowerCase();
+          const trackingType = (item.trackingType || "HYBRID").toUpperCase() as "HYBRID" | "TIME" | "QUANTITY";
+
+          let detectedType: ServiceType = "SERVICE";
+          if (slug === "domain" || name.includes("domain") || name.includes("دامنه") || typeName.includes("دامنه")) {
+            detectedType = "DOMAIN";
+          } else if (
+            slug === "server" ||
+            slug === "hosting" ||
+            name.includes("server") ||
+            name.includes("سرور") ||
+            name.includes("hosting") ||
+            name.includes("هاست") ||
+            name.includes("میزبانی") ||
+            name.includes("vps") ||
+            typeName.includes("سرور") ||
+            typeName.includes("هاست")
+          ) {
+            detectedType = "SERVER";
+          } else if (slug === "package" || trackingType === "QUANTITY" || (trackingType === "HYBRID" && Number(item.quantity) > 1)) {
+            detectedType = "PACKAGE";
+          } else {
+            detectedType = "SERVICE";
+          }
+
+          const totalQty = Number(item.quantity) || 1;
+          const usedQty = Number(item.usedQuantity) || 0;
+          const remainedQty = Math.max(0, totalQty - usedQty);
 
           return {
             id: item.id || `svc_${idx}`,
@@ -49,11 +69,15 @@ export function DashboardPage() {
             description: item.description || item.serviceType?.name || "سرویس ابری فعال جیکات",
             status: item.status || "ACTIVE",
             priceToman: Number(item.priceToman ?? item.price ?? 0),
-            quantity: item.quantity ? Number(item.quantity) : undefined,
-            remainedQuantity: item.quantity ? Number(item.quantity) : undefined,
+            trackingType,
+            quantity: totalQty,
+            usedQuantity: usedQty,
+            remainedQuantity: remainedQty,
             billingCycle: item.billingCycle || "MONTHLY",
             autoRenew: item.autoRenew !== false,
             startDate: item.startDate ? new Date(item.startDate) : new Date(),
+            purchaseDate: item.purchaseDate ? new Date(item.purchaseDate) : undefined,
+            createdAt: item.createdAt ? new Date(item.createdAt) : undefined,
             renewalDate: item.renewalDate
               ? new Date(item.renewalDate)
               : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),

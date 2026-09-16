@@ -32,6 +32,7 @@ export function CustomerLoginPage() {
   const [countdown, setCountdown] = useState(120);
   const [loading, setLoading] = useState(false);
   const [demoCode, setDemoCode] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Countdown timer for OTP
   useEffect(() => {
@@ -50,6 +51,7 @@ export function CustomerLoginPage() {
       return;
     }
 
+    setErrorMessage(null);
     setLoading(true);
     try {
       const res = await apiClient<{ success: boolean; message: string; demoCode?: string }>(
@@ -68,7 +70,9 @@ export function CustomerLoginPage() {
         setOtpCode(res.demoCode);
       }
     } catch (err: any) {
-      toast.danger(err.message || "خطا در ارسال کد تایید");
+      const msg = err.message || "خطا در ارسال کد تایید";
+      setErrorMessage(msg);
+      toast.danger(msg);
     } finally {
       setLoading(false);
     }
@@ -83,6 +87,7 @@ export function CustomerLoginPage() {
       return;
     }
 
+    setErrorMessage(null);
     setLoading(true);
     try {
       const res = await apiClient<{
@@ -110,7 +115,9 @@ export function CustomerLoginPage() {
       toast.success(res.message || "با موفقیت وارد حساب کاربری شدید");
       navigate({ to: "/" });
     } catch (err: any) {
-      toast.danger(err.message || "کد تایید نامعتبر است");
+      const msg = err.message || "کد تایید نامعتبر است";
+      setErrorMessage(msg);
+      toast.danger(msg);
     } finally {
       setLoading(false);
     }
@@ -135,6 +142,15 @@ export function CustomerLoginPage() {
           title="ورود مشترکین به جیکات کلود"
           subtitle="مشاهده و مدیریت سرویس‌ها، هاستینگ و صورت‌حساب‌ها"
         />
+
+        {errorMessage && (
+          <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-semibold leading-relaxed flex items-center gap-2.5 animate-in fade-in duration-200">
+            <svg className="h-5 w-5 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
         {!otpSent ? (
           /* STEP 1: ENTER PHONE NUMBER */

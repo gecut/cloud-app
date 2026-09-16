@@ -4,6 +4,7 @@ import { CreateServiceHandler } from "./commands/create-service/create-service.h
 import { UpdateServiceHandler } from "./commands/update-service/update-service.handler";
 import { GetServiceHandler } from "./queries/get-service/get-service.handler";
 import { ListServicesHandler } from "./queries/list-services/list-services.handler";
+import { CategoriesController, ServiceTypesAliasController } from "./categories.controller";
 import { ServicesController } from "./services.controller";
 
 const CommandHandlers = [CreateServiceHandler, UpdateServiceHandler];
@@ -11,7 +12,7 @@ const QueryHandlers = [GetServiceHandler, ListServicesHandler];
 
 @Module({
   imports: [CqrsModule],
-  controllers: [ServicesController],
+  controllers: [ServicesController, CategoriesController, ServiceTypesAliasController],
   providers: [...CommandHandlers, ...QueryHandlers],
   exports: [...CommandHandlers, ...QueryHandlers],
 })

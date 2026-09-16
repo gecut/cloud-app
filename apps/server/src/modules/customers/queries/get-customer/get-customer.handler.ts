@@ -8,8 +8,10 @@ export class GetCustomerHandler implements IQueryHandler<GetCustomerQuery> {
   constructor(private readonly prisma: PrismaService) {}
 
   async execute(query: GetCustomerQuery) {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: query.id },
+    const customer = await this.prisma.customer.findFirst({
+      where: {
+        OR: [{ id: query.id }, { userId: query.id }],
+      },
       include: {
         user: true,
         services: {

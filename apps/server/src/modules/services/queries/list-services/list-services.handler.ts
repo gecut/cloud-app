@@ -39,6 +39,10 @@ export class ListServicesHandler implements IQueryHandler<ListServicesQuery> {
           serviceGroup: true,
           server: true,
           endpoints: true,
+          parentService: true,
+          childServices: {
+            include: { customer: true, endpoints: true },
+          },
         },
       }),
       this.prisma.service.count({ where }),

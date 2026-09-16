@@ -82,6 +82,13 @@ export class ServicesController {
   @Roles("ADMIN")
   @ApiOperation({ summary: "Delete a service by ID" })
   async delete(@Param("id") id: string) {
+    // Delete related endpoints first
+    await this.prisma.endpoint.deleteMany({ where: { serviceId: id } }).catch(() => {});
+    // Unlink service from invoice items to preserve historical invoices
+    await this.prisma.invoiceItem.updateMany({
+      where: { serviceId: id },
+      data: { serviceId: null },
+    }).catch(() => {});
     return this.prisma.service.delete({ where: { id } });
   }
 }

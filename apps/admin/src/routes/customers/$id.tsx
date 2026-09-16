@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect, useMemo } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
 import { AppShell } from "@/components/layout/app-shell";
+import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
 import { apiClient } from "@/utils/api-client";
 import {
   Card,
@@ -113,12 +114,30 @@ function getBillingCycleLabel(cycle?: string | number) {
   }
 }
 
+function formatPriceInput(val: number | string | undefined | null): string {
+  if (val === "" || val === null || val === undefined || val === 0 || val === "0") return "";
+  const cleanDigits = String(val).replace(/[^0-9]/g, "");
+  const num = Number(cleanDigits);
+  if (isNaN(num) || num === 0) return "";
+  return num.toLocaleString("en-US");
+}
+
+function parsePriceInput(valStr: string): string {
+  if (!valStr) return "";
+  const standardDigits = valStr
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/[^0-9]/g, "");
+  return standardDigits;
+}
+
 export const Route = createFileRoute("/customers/$id")({
   component: AdminCustomerProfileDetailPage,
 });
 
 function AdminCustomerProfileDetailPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // Active Tab: 'profile' | 'services' | 'invoices' | 'notifications'
@@ -130,6 +149,7 @@ function AdminCustomerProfileDetailPage() {
   const [selectedService, setSelectedService] = useState<any>(null);
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
   const [isSendNotificationOpen, setIsSendNotificationOpen] = useState(false);
+  const [isDeleteCustomerOpen, setIsDeleteCustomerOpen] = useState(false);
 
   // Fetch Customer Details
   const { data: customer, isLoading, refetch } = useQuery({
@@ -149,11 +169,14 @@ function AdminCustomerProfileDetailPage() {
     queryFn: () => apiClient<{ items: any[]; total: number }>("/services?limit=100"),
   });
 
-  // Unique services created in the system catalog
+  // Unique base services created in the system catalog
+  const rawCatalogList = (allServicesData?.items || []).filter(
+    (s: any) => !s.customerId && !s.parentServiceId,
+  );
   const catalogServices = Array.from(
     new Map(
-      (allServicesData?.items || []).map((s: any) => [
-        s.name?.trim(),
+      (rawCatalogList.length > 0 ? rawCatalogList : allServicesData?.items || []).map((s: any) => [
+        s.id,
         {
           id: s.id,
           name: s.name,
@@ -162,6 +185,9 @@ function AdminCustomerProfileDetailPage() {
           serviceType: s.serviceType,
           description: s.description,
           server: s.server,
+          priceToman: s.priceToman,
+          quantity: s.quantity,
+          trackingType: s.trackingType,
         },
       ]),
     ).values(),
@@ -175,14 +201,16 @@ function AdminCustomerProfileDetailPage() {
   const [profileStatus, setProfileStatus] = useState<string>("ACTIVE");
   const [hasProfileInitialized, setHasProfileInitialized] = useState(false);
 
-  if (customer && !hasProfileInitialized) {
-    setProfileName(customer.name || "");
-    setProfileDisplayName(customer.displayName || customer.company || "");
-    setProfilePhone(customer.phone || customer.user?.phone || "");
-    setProfileEmail(customer.email || customer.user?.email || "");
-    setProfileStatus(customer.status || "ACTIVE");
-    setHasProfileInitialized(true);
-  }
+  useEffect(() => {
+    if (customer && !hasProfileInitialized) {
+      setProfileName(customer.name || "");
+      setProfileDisplayName(customer.displayName || customer.company || "");
+      setProfilePhone(customer.phone || customer.user?.phone || "");
+      setProfileEmail(customer.email || customer.user?.email || "");
+      setProfileStatus(customer.status || "ACTIVE");
+      setHasProfileInitialized(true);
+    }
+  }, [customer, hasProfileInitialized]);
 
   // Assign Created Service Form State
   const [selectedCatalogServiceId, setSelectedCatalogServiceId] = useState("");
@@ -192,6 +220,8 @@ function AdminCustomerProfileDetailPage() {
   const [serviceDurationDays, setServiceDurationDays] = useState<number>(30);
   const [serviceAutoRenew, setServiceAutoRenew] = useState<boolean>(true);
   const [serviceCreateInvoice, setServiceCreateInvoice] = useState<boolean>(true);
+  const [serviceTrackingType, setServiceTrackingType] = useState<"TIME" | "QUANTITY" | "HYBRID">("HYBRID");
+  const [servicePurchaseDate, setServicePurchaseDate] = useState<string | null>(new Date().toISOString());
   const [newServiceRenewalDate, setNewServiceRenewalDate] = useState(
     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
   );
@@ -215,6 +245,9 @@ function AdminCustomerProfileDetailPage() {
   const [editServiceName, setEditServiceName] = useState("");
   const [editServicePrice, setEditServicePrice] = useState("");
   const [editServiceQuantity, setEditServiceQuantity] = useState<number>(1);
+  const [editServiceUsedQuantity, setEditServiceUsedQuantity] = useState<number>(0);
+  const [editServiceTrackingType, setEditServiceTrackingType] = useState<"TIME" | "QUANTITY" | "HYBRID">("HYBRID");
+  const [editServicePurchaseDate, setEditServicePurchaseDate] = useState<string | null>(null);
   const [editServiceDurationDays, setEditServiceDurationDays] = useState<number>(30);
   const [editServiceAutoRenew, setEditServiceAutoRenew] = useState(true);
   const [editServiceStatus, setEditServiceStatus] = useState("ACTIVE");
@@ -303,6 +336,9 @@ function AdminCustomerProfileDetailPage() {
       toast.success("سرویس با موفقیت ویرایش شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "customer", id] });
       queryClient.invalidateQueries({ queryKey: ["admin", "services"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "payments"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "accounting"] });
       setIsEditServiceOpen(false);
       setSelectedService(null);
     },
@@ -365,6 +401,22 @@ function AdminCustomerProfileDetailPage() {
     },
   });
 
+  // Delete Customer Mutation
+  const deleteCustomerMutation = useMutation({
+    mutationFn: () =>
+      apiClient(`/customers/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      toast.success("پرونده مشتری و کلیه اطلاعات وابسته با موفقیت حذف گردید");
+      queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
+      navigate({ to: "/customers" });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در حذف مشتری");
+    },
+  });
+
   // Handle Profile Update
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -385,25 +437,32 @@ function AdminCustomerProfileDetailPage() {
       toast.error("لطفاً یک سرویس از سرویس‌های تعریف‌شده را انتخاب کنید");
       return;
     }
-    const isPackage = activeSelectedService.categorySlug === "package";
-    const qty = isPackage ? Math.max(1, Number(serviceQuantity) || 1) : undefined;
+    const qty = serviceTrackingType === "TIME" ? 1 : Math.max(1, Number(serviceQuantity) || 1);
     const finalPrice = Math.round(Number(servicePrice)) || 0;
     const finalName = serviceCustomName.trim() || activeSelectedService.name;
 
+    const renewalDateIso =
+      serviceTrackingType === "QUANTITY"
+        ? null
+        : newServiceRenewalDate
+        ? new Date(newServiceRenewalDate).toISOString()
+        : new Date(Date.now() + (serviceDurationDays || 30) * 24 * 60 * 60 * 1000).toISOString();
+
     createServiceMutation.mutate({
       customerId: activeCustomer?.id || id,
+      parentServiceId: activeSelectedService.id,
       serviceTypeId: activeSelectedService.serviceTypeId,
       serviceTypeSlug: activeSelectedService.categorySlug,
       name: finalName,
       priceToman: finalPrice,
-      billingCycle: String(serviceDurationDays),
-      autoRenew: serviceAutoRenew,
+      billingCycle: serviceTrackingType === "QUANTITY" ? "NONE" : String(serviceDurationDays),
+      autoRenew: serviceTrackingType === "QUANTITY" ? false : serviceAutoRenew,
       quantity: qty,
-      description: isPackage
-        ? `بسته ${qty ? qty.toLocaleString("fa-IR") : "۱"} عددی`
-        : (activeSelectedService.description || undefined),
+      trackingType: serviceTrackingType,
+      purchaseDate: servicePurchaseDate || new Date().toISOString(),
+      description: activeSelectedService.description || undefined,
       startDate: new Date().toISOString(),
-      renewalDate: new Date(newServiceRenewalDate).toISOString(),
+      renewalDate: renewalDateIso,
     });
   };
 
@@ -411,17 +470,24 @@ function AdminCustomerProfileDetailPage() {
   const handleEditServiceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedService) return;
-    const isPackage = selectedService.serviceType?.slug === "package";
     updateServiceMutation.mutate({
       serviceId: selectedService.id,
       data: {
         name: editServiceName,
         priceToman: Math.round(Number(editServicePrice)) || 0,
-        billingCycle: String(editServiceDurationDays),
-        autoRenew: editServiceAutoRenew,
-        quantity: isPackage ? Math.max(1, Number(editServiceQuantity) || 1) : undefined,
+        billingCycle: editServiceTrackingType === "QUANTITY" ? "NONE" : String(editServiceDurationDays),
+        autoRenew: editServiceTrackingType === "QUANTITY" ? false : editServiceAutoRenew,
+        quantity: editServiceTrackingType === "TIME" ? 1 : Math.max(1, Number(editServiceQuantity) || 1),
+        usedQuantity: editServiceTrackingType === "TIME" ? 0 : Math.max(0, Number(editServiceUsedQuantity) || 0),
         status: editServiceStatus,
-        renewalDate: editServiceRenewalDate ? new Date(editServiceRenewalDate).toISOString() : undefined,
+        trackingType: editServiceTrackingType,
+        purchaseDate: editServicePurchaseDate || undefined,
+        renewalDate:
+          editServiceTrackingType === "QUANTITY"
+            ? null
+            : editServiceRenewalDate
+            ? new Date(editServiceRenewalDate).toISOString()
+            : undefined,
       },
     });
   };
@@ -470,6 +536,14 @@ function AdminCustomerProfileDetailPage() {
     });
   };
 
+  const invoicesList = useMemo(() => {
+    return [...(customer?.invoices || [])].sort((a: any, b: any) => {
+      const timeA = new Date(a.createdAt || a.issuedAt || 0).getTime();
+      const timeB = new Date(b.createdAt || b.issuedAt || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [customer?.invoices]);
+
   const activeCustomer = customer;
 
   if (isLoading) {
@@ -503,7 +577,6 @@ function AdminCustomerProfileDetailPage() {
   }
 
   const servicesList = activeCustomer.services || [];
-  const invoicesList = activeCustomer.invoices || [];
   
   // Calculate summary metrics
   const activeServicesCount = servicesList.filter((s: any) => s.status === "ACTIVE").length;
@@ -571,6 +644,16 @@ function AdminCustomerProfileDetailPage() {
             >
               <Send className="h-3.5 w-3.5" />
               ارسال پیام
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsDeleteCustomerOpen(true)}
+              disabled={deleteCustomerMutation.isPending}
+              className="gap-1.5 text-rose-600 hover:text-white hover:bg-rose-600 border-rose-300 dark:border-rose-900/50 cursor-pointer transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>حذف مشتری</span>
             </Button>
           </div>
         </div>
@@ -947,33 +1030,140 @@ function AdminCustomerProfileDetailPage() {
                             <CatIcon className="h-5 w-5" />
                           </div>
                           <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${catBadge.className}`}
-                              >
-                                <CatIcon className="h-3 w-3" />
-                                {catBadge.label}
-                              </span>
-                              {isPackage && svc.quantity && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-mono">
-                                  <Package className="h-3 w-3" />
-                                  {svc.quantity} عدد در بسته
-                                </span>
-                              )}
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                  svc.status === "ACTIVE"
-                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                                }`}
-                              >
-                                {svc.status === "ACTIVE" ? "فعال" : "معلق"}
-                              </span>
-                            </div>
-                            <span className="text-[11px] text-muted-foreground font-mono mt-0.5 block">
-                              شناسه: {svc.id} • سرور: {svc.server?.name || "زیرساخت ابری جیکات"}
-                            </span>
+                            {(() => {
+                              const rawCycle = Number(svc.billingCycle);
+                              const totalDays =
+                                !isNaN(rawCycle) && rawCycle > 0
+                                  ? rawCycle
+                                  : svc.billingCycle === "ANNUAL"
+                                  ? 365
+                                  : svc.billingCycle === "SEMI_ANNUAL"
+                                  ? 180
+                                  : svc.billingCycle === "QUARTERLY"
+                                  ? 90
+                                  : 30;
+                              const renewalMs = svc.renewalDate ? new Date(svc.renewalDate).getTime() : 0;
+                              const now = Date.now();
+                              const remainingDays = renewalMs > 0 ? Math.max(0, Math.ceil((renewalMs - now) / 86400000)) : 0;
+                              const totalQty = Number(svc.quantity) || 1;
+                              const usedQty = Number(svc.usedQuantity) || 0;
+                              const remainingQty = Math.max(0, totalQty - usedQty);
+                              const trackingType = (svc.trackingType || "HYBRID").toUpperCase();
+                              const showDays = trackingType === "TIME" || trackingType === "HYBRID";
+                              const showQty = trackingType === "QUANTITY" || trackingType === "HYBRID";
+
+                              return (
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
+                                    {svc.parentService?.name && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground border border-border/60">
+                                        سرویس مرجع: {svc.parentService.name}
+                                      </span>
+                                    )}
+                                    <span
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${catBadge.className}`}
+                                    >
+                                      <CatIcon className="h-3 w-3" />
+                                      {catBadge.label}
+                                    </span>
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                        svc.status === "ACTIVE"
+                                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                      }`}
+                                    >
+                                      {svc.status === "ACTIVE" ? "فعال" : "معلق"}
+                                    </span>
+                                  </div>
+
+                                  {/* Remaining Balance Badges & Progress */}
+                                  <div className="flex flex-wrap items-center gap-3 mt-1">
+                                    {/* Days Remaining (for TIME and HYBRID only) */}
+                                    {showDays && (
+                                      <div className="flex flex-col gap-1 min-w-[190px]">
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20 font-mono">
+                                          <Clock className="h-3.5 w-3.5 text-blue-500" />
+                                          <span>
+                                            {remainingDays.toLocaleString("fa-IR")} روز باقی‌مانده از {totalDays.toLocaleString("fa-IR")} روز
+                                          </span>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full bg-blue-500 transition-all duration-300"
+                                            style={{
+                                              width: `${Math.min(100, Math.max(5, (remainingDays / totalDays) * 100))}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Quantity / Pack Consumable Remaining (for QUANTITY and HYBRID only) */}
+                                    {showQty && (
+                                      <div className="flex flex-col gap-1 min-w-[220px]">
+                                        <div className="flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold font-mono">
+                                            <Package className="h-3.5 w-3.5 text-emerald-500" />
+                                            <span>
+                                              {remainingQty.toLocaleString("fa-IR")} باقی‌مانده از {totalQty.toLocaleString("fa-IR")} عدد
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground">
+                                              ({usedQty.toLocaleString("fa-IR")} مصرف‌شده)
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              type="button"
+                                              title="کاهش مصرف (بازگشت به موجودی)"
+                                              disabled={usedQty <= 0 || updateServiceMutation.isPending}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                updateServiceMutation.mutate({
+                                                  serviceId: svc.id,
+                                                  data: { usedQuantity: Math.max(0, usedQty - 1) },
+                                                });
+                                              }}
+                                              className="h-5 w-5 rounded bg-card border border-emerald-500/30 text-foreground hover:bg-muted flex items-center justify-center text-xs font-bold disabled:opacity-30 cursor-pointer"
+                                            >
+                                              -
+                                            </button>
+                                            <button
+                                              type="button"
+                                              title="ثبت یک واحد مصرف دستی"
+                                              disabled={remainingQty <= 0 || updateServiceMutation.isPending}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                updateServiceMutation.mutate({
+                                                  serviceId: svc.id,
+                                                  data: { usedQuantity: usedQty + 1 },
+                                                });
+                                              }}
+                                              className="h-5 px-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-0.5 text-[9px] font-semibold disabled:opacity-30 cursor-pointer shadow-xs"
+                                            >
+                                              + مصرف
+                                            </button>
+                                          </div>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full bg-emerald-500 transition-all duration-300"
+                                            style={{
+                                              width: `${Math.min(100, Math.max(5, (remainingQty / totalQty) * 100))}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <span className="text-[11px] text-muted-foreground font-mono mt-0.5 block">
+                                    شناسه: {svc.id} • سرور: {svc.server?.name || "زیرساخت ابری جیکات"} • تاریخ ساخت: {formatJalaliDate(svc.createdAt)} • تاریخ خرید: {formatJalaliDate(svc.purchaseDate || svc.startDate || svc.createdAt)}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -985,28 +1175,38 @@ function AdminCustomerProfileDetailPage() {
                             </span>
                           </div>
                           <div className="text-left">
-                            <span className="text-[11px] text-muted-foreground block">دوره پرداخت:</span>
+                            <span className="text-[11px] text-muted-foreground block">
+                              {(svc.trackingType || "HYBRID").toUpperCase() === "QUANTITY" ? "نوع پکیج:" : "دوره پرداخت:"}
+                            </span>
                             <span className="font-semibold text-xs text-foreground">
-                              {getBillingCycleLabel(svc.billingCycle)}
+                              {(svc.trackingType || "HYBRID").toUpperCase() === "QUANTITY"
+                                ? "شارژ مصرفی / بسته اعتباری"
+                                : getBillingCycleLabel(svc.billingCycle)}
                             </span>
                           </div>
+                          {(svc.trackingType || "HYBRID").toUpperCase() !== "QUANTITY" && (
+                            <div className="text-left">
+                              <span className="text-[11px] text-muted-foreground block">تمدید خودکار:</span>
+                              {svc.autoRenew !== false ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                                  <Repeat className="h-3 w-3" />
+                                  فعال
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground font-medium">
+                                  غیرفعال
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <div className="text-left">
-                            <span className="text-[11px] text-muted-foreground block">تمدید خودکار:</span>
-                            {svc.autoRenew !== false ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                <Repeat className="h-3 w-3" />
-                                فعال
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground font-medium">
-                                غیرفعال
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-left">
-                            <span className="text-[11px] text-muted-foreground block">تاریخ سررسید:</span>
+                            <span className="text-[11px] text-muted-foreground block">
+                              {(svc.trackingType || "HYBRID").toUpperCase() === "QUANTITY" ? "اعتبار زمانی:" : "تاریخ سررسید:"}
+                            </span>
                             <span className="font-mono text-xs text-foreground">
-                              {formatJalaliDate(svc.renewalDate)}
+                              {(svc.trackingType || "HYBRID").toUpperCase() === "QUANTITY"
+                                ? "بدون انقضای زمانی"
+                                : formatJalaliDate(svc.renewalDate)}
                             </span>
                           </div>
                           <Button
@@ -1017,6 +1217,9 @@ function AdminCustomerProfileDetailPage() {
                               setEditServiceName(svc.name);
                               setEditServicePrice(String(svc.priceToman || "0"));
                               setEditServiceQuantity(svc.quantity || 1);
+                              setEditServiceUsedQuantity(svc.usedQuantity || 0);
+                              setEditServiceTrackingType(svc.trackingType || "HYBRID");
+                              setEditServicePurchaseDate(svc.purchaseDate ? new Date(svc.purchaseDate).toISOString() : null);
                               setEditServiceAutoRenew(svc.autoRenew !== false);
                               const rawCycle = Number(svc.billingCycle);
                               const initialDays =
@@ -1540,106 +1743,230 @@ function AdminCustomerProfileDetailPage() {
                     </div>
                   )}
 
-                  {/* Conditional Fields based on Category */}
-                  {activeSelectedService?.categorySlug === "package" ? (
-                    <div className="space-y-3 p-3.5 rounded-xl border bg-amber-500/5 border-amber-500/20">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-semibold">تعداد (عدد در بسته) *</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={serviceQuantity}
-                            onChange={(e) => setServiceQuantity(Math.max(1, Number(e.target.value)))}
-                            placeholder="مثال: 5000"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-semibold">هزینه دوره (تومان) *</Label>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={servicePrice}
-                            onChange={(e) => setServicePrice(e.target.value)}
-                            placeholder="2500000"
-                            required
-                          />
-                        </div>
-                      </div>
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                        * برای دسته‌بندی بسته‌ها، تعداد و قیمت به صورت مستقل و آزادانه برای این مشتری تعیین می‌شوند.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">هزینه دوره (تومان) *</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={servicePrice}
-                        onChange={(e) => setServicePrice(e.target.value)}
-                        placeholder="مثال: 2500000"
-                        required
-                      />
-                    </div>
-                  )}
-
-                  {/* Service Duration (Days) and Renewal Date */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">دوره سرویس (تعداد روز) *</Label>
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          min={1}
-                          value={serviceDurationDays}
-                          onChange={(e) => {
-                            const days = Math.max(1, Number(e.target.value) || 1);
-                            setServiceDurationDays(days);
-                            const targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-                            setNewServiceRenewalDate(targetDate.toISOString().split("T")[0]);
-                          }}
-                          placeholder="مثال: 30"
-                          className="pl-12 font-mono"
-                          required
-                        />
-                        <span className="absolute left-3 top-2.5 text-xs text-muted-foreground pointer-events-none">
-                          روز
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">تاریخ سررسید تمدید</Label>
-                      <Input
-                        type="date"
-                        value={newServiceRenewalDate}
-                        onChange={(e) => setNewServiceRenewalDate(e.target.value)}
-                      />
-                      {newServiceRenewalDate && (
-                        <p className="text-[11px] text-primary font-medium">
-                          معادل شمسی: {formatJalaliDateWords(newServiceRenewalDate)} ({formatJalaliDate(newServiceRenewalDate)})
-                        </p>
-                      )}
+                  {/* 3. Tracking Mode */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">مدل ردگیری و مصرف سرویس *</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={serviceTrackingType === "HYBRID" ? "default" : "outline"}
+                        onClick={() => setServiceTrackingType("HYBRID")}
+                        className={`text-xs h-8 cursor-pointer rounded-xl ${
+                          serviceTrackingType === "HYBRID" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                        }`}
+                      >
+                        ترکیبی (هر دو)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={serviceTrackingType === "TIME" ? "default" : "outline"}
+                        onClick={() => setServiceTrackingType("TIME")}
+                        className={`text-xs h-8 cursor-pointer rounded-xl ${
+                          serviceTrackingType === "TIME" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                        }`}
+                      >
+                        زمان (فقط زمان)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={serviceTrackingType === "QUANTITY" ? "default" : "outline"}
+                        onClick={() => setServiceTrackingType("QUANTITY")}
+                        className={`text-xs h-8 cursor-pointer rounded-xl ${
+                          serviceTrackingType === "QUANTITY" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                        }`}
+                      >
+                        تعداد (فقط تعداد)
+                      </Button>
                     </div>
                   </div>
 
-                  {/* Auto-renew checkbox */}
-                  <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={serviceAutoRenew}
-                      onChange={(e) => setServiceAutoRenew(e.target.checked)}
-                      className="rounded h-4 w-4 text-primary focus:ring-primary"
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-foreground">تمدید خودکار سرویس</span>
-                      <span className="text-[11px] text-muted-foreground">
-                        در تاریخ سررسید، صورت‌حساب تمدید به صورت اتوماتیک صادر شود
-                      </span>
+                  {/* 4. Tracking Parameters: Price, Duration, Quantity */}
+                  {serviceTrackingType === "TIME" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">هزینه دوره (تومان) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(servicePrice)}
+                          onChange={(e) => setServicePrice(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          className="font-mono text-left"
+                          required
+                        />
+                        {Number(servicePrice) > 0 && (
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            معادل: {Number(servicePrice).toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">مدت اعتبار (روز) *</Label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={serviceDurationDays}
+                            onChange={(e) => {
+                              const days = Math.max(1, Number(e.target.value) || 1);
+                              setServiceDurationDays(days);
+                              const targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+                              setNewServiceRenewalDate(targetDate.toISOString());
+                            }}
+                            placeholder="مثال: 30"
+                            className="pl-12 font-mono"
+                            required
+                          />
+                          <span className="absolute left-3 top-2.5 text-xs text-muted-foreground pointer-events-none">
+                            روز
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </label>
+                  )}
+
+                  {serviceTrackingType === "QUANTITY" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">مبلغ کل بسته (تومان) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(servicePrice)}
+                          onChange={(e) => setServicePrice(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          className="font-mono text-left"
+                          required
+                        />
+                        {Number(servicePrice) > 0 && (
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            معادل: {Number(servicePrice).toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">تعداد ظرفیت / پکیج اولیه (عدد) *</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={serviceQuantity}
+                          onChange={(e) => setServiceQuantity(Math.max(1, Number(e.target.value)))}
+                          placeholder="مثال: 5000"
+                          className="font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {serviceTrackingType === "HYBRID" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">هزینه دوره (تومان) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(servicePrice)}
+                          onChange={(e) => setServicePrice(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          className="font-mono text-left"
+                          required
+                        />
+                        {Number(servicePrice) > 0 && (
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            معادل: {Number(servicePrice).toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">مدت اعتبار (روز) *</Label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={serviceDurationDays}
+                            onChange={(e) => {
+                              const days = Math.max(1, Number(e.target.value) || 1);
+                              setServiceDurationDays(days);
+                              const targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+                              setNewServiceRenewalDate(targetDate.toISOString());
+                            }}
+                            placeholder="مثال: 30"
+                            className="pl-12 font-mono"
+                            required
+                          />
+                          <span className="absolute left-3 top-2.5 text-xs text-muted-foreground pointer-events-none">
+                            روز
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">ظرفیت پکیج (عدد) *</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={serviceQuantity}
+                          onChange={(e) => setServiceQuantity(Math.max(1, Number(e.target.value)))}
+                          placeholder="مثال: 1000"
+                          className="font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 5. Dates (Only for TIME and HYBRID) */}
+                  {serviceTrackingType !== "QUANTITY" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <JalaliDatePicker
+                            label="تاریخ ساخت و ایجاد سرویس (شمسی)"
+                            value={servicePurchaseDate}
+                            onChange={(val) => setServicePurchaseDate(val)}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <JalaliDatePicker
+                            label="تاریخ شروع / خرید (شمسی)"
+                            value={servicePurchaseDate}
+                            onChange={(val) => setServicePurchaseDate(val)}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <JalaliDatePicker
+                          label="تاریخ سررسید تمدید"
+                          value={newServiceRenewalDate}
+                          onChange={(val) => setNewServiceRenewalDate(val)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Auto-renew checkbox (only for TIME & HYBRID) */}
+                  {serviceTrackingType !== "QUANTITY" && (
+                    <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={serviceAutoRenew}
+                        onChange={(e) => setServiceAutoRenew(e.target.checked)}
+                        className="rounded h-4 w-4 text-primary focus:ring-primary"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-foreground">تمدید خودکار سرویس</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          در تاریخ سررسید، صورت‌حساب تمدید به صورت اتوماتیک صادر شود
+                        </span>
+                      </div>
+                    </label>
+                  )}
 
                   <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
                     <Button
@@ -1695,107 +2022,245 @@ function AdminCustomerProfileDetailPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">هزینه دوره (تومان)</Label>
-                    <Input
-                      type="number"
-                      value={editServicePrice}
-                      onChange={(e) => setEditServicePrice(e.target.value)}
-                    />
+                {/* Tracking Mode */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">مدل ردگیری و مصرف سرویس *</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={editServiceTrackingType === "HYBRID" ? "default" : "outline"}
+                      onClick={() => setEditServiceTrackingType("HYBRID")}
+                      className={`text-xs h-8 cursor-pointer rounded-xl ${
+                        editServiceTrackingType === "HYBRID" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                      }`}
+                    >
+                      ترکیبی (هر دو)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={editServiceTrackingType === "TIME" ? "default" : "outline"}
+                      onClick={() => setEditServiceTrackingType("TIME")}
+                      className={`text-xs h-8 cursor-pointer rounded-xl ${
+                        editServiceTrackingType === "TIME" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                      }`}
+                    >
+                      زمان (فقط زمان)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={editServiceTrackingType === "QUANTITY" ? "default" : "outline"}
+                      onClick={() => setEditServiceTrackingType("QUANTITY")}
+                      className={`text-xs h-8 cursor-pointer rounded-xl ${
+                        editServiceTrackingType === "QUANTITY" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                      }`}
+                    >
+                      تعداد (فقط تعداد)
+                    </Button>
                   </div>
-
-                  {selectedService.serviceType?.slug === "package" || selectedService.quantity ? (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">تعداد در بسته</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={editServiceQuantity}
-                        onChange={(e) => setEditServiceQuantity(Math.max(1, Number(e.target.value)))}
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">وضعیت سرویس</Label>
-                      <select
-                        value={editServiceStatus}
-                        onChange={(e) => setEditServiceStatus(e.target.value)}
-                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      >
-                        <option value="ACTIVE">فعال (ACTIVE)</option>
-                        <option value="SUSPENDED">معلق (SUSPENDED)</option>
-                        <option value="INACTIVE">غیرفعال (INACTIVE)</option>
-                      </select>
-                    </div>
-                  )}
                 </div>
 
+                {/* Price and Status */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">دوره سرویس (تعداد روز) *</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        min={1}
-                        value={editServiceDurationDays}
-                        onChange={(e) => {
-                          const days = Math.max(1, Number(e.target.value) || 1);
-                          setEditServiceDurationDays(days);
-                          const base = selectedService?.startDate ? new Date(selectedService.startDate) : new Date();
-                          const targetDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
-                          setEditServiceRenewalDate(targetDate.toISOString().split("T")[0]);
-                        }}
-                        placeholder="مثال: 30"
-                        className="pl-12 font-mono h-9 text-xs"
-                        required
-                      />
-                      <span className="absolute left-3 top-2 text-xs text-muted-foreground pointer-events-none">
-                        روز
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">تاریخ سررسید تمدید</Label>
+                    <Label className="text-xs font-semibold">
+                      {editServiceTrackingType === "QUANTITY" ? "مبلغ کل بسته (تومان)" : "هزینه دوره (تومان)"}
+                    </Label>
                     <Input
-                      type="date"
-                      value={editServiceRenewalDate}
-                      onChange={(e) => setEditServiceRenewalDate(e.target.value)}
-                      className="h-9 text-xs"
+                      type="text"
+                      inputMode="numeric"
+                      dir="ltr"
+                      value={formatPriceInput(editServicePrice)}
+                      onChange={(e) => setEditServicePrice(parsePriceInput(e.target.value))}
+                      placeholder="0"
+                      className="font-mono text-left"
                     />
-                    {editServiceRenewalDate && (
-                      <p className="text-[11px] text-primary font-medium">
-                        معادل شمسی: {formatJalaliDateWords(editServiceRenewalDate)} ({formatJalaliDate(editServiceRenewalDate)})
+                    {Number(editServicePrice) > 0 && (
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        معادل: {Number(editServicePrice).toLocaleString("fa-IR")} تومان
                       </p>
                     )}
                   </div>
-                </div>
 
-                {(selectedService.serviceType?.slug === "package" || selectedService.quantity) && (
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">وضعیت سرویس</Label>
                     <select
                       value={editServiceStatus}
-                      onChange={(e) => setEditServiceStatus(e.target.value)}
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      onChange={(e) => {
+                        const newStatus = e.target.value;
+                        if (newStatus === "INACTIVE" || newStatus === "SUSPENDED") {
+                          if (!confirm(`آیا از غیرفعال‌سازی سرویس «${selectedService?.name}» متعلق به مشتری «${activeCustomer.name}» اطمینان دارید؟`)) {
+                            return;
+                          }
+                        }
+                        setEditServiceStatus(newStatus);
+                      }}
+                      className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500/20"
                     >
                       <option value="ACTIVE">فعال (ACTIVE)</option>
                       <option value="SUSPENDED">معلق (SUSPENDED)</option>
                       <option value="INACTIVE">غیرفعال (INACTIVE)</option>
                     </select>
                   </div>
+                </div>
+
+                {/* TIME conditional fields */}
+                {editServiceTrackingType === "TIME" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">دوره سرویس (تعداد روز) *</Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={editServiceDurationDays}
+                          onChange={(e) => {
+                            const days = Math.max(1, Number(e.target.value) || 1);
+                            setEditServiceDurationDays(days);
+                            const base = selectedService?.startDate ? new Date(selectedService.startDate) : new Date();
+                            const targetDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+                            setEditServiceRenewalDate(targetDate.toISOString());
+                          }}
+                          placeholder="مثال: 30"
+                          className="pl-12 font-mono h-10 text-xs"
+                          required
+                        />
+                        <span className="absolute left-3 top-2.5 text-xs text-muted-foreground pointer-events-none">
+                          روز
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <JalaliDatePicker
+                        label="تاریخ سررسید تمدید"
+                        value={editServiceRenewalDate}
+                        onChange={(val) => setEditServiceRenewalDate(val)}
+                      />
+                    </div>
+                  </div>
                 )}
 
-                <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={editServiceAutoRenew}
-                    onChange={(e) => setEditServiceAutoRenew(e.target.checked)}
-                    className="rounded h-4 w-4 text-primary"
-                  />
-                  <span className="text-xs font-semibold">تمدید خودکار سرویس فعال باشد</span>
-                </label>
+                {/* QUANTITY conditional fields */}
+                {editServiceTrackingType === "QUANTITY" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">تعداد کل ظرفیت پکیج (عدد) *</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={editServiceQuantity}
+                        onChange={(e) => setEditServiceQuantity(Math.max(1, Number(e.target.value)))}
+                        className="font-mono"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">تعداد مصرف‌شده تا الان</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={editServiceUsedQuantity}
+                        onChange={(e) => setEditServiceUsedQuantity(Math.max(0, Number(e.target.value)))}
+                        className="font-mono"
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        باقی‌مانده: {Math.max(0, editServiceQuantity - editServiceUsedQuantity).toLocaleString("fa-IR")} عدد
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {editServiceTrackingType === "HYBRID" && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">دوره سرویس (تعداد روز) *</Label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={editServiceDurationDays}
+                            onChange={(e) => {
+                              const days = Math.max(1, Number(e.target.value) || 1);
+                              setEditServiceDurationDays(days);
+                              const base = selectedService?.startDate ? new Date(selectedService.startDate) : new Date();
+                              const targetDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+                              setEditServiceRenewalDate(targetDate.toISOString());
+                            }}
+                            placeholder="مثال: 30"
+                            className="pl-12 font-mono h-10 text-xs"
+                            required
+                          />
+                          <span className="absolute left-3 top-2.5 text-xs text-muted-foreground pointer-events-none">
+                            روز
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <JalaliDatePicker
+                          label="تاریخ سررسید تمدید"
+                          value={editServiceRenewalDate}
+                          onChange={(val) => setEditServiceRenewalDate(val)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">تعداد کل ظرفیت پکیج (عدد) *</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={editServiceQuantity}
+                          onChange={(e) => setEditServiceQuantity(Math.max(1, Number(e.target.value)))}
+                          className="font-mono"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">تعداد مصرف‌شده تا الان</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={editServiceUsedQuantity}
+                          onChange={(e) => setEditServiceUsedQuantity(Math.max(0, Number(e.target.value)))}
+                          className="font-mono"
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          باقی‌مانده: {Math.max(0, editServiceQuantity - editServiceUsedQuantity).toLocaleString("fa-IR")} عدد
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {editServiceTrackingType !== "QUANTITY" && (
+                  <div className="space-y-1.5">
+                    <JalaliDatePicker
+                      label="تاریخ خرید / شروع سرویس (شمسی)"
+                      value={editServicePurchaseDate}
+                      onChange={(val) => setEditServicePurchaseDate(val)}
+                    />
+                  </div>
+                )}
+
+                {editServiceTrackingType !== "QUANTITY" && (
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editServiceAutoRenew}
+                      onChange={(e) => setEditServiceAutoRenew(e.target.checked)}
+                      className="rounded h-4 w-4 text-primary"
+                    />
+                    <span className="text-xs font-semibold">تمدید خودکار سرویس فعال باشد</span>
+                  </label>
+                )}
 
                 <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
                   <Button
@@ -1853,20 +2318,27 @@ function AdminCustomerProfileDetailPage() {
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">مبلغ کل (تومان) *</Label>
                     <Input
-                      type="number"
-                      value={invoiceItemAmount}
-                      onChange={(e) => setInvoiceItemAmount(e.target.value)}
-                      placeholder="2500000"
+                      type="text"
+                      inputMode="numeric"
+                      dir="ltr"
+                      value={formatPriceInput(invoiceItemAmount)}
+                      onChange={(e) => setInvoiceItemAmount(parsePriceInput(e.target.value))}
+                      placeholder="0"
+                      className="font-mono text-left"
                       required
                     />
+                    {Number(invoiceItemAmount) > 0 && (
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        معادل: {Number(invoiceItemAmount).toLocaleString("fa-IR")} تومان
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">مهلت پرداخت</Label>
-                    <Input
-                      type="date"
+                    <JalaliDatePicker
+                      label="مهلت پرداخت"
                       value={invoiceDueDate}
-                      onChange={(e) => setInvoiceDueDate(e.target.value)}
+                      onChange={(val) => setInvoiceDueDate(val)}
                     />
                   </div>
                 </div>
@@ -1901,6 +2373,54 @@ function AdminCustomerProfileDetailPage() {
           }}
           onCancel={(invId) => cancelInvoiceMutation.mutate(invId)}
         />
+
+        {/* MODAL 5: DELETE CUSTOMER MODAL */}
+        {isDeleteCustomerOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+            <div className="relative w-full max-w-md rounded-2xl border border-rose-500/20 bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/40">
+                <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-foreground">حذف کامل پرونده مشتری</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{customer?.name}</p>
+                </div>
+              </div>
+
+              <div className="py-4 text-xs text-muted-foreground leading-relaxed space-y-2">
+                <p>
+                  آیا از حذف پرونده مشترک <strong className="text-foreground font-semibold">{customer?.name}</strong> اطمینان دارید؟
+                </p>
+                <p className="text-rose-500/90 font-medium">
+                  هشدار: با انجام این عملیات، تمامی سرویس‌های تخصیص‌یافته، صورت‌حساب‌ها و سوابق ثبت‌شده برای این مشتری از سیستم پاکسازی خواهند شد. این فرآیند غیرقابل بازگشت است.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/40">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsDeleteCustomerOpen(false)}
+                  disabled={deleteCustomerMutation.isPending}
+                  className="rounded-xl text-xs"
+                >
+                  انصراف
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => deleteCustomerMutation.mutate()}
+                  disabled={deleteCustomerMutation.isPending}
+                  className="rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold gap-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {deleteCustomerMutation.isPending ? "در حال حذف..." : "تأیید و حذف مشتری"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );
