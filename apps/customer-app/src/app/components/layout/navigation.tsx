@@ -58,7 +58,7 @@ export function Navigation() {
       <nav
         className={cn(
           "w-full flex items-center justify-between h-full px-6",
-          "max-w-md mx-auto",
+          "max-w-100 mx-auto",
         )}
       >
         {Object.keys(NAVIGATION_ITEMS).map((key) => {
@@ -72,7 +72,7 @@ export function Navigation() {
                 to={item.href}
                 className={buttonVariants({
                   className: [
-                    "flex flex-col gap-0 items-center justify-center h-min",
+                    "flex flex-col gap-1 items-center justify-center h-min py-1 px-3",
                     "text-accent bg-transparent! transform-none! group",
                     isCurrent && "pointer-events-none",
                   ],

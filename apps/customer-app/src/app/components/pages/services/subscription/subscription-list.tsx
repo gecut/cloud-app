@@ -25,7 +25,7 @@ export function SubscriptionList({ data }: SubscriptionListProps) {
   }
 
   return (
-    <div className="w-full flex flex-col gap-4">
+    <div className="w-full flex flex-col gap-5 mt-6">
       {data.map((subscription) => (
         <SubscriptionCard key={subscription.title} data={subscription} />
       ))}

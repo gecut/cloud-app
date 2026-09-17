@@ -13,7 +13,6 @@
     "@fastify/cors": "^11.3.0",
     "@fastify/static": "^10.1.2",
     "@gecut-cloud/contracts": "workspace:*",
-    "@gecut-cloud/core": "workspace:*",
     "@gecut-cloud/db": "workspace:*",
     "@gecut-cloud/env": "workspace:*",
     "@nestjs/bullmq": "^11.0.2",

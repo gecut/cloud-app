@@ -63,7 +63,10 @@ function AdminDashboardPage() {
   });
 
   const allCustomers = customersData?.items || [];
-  const activeCustomersCount = allCustomers.filter((c: any) => c.status === "ACTIVE").length || (customersData?.total ?? 0);
+  const activeCustomersCount = allCustomers.filter((c: any) => c.status === "ACTIVE").length;
+  const suspendedCustomersCount = allCustomers.filter((c: any) => c.status === "SUSPENDED").length;
+  const inactiveCustomersCount = allCustomers.filter((c: any) => c.status === "INACTIVE" || c.deletedAt).length;
+  const totalCustomersCount = customersData?.total ?? allCustomers.length;
 
   const allServices = servicesData?.items || [];
   const activeServices = allServices.filter((s: any) => s.status === "ACTIVE");
@@ -249,24 +252,48 @@ function AdminDashboardPage() {
 
         {/* Minimalist Metric Cards Grid (Bento Style) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* 1. Active Customers */}
-          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group">
+          {/* 1. Customers Overview */}
+          <Link
+            to="/customers"
+            className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group cursor-pointer"
+          >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">مشترکین فعال</span>
+              <span className="text-xs font-medium text-muted-foreground">وضعیت کلی مشترکین</span>
               <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform">
                 <Users className="h-4 w-4" />
               </div>
             </div>
             <div className="mt-4">
-              <div className="text-2xl sm:text-3xl font-black tracking-tight">
-                {loadingCustomers ? "..." : Number(activeCustomersCount).toLocaleString("fa-IR")}
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                  {loadingCustomers ? "..." : Number(totalCustomersCount).toLocaleString("fa-IR")}
+                </span>
+                <span className="text-xs text-muted-foreground font-medium">کل پرونده‌ها</span>
               </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[11px] text-muted-foreground font-medium">سازمان‌ها و مشترکین طرف قرارداد</span>
+              <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px]">
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  {activeCustomersCount.toLocaleString("fa-IR")} فعال
+                </span>
+                {(suspendedCustomersCount > 0 || inactiveCustomersCount > 0) ? (
+                  <>
+                    <span className="text-muted-foreground/40">•</span>
+                    <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                      {suspendedCustomersCount.toLocaleString("fa-IR")} معلق
+                    </span>
+                    <span className="text-muted-foreground/40">•</span>
+                    <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold">
+                      <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                      {inactiveCustomersCount.toLocaleString("fa-IR")} غیرفعال/حذف
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground mr-1">همه مشترکین فعال هستند</span>
+                )}
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* 2. Active Services (Prominently showing active count) */}
           <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group">
@@ -554,6 +581,32 @@ function AdminDashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Suspended / Inactive Customers Alert Strip (if any) */}
+        {(suspendedCustomersCount > 0 || inactiveCustomersCount > 0) && (
+          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-4 px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 shrink-0">
+                <Users className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="font-bold text-xs text-foreground">
+                  هشدار پرونده‌های معلق یا غیرفعال: {(suspendedCustomersCount + inactiveCustomersCount).toLocaleString("fa-IR")} مشترک نیازمند پیگیری
+                </span>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  تعداد <span className="font-bold text-amber-600 dark:text-amber-400">{suspendedCustomersCount.toLocaleString("fa-IR")} مشتری معلق</span> و{" "}
+                  <span className="font-bold text-rose-600 dark:text-rose-400">{inactiveCustomersCount.toLocaleString("fa-IR")} مشتری غیرفعال یا حذف‌شده</span> در سامانه وجود دارد.
+                </p>
+              </div>
+            </div>
+            <Link to="/customers">
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-rose-500/30 hover:bg-rose-500/10 text-rose-700 dark:text-rose-300">
+                مشاهده لیست مشترکین
+                <ArrowLeft className="h-3 w-3" />
+              </Button>
+            </Link>
+          </div>
+        )}
 
         {/* Pending Invoices Strip Alert (if any) */}
         {unpaidCount > 0 && (

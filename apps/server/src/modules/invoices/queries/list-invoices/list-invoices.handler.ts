@@ -99,6 +99,7 @@ export class ListInvoicesHandler implements IQueryHandler<ListInvoicesQuery> {
         orderBy: { createdAt: "desc" },
         include: {
           customer: true,
+          items: true,
           _count: {
             select: { items: true },
           },

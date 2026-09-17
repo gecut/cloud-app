@@ -29,4 +29,29 @@ export class CreateCustomerDto {
   @IsEmail()
   @IsOptional()
   email?: string;
+
+  @ApiPropertyOptional({ description: "Birth date (ISO or Jalali formatted string)" })
+  @IsString()
+  @IsOptional()
+  birthDate?: string;
+
+  @ApiPropertyOptional({ description: "Cooperation start date" })
+  @IsString()
+  @IsOptional()
+  cooperationStartDate?: string;
+
+  @ApiPropertyOptional({ description: "Telegram chat ID / Username" })
+  @IsString()
+  @IsOptional()
+  telegramChatId?: string;
+
+  @ApiPropertyOptional({ description: "Address" })
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @ApiPropertyOptional({ description: "Description / Notes" })
+  @IsString()
+  @IsOptional()
+  description?: string;
 }

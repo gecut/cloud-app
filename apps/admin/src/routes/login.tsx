@@ -23,17 +23,10 @@ export const Route = createFileRoute("/login")({
 
 function AdminLoginPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   
-  // Login form state
-  const [phone, setPhone] = useState("09120000001");
-  const [password, setPassword] = useState("Admin@123456");
-  
-  // Register form state
-  const [registerName, setRegisterName] = useState("");
-  const [registerPhone, setRegisterPhone] = useState("");
-  const [registerPassword, setRegisterPassword] = useState("");
-  
+  // Login form state (Configured for primary admin)
+  const [phone, setPhone] = useState("09363528608");
+  const [password, setPassword] = useState("admin@Gecut-cloud");
   const [loading, setLoading] = useState(false);
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
@@ -78,45 +71,6 @@ function AdminLoginPage() {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!registerName || !registerPhone || !registerPassword) {
-      toast.error("تمامی فیلدها برای ثبت‌نام مدیر الزامی است");
-      return;
-    }
-
-    if (registerPassword.length < 6) {
-      toast.error("رمز عبور باید حداقل ۶ کاراکتر باشد");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await apiClient<{
-        success: boolean;
-        tokens: { accessToken: string; refreshToken: string };
-        user: { id: string; name: string; phone: string; role: "ADMIN" | "CUSTOMER" };
-        message?: string;
-      }>("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          name: registerName,
-          phone: registerPhone,
-          password: registerPassword,
-          role: "ADMIN",
-        }),
-      });
-
-      setAdminAuthSession(res.tokens, res.user);
-      toast.success("حساب کاربری مدیریت با موفقیت ایجاد و فعال شد");
-      navigate({ to: "/" });
-    } catch (err: any) {
-      toast.error(err.message || "خطا در ثبت‌نام حساب کاربری مدیر");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-center items-center p-4 relative overflow-hidden select-none">
       {/* Ambient background glow accents */}
@@ -149,162 +103,64 @@ function AdminLoginPage() {
 
           <div className="text-center flex flex-col items-center gap-1 mt-3">
             <h1 className="text-xl font-black tracking-tight text-foreground">
-              پنل مدیریت جیکات کلود
+              ورود به سامانه مدیریت
             </h1>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              مرکز فرماندهی زیرساخت و مدیریت مشترکین
+              جهت ورود، شماره همراه و گذرواژه معتبر خود را وارد نمایید
             </p>
           </div>
         </div>
 
         {/* Minimalist Card Container */}
         <div className="rounded-2xl border border-border/60 bg-card/60 backdrop-blur-xl p-5 shadow-xl shadow-black/5 dark:shadow-black/20 flex flex-col gap-4">
-          {/* Tab Switcher (Login / Register) */}
-          <div className="grid grid-cols-2 p-1 rounded-xl bg-muted/40 border border-border/40 text-xs">
-            <button
-              type="button"
-              onClick={() => setActiveTab("login")}
-              className={`py-2 rounded-lg font-semibold transition-all cursor-pointer ${
-                activeTab === "login"
-                  ? "bg-background text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+          <form onSubmit={handlePasswordLogin} className="flex flex-col gap-3.5">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="admin-phone" className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
+                <span>شماره موبایل مدیر</span>
+                <span className="text-emerald-500">*</span>
+              </label>
+              <div className="relative">
+                <Input
+                  id="admin-phone"
+                  type="tel"
+                  dir="ltr"
+                  placeholder="09363528608"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="text-center pl-9 rounded-xl border-border/60 bg-background/50 focus:border-emerald-500/50 focus:ring-emerald-500/20 text-xs h-10 font-mono"
+                  required
+                />
+                <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="admin-password" className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
+                <span>رمز عبور مدیر</span>
+                <span className="text-emerald-500">*</span>
+              </label>
+              <div className="relative">
+                <Input
+                  id="admin-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="text-center pl-9 rounded-xl border-border/60 bg-background/50 focus:border-emerald-500/50 focus:ring-emerald-500/20 text-xs h-10 font-mono"
+                  required
+                />
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-10 rounded-xl font-semibold text-xs mt-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-[0.98]"
             >
-              ورود مدیر
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("register")}
-              className={`py-2 rounded-lg font-semibold transition-all cursor-pointer ${
-                activeTab === "register"
-                  ? "bg-background text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              ثبت‌نام مدیر جدید
-            </button>
-          </div>
-
-          {activeTab === "login" ? (
-            /* Password Login Form */
-            <form onSubmit={handlePasswordLogin} className="flex flex-col gap-3.5">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="admin-phone" className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
-                  <span>شماره موبایل مدیر</span>
-                  <span className="text-emerald-500">*</span>
-                </label>
-                <div className="relative">
-                  <Input
-                    id="admin-phone"
-                    type="tel"
-                    dir="ltr"
-                    placeholder="09120000001"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="text-center pl-9 rounded-xl border-border/60 bg-background/50 focus:border-emerald-500/50 focus:ring-emerald-500/20 text-xs h-10"
-                    required
-                  />
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="admin-password" className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
-                  <span>رمز عبور</span>
-                  <span className="text-emerald-500">*</span>
-                </label>
-                <div className="relative">
-                  <Input
-                    id="admin-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="text-center pl-9 rounded-xl border-border/60 bg-background/50 focus:border-emerald-500/50 focus:ring-emerald-500/20 text-xs h-10"
-                    required
-                  />
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full h-10 rounded-xl font-semibold text-xs mt-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-[0.98]"
-              >
-                {loading ? "در حال اعتبارسنجی..." : "ورود امن به پنل مدیریت"}
-              </Button>
-            </form>
-          ) : (
-            /* Admin Register Form */
-            <form onSubmit={handleRegister} className="flex flex-col gap-3.5">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="reg-name" className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
-                  <span>نام و نام خانوادگی مدیر</span>
-                  <span className="text-emerald-500">*</span>
-                </label>
-                <div className="relative">
-                  <Input
-                    id="reg-name"
-                    type="text"
-                    placeholder="مثال: مهندس محمدی"
-                    value={registerName}
-                    onChange={(e) => setRegisterName(e.target.value)}
-                    className="text-center pl-9 rounded-xl border-border/60 bg-background/50 focus:border-emerald-500/50 focus:ring-emerald-500/20 text-xs h-10"
-                    required
-                  />
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="reg-phone" className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
-                  <span>شماره موبایل مدیر</span>
-                  <span className="text-emerald-500">*</span>
-                </label>
-                <div className="relative">
-                  <Input
-                    id="reg-phone"
-                    type="tel"
-                    dir="ltr"
-                    placeholder="09121234567"
-                    value={registerPhone}
-                    onChange={(e) => setRegisterPhone(e.target.value)}
-                    className="text-center pl-9 rounded-xl border-border/60 bg-background/50 focus:border-emerald-500/50 focus:ring-emerald-500/20 text-xs h-10"
-                    required
-                  />
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="reg-password" className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
-                  <span>رمز عبور (حداقل ۶ کاراکتر)</span>
-                  <span className="text-emerald-500">*</span>
-                </label>
-                <div className="relative">
-                  <Input
-                    id="reg-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={registerPassword}
-                    onChange={(e) => setRegisterPassword(e.target.value)}
-                    className="text-center pl-9 rounded-xl border-border/60 bg-background/50 focus:border-emerald-500/50 focus:ring-emerald-500/20 text-xs h-10"
-                    required
-                  />
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full h-10 rounded-xl font-semibold text-xs mt-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-[0.98]"
-              >
-                {loading ? "در حال ثبت‌نام مدیر..." : "ثبت‌نام و ورود مستقیم به پنل"}
-              </Button>
-            </form>
-          )}
+              {loading ? "در حال اعتبارسنجی..." : "ورود امن به پنل مدیریت"}
+            </Button>
+          </form>
         </div>
       </div>
     </div>

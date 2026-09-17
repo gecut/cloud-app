@@ -16,14 +16,19 @@ export function DashboardCard({ data }: DashboardCardProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
   const startDate =
-    data.startDate instanceof Date ? data.startDate : new Date(data.startDate || Date.now());
+    data.purchaseDate instanceof Date
+      ? data.purchaseDate
+      : data.startDate instanceof Date
+      ? data.startDate
+      : new Date(data.purchaseDate || data.startDate || Date.now());
+
   const renewalDate =
     data.renewalDate instanceof Date
       ? data.renewalDate
-      : new Date(data.renewalDate || Date.now() + 30 * 86400000);
-
-  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+      : new Date(data.renewalDate || (startDate.getTime() + 30 * MS_PER_DAY));
 
   const trackingType = (data.trackingType || "HYBRID").toUpperCase();
   const showDays = trackingType === "TIME" || trackingType === "HYBRID";
@@ -34,16 +39,24 @@ export function DashboardCard({ data }: DashboardCardProps) {
   const remainedQty = data.remainedQuantity ?? Math.max(0, totalQty - (data.usedQuantity || 0));
   const quantityPercent = Math.min(Math.max((remainedQty / totalQty) * 100, 0), 100);
 
-  const rawTotalDays = (renewalDate.getTime() - startDate.getTime()) / MS_PER_DAY;
-  const totalDays = Math.max(1, Math.round(rawTotalDays));
+  // 1. بازه زمانی کلی یا دوره تعیین‌شده
+  const rawCycle = Number(data.billingCycle);
+  const configuredCycleDays = !isNaN(rawCycle) && rawCycle > 0 ? rawCycle : null;
+  const rawTotalDays = Math.round((renewalDate.getTime() - startDate.getTime()) / MS_PER_DAY);
+  const totalDays = configuredCycleDays || Math.max(1, rawTotalDays);
 
-  const rawDaysLeft = (renewalDate.getTime() - Date.now()) / MS_PER_DAY;
-  const daysLeft = Math.max(0, Math.ceil(rawDaysLeft));
+  // 2. روزشمار معطوف به روزهای سپری‌شده
+  const creationMs = data.createdAt ? new Date(data.createdAt).getTime() : startDate.getTime();
+  const daysPassed = Math.max(0, Math.floor((Date.now() - creationMs) / MS_PER_DAY));
+  const daysLeft = Math.max(0, totalDays - daysPassed);
 
   const remainingDaysPercent = Math.min(
     Math.max((daysLeft / totalDays) * 100, 0),
     100,
   );
+
+  // 3. آلارم در صورت مغایرت دوره تعیین‌شده با بازه زمانی
+  const isAlarmExceeded = trackingType !== "QUANTITY" && configuredCycleDays !== null && configuredCycleDays > totalDays;
 
   const statusStyle: Record<Service["status"], string> = {
     ACTIVE: "bg-green-400",
@@ -90,8 +103,8 @@ export function DashboardCard({ data }: DashboardCardProps) {
   };
 
   return (
-    <div className="flex flex-col w-full gap-2">
-      <div className="flex flex-col gap-6 w-full p-8 rounded-[20px] bg-surface">
+    <div className="flex flex-col w-full gap-3">
+      <div className="flex flex-col gap-6 w-full p-6 sm:p-8 rounded-3xl bg-surface border border-border/40 shadow-xs">
         <div className="w-full flex items-start justify-between">
           <div className="flex items-center gap-4">
             {isPackage ? (
@@ -146,10 +159,15 @@ export function DashboardCard({ data }: DashboardCardProps) {
                     {daysLeft.toLocaleString("fa-IR")} روز مانده
                   </span>
                   <span className="text-muted-foreground text-[11px]">
-                    ({Math.round(remainingDaysPercent).toLocaleString("fa-IR")}٪ از {totalDays.toLocaleString("fa-IR")} روز)
+                    ({Math.round(remainingDaysPercent).toLocaleString("fa-IR")}٪ از بازه {totalDays.toLocaleString("fa-IR")} روزه)
                   </span>
                 </div>
               </div>
+              {isAlarmExceeded && (
+                <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium animate-pulse flex items-center gap-1">
+                  <span>⚠️ هشدار: دوره تعیین‌شده ({configuredCycleDays?.toLocaleString("fa-IR")} روز) بیشتر از بازه زمانی سررسید ({totalDays.toLocaleString("fa-IR")} روز) است</span>
+                </div>
+              )}
               <Progress progress={remainingDaysPercent} />
             </div>
           )}

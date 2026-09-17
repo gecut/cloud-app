@@ -21,6 +21,7 @@ interface InvoiceDetailModalProps {
   onClose: () => void;
   onEdit?: (invoice: any) => void;
   onCancel?: (invoiceId: string) => void;
+  onReactivate?: (invoiceId: string) => void;
 }
 
 export function InvoiceDetailModal({
@@ -29,6 +30,7 @@ export function InvoiceDetailModal({
   onClose,
   onEdit,
   onCancel,
+  onReactivate,
 }: InvoiceDetailModalProps) {
   if (!isOpen || !invoice) return null;
 
@@ -268,14 +270,14 @@ export function InvoiceDetailModal({
           </div>
 
           {/* Seller & Customer Information Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
             {/* Seller */}
-            <div className="p-4 rounded-xl border bg-muted/10 space-y-2">
-              <div className="flex items-center gap-2 font-semibold text-foreground pb-2 border-b">
+            <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
+              <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
                 <Building2 className="h-4 w-4 text-primary" />
                 <span>مشخصات فروشنده (ارائه‌دهنده خدمت)</span>
               </div>
-              <div className="space-y-1 text-muted-foreground">
+              <div className="space-y-1.5 text-muted-foreground">
                 <p>
                   <strong className="text-foreground">نام:</strong> شرکت جیکات کلود (Gecut Cloud)
                 </p>
@@ -290,12 +292,12 @@ export function InvoiceDetailModal({
             </div>
 
             {/* Customer */}
-            <div className="p-4 rounded-xl border bg-muted/10 space-y-2">
-              <div className="flex items-center gap-2 font-semibold text-foreground pb-2 border-b">
+            <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
+              <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
                 <User className="h-4 w-4 text-primary" />
                 <span>مشخصات خریدار (مشتری)</span>
               </div>
-              <div className="space-y-1 text-muted-foreground">
+              <div className="space-y-1.5 text-muted-foreground">
                 <p>
                   <strong className="text-foreground">نام مشترک:</strong>{" "}
                   {invoice.customer?.name || "نامشخص"}
@@ -319,15 +321,15 @@ export function InvoiceDetailModal({
           </div>
 
           {/* Invoice Items Table */}
-          <div className="rounded-xl border overflow-hidden">
+          <div className="rounded-2xl border overflow-hidden">
             <table className="w-full text-right text-xs">
               <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
                 <tr>
-                  <th className="py-3 px-4 w-12 text-center">ردیف</th>
-                  <th className="py-3 px-4">شرح خدمات / بسته</th>
-                  <th className="py-3 px-4 text-center w-24">تعداد / دوره</th>
-                  <th className="py-3 px-4 text-left w-36">قیمت واحد (تومان)</th>
-                  <th className="py-3 px-4 text-left w-36">مبلغ کل (تومان)</th>
+                  <th className="py-3.5 px-5 w-12 text-center">ردیف</th>
+                  <th className="py-3.5 px-5">شرح خدمات / بسته</th>
+                  <th className="py-3.5 px-5 text-center w-24">تعداد / دوره</th>
+                  <th className="py-3.5 px-5 text-left w-36">قیمت واحد (تومان)</th>
+                  <th className="py-3.5 px-5 text-left w-36">مبلغ کل (تومان)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -337,17 +339,17 @@ export function InvoiceDetailModal({
                   const itemTotal = unitPrice * qty;
                   return (
                     <tr key={idx} className="hover:bg-muted/10">
-                      <td className="py-3 px-4 text-center font-mono text-muted-foreground">
+                      <td className="py-3.5 px-5 text-center font-mono text-muted-foreground">
                         {idx + 1}
                       </td>
-                      <td className="py-3 px-4 font-medium text-foreground">
+                      <td className="py-3.5 px-5 font-medium text-foreground">
                         {item.title || "خدمات زیرساخت جیکات کلود"}
                       </td>
-                      <td className="py-3 px-4 text-center font-mono">{qty}</td>
-                      <td className="py-3 px-4 text-left font-mono">
+                      <td className="py-3.5 px-5 text-center font-mono">{qty}</td>
+                      <td className="py-3.5 px-5 text-left font-mono">
                         {unitPrice.toLocaleString("fa-IR")}
                       </td>
-                      <td className="py-3 px-4 text-left font-mono font-semibold text-foreground">
+                      <td className="py-3.5 px-5 text-left font-mono font-semibold text-foreground">
                         {itemTotal.toLocaleString("fa-IR")}
                       </td>
                     </tr>
@@ -358,7 +360,7 @@ export function InvoiceDetailModal({
           </div>
 
           {/* Financial Totals */}
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 p-4 rounded-xl border bg-muted/20">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-5 p-5 rounded-2xl border bg-muted/20">
             <div className="text-xs text-muted-foreground max-w-sm space-y-1">
               <p className="font-medium text-foreground">توضیحات و شرایط:</p>
               <p>
@@ -435,6 +437,26 @@ export function InvoiceDetailModal({
                   className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900/50 dark:hover:bg-rose-950/50 h-7 text-[11px] shrink-0 print:hidden"
                 >
                   لغو این فاکتور
+                </Button>
+              )}
+            </div>
+          ) : invoice.status === "CANCELLED" ? (
+            <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Ban className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                <span>این صورت‌حساب لغو شده است.</span>
+              </div>
+              {onReactivate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onClose();
+                    onReactivate(invoice.id);
+                  }}
+                  className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-900/50 dark:hover:bg-emerald-950/50 h-7 text-[11px] shrink-0 print:hidden font-medium cursor-pointer"
+                >
+                  فعال‌سازی مجدد این فاکتور
                 </Button>
               )}
             </div>

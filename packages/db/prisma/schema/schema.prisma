@@ -81,6 +81,7 @@ model User {
   birthDate            DateTime?
   cooperationStartDate DateTime?
   telegramChatId       String?
+  address              String?
   customer             Customer?
   sessions             Session[]
   auditLogs            AuditLog[]
@@ -111,8 +112,11 @@ model Customer {
   displayName          String?
   phone                String?
   email                String?
+  birthDate            DateTime?
   cooperationStartDate DateTime?
   telegramChatId       String?
+  description          String?
+  address              String?
   status               CustomerStatus @default(ACTIVE)
   serviceGroups        ServiceGroup[]
   services             Service[]

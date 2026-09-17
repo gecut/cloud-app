@@ -1,14 +1,21 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
+  Param,
+  Patch,
   Post,
   UseGuards,
 } from "@nestjs/common";
 import { CommandBus, QueryBus } from "@nestjs/cqrs";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { PrismaService } from "../../infrastructure/database/prisma.service";
+import { PasswordService } from "./services/password.service";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { ChangePasswordCommand } from "./commands/change-password/change-password.command";
 import { ChangePasswordDto } from "./commands/change-password/change-password.dto";
@@ -35,6 +42,8 @@ export class AuthController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
+    private readonly prisma: PrismaService,
+    private readonly passwordService: PasswordService,
   ) {}
 
   @Public()
@@ -147,5 +156,192 @@ export class AuthController {
   @ApiOperation({ summary: "دریافت مشخصات و نقش کاربر جاری احراز هویت شده" })
   async getMe(@CurrentUser() user: AuthenticatedUser) {
     return this.queryBus.execute(new GetMeQuery(user.id));
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Get("admins")
+  @ApiOperation({ summary: "دریافت لیست مدیران سامانه" })
+  async listAdmins(@CurrentUser() user: AuthenticatedUser) {
+    if (user.role !== "ADMIN") {
+      throw new ForbiddenException("فقط مدیران سامانه مجاز به این عملیات هستند");
+    }
+    const users = await this.prisma.user.findMany({
+      where: { role: "ADMIN" },
+    });
+    return (users || [])
+      .filter((u: any) => u.role === "ADMIN")
+      .map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        phone: u.phone,
+        email: u.email,
+        role: u.role,
+        createdAt: u.createdAt,
+        lastLoginAt: u.lastLoginAt,
+      }));
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Post("admins")
+  @ApiOperation({ summary: "تعریف مدیر جدید در سامانه (فقط نقش ADMIN)" })
+  async createAdmin(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { name: string; phone: string; password: string },
+  ) {
+    if (user.role !== "ADMIN") {
+      throw new ForbiddenException("فقط مدیران سامانه مجاز به ایجاد مدیر جدید هستند");
+    }
+    if (!body.name || !body.phone || !body.password) {
+      throw new BadRequestException("نام، شماره تماس و رمز عبور الزامی است");
+    }
+    if (body.password.length < 6) {
+      throw new BadRequestException("رمز عبور باید حداقل ۶ کاراکتر باشد");
+    }
+
+    const cleanPhone = body.phone.trim().replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
+    const existing = await this.prisma.user.findUnique({
+      where: { phone: cleanPhone },
+    });
+
+    const passwordHash = await this.passwordService.hash(body.password);
+
+    if (existing) {
+      const updated = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: body.name.trim(),
+          role: "ADMIN",
+          passwordHash,
+          tokenVersion: (existing.tokenVersion || 0) + 1,
+        },
+      });
+      return {
+        success: true,
+        message: "کاربر موجود با موفقیت به عنوان مدیر ارتقا یافت",
+        user: {
+          id: updated.id,
+          name: updated.name,
+          phone: updated.phone,
+          role: updated.role,
+        },
+      };
+    }
+
+    const created = await this.prisma.user.create({
+      data: {
+        name: body.name.trim(),
+        phone: cleanPhone,
+        role: "ADMIN",
+        passwordHash,
+      },
+    });
+
+    return {
+      success: true,
+      message: "مدیر جدید با موفقیت ایجاد شد",
+      user: {
+        id: created.id,
+        name: created.name,
+        phone: created.phone,
+        role: created.role,
+      },
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Patch("admins/:id")
+  @ApiOperation({ summary: "ویرایش مشخصات مدیر (نام، شماره موبایل و رمز عبور)" })
+  async updateAdmin(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() body: { name?: string; phone?: string; newPassword?: string },
+  ) {
+    if (user.role !== "ADMIN") {
+      throw new ForbiddenException("فقط مدیران سامانه مجاز به ویرایش اطلاعات مدیر هستند");
+    }
+
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException("کاربر مدیر مورد نظر یافت نشد");
+    }
+
+    const updateData: any = {};
+    if (body.name !== undefined && body.name.trim()) {
+      updateData.name = body.name.trim();
+    }
+
+    if (body.phone !== undefined && body.phone.trim()) {
+      const cleanPhone = body.phone.trim().replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
+      const allUsers = await this.prisma.user.findMany();
+      const conflict = allUsers.find(
+        (u: any) => u.id !== id && u.phone === cleanPhone
+      );
+      if (conflict) {
+        throw new BadRequestException("این شماره موبایل قبلاً برای کاربر دیگری ثبت شده است");
+      }
+      updateData.phone = cleanPhone;
+    }
+
+    if (body.newPassword !== undefined && body.newPassword.trim()) {
+      if (body.newPassword.trim().length < 6) {
+        throw new BadRequestException("رمز عبور جدید باید حداقل ۶ کاراکتر باشد");
+      }
+      updateData.passwordHash = await this.passwordService.hash(body.newPassword.trim());
+      updateData.tokenVersion = (targetUser.tokenVersion || 0) + 1;
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return {
+      success: true,
+      message: "مشخصات مدیر با موفقیت به‌روزرسانی شد",
+      user: {
+        id: updated?.id || id,
+        name: updated?.name || updateData.name || targetUser.name,
+        phone: updated?.phone || updateData.phone || targetUser.phone,
+        role: updated?.role || targetUser.role,
+      },
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Post("admins/:id")
+  @ApiOperation({ summary: "ویرایش مشخصات مدیر (جایگزین POST)" })
+  async updateAdminPost(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() body: { name?: string; phone?: string; newPassword?: string },
+  ) {
+    return this.updateAdmin(user, id, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Post("admins/change-password")
+  @ApiOperation({ summary: "تغییر رمز عبور یا مشخصات مدیر (توسط مدیر سامانه)" })
+  async changeAdminPassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { userId?: string; newPassword?: string; name?: string; phone?: string },
+  ) {
+    if (user.role !== "ADMIN") {
+      throw new ForbiddenException("فقط مدیران مجاز به تغییر مشخصات هستند");
+    }
+
+    const targetUserId = body.userId || user.id;
+    return this.updateAdmin(user, targetUserId, {
+      name: body.name,
+      phone: body.phone,
+      newPassword: body.newPassword,
+    });
   }
 }

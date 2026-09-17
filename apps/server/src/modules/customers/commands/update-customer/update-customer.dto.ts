@@ -31,4 +31,29 @@ export class UpdateCustomerDto {
   @IsEnum(["ACTIVE", "SUSPENDED", "INACTIVE"])
   @IsOptional()
   status?: "ACTIVE" | "SUSPENDED" | "INACTIVE";
+
+  @ApiPropertyOptional({ description: "Birth date (ISO string)", example: "1995-06-20T00:00:00.000Z" })
+  @IsString()
+  @IsOptional()
+  birthDate?: string;
+
+  @ApiPropertyOptional({ description: "Cooperation start date (ISO string)", example: "2024-03-20T00:00:00.000Z" })
+  @IsString()
+  @IsOptional()
+  cooperationStartDate?: string;
+
+  @ApiPropertyOptional({ description: "Telegram chat ID or @username", example: "@ali_gecut" })
+  @IsString()
+  @IsOptional()
+  telegramChatId?: string;
+
+  @ApiPropertyOptional({ description: "Address", example: "تهران، میدان ونک، خیابان ملاصدرا، پلاک ۱۲" })
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @ApiPropertyOptional({ description: "Description / Notes", example: "مشتری VIP هاستینگ ابری" })
+  @IsString()
+  @IsOptional()
+  description?: string;
 }

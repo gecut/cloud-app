@@ -41,17 +41,14 @@ export function Header({
 
   return (
     <header className="fixed top-0 inset-x-0 border-b border-b-border bg-surface supports-[backdrop-filter]:backdrop-blur-sm supports-[backdrop-filter]:bg-surface/80 h-16 z-50">
-      <nav className="w-full max-w-md mx-auto flex items-center justify-between px-4 h-full">
+      <nav className="w-full max-w-100 mx-auto flex items-center justify-between px-4 h-full">
         <div className="flex items-center gap-2">
           <ModeToggle />
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex flex-col text-left">
-            <span className="text-xs font-semibold text-foreground max-w-[120px] truncate">
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center text-left">
+            <span className="text-xs font-semibold text-foreground max-w-[160px] truncate">
               {displayName}
-            </span>
-            <span className="text-[10px] text-muted-foreground font-mono">
-              {currentUser.role}
             </span>
           </div>
           <Avatar>

@@ -751,21 +751,21 @@ function AdminPaymentsListPage() {
                 <table className="w-full text-right text-xs">
                   <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
                     <tr>
-                      <th className="py-3.5 px-4">شناسه رسید</th>
-                      <th className="py-3.5 px-4">شماره فاکتور</th>
-                      <th className="py-3.5 px-4">کلاینت / مشتری</th>
-                      <th className="py-3.5 px-4">مبلغ تسویه‌شده (تومان)</th>
-                      <th className="py-3.5 px-4">کد رهگیری / ارجاع</th>
-                      <th className="py-3.5 px-4">شیوه پرداخت</th>
-                      <th className="py-3.5 px-4">مرجع تایید</th>
-                      <th className="py-3.5 px-4">تاریخ پرداخت</th>
-                      <th className="py-3.5 px-4">وضعیت</th>
+                      <th className="py-4 px-6 whitespace-nowrap">شناسه رسید</th>
+                      <th className="py-4 px-6 whitespace-nowrap">شماره فاکتور</th>
+                      <th className="py-4 px-6 whitespace-nowrap">کلاینت / مشتری</th>
+                      <th className="py-4 px-6 whitespace-nowrap">مبلغ تسویه‌شده (تومان)</th>
+                      <th className="py-4 px-6 whitespace-nowrap">کد رهگیری / ارجاع</th>
+                      <th className="py-4 px-6 whitespace-nowrap">شیوه پرداخت</th>
+                      <th className="py-4 px-6 whitespace-nowrap">مرجع تایید</th>
+                      <th className="py-4 px-6 whitespace-nowrap">تاریخ پرداخت</th>
+                      <th className="py-4 px-6 whitespace-nowrap">وضعیت</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {paginatedItems.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                        <td colSpan={9} className="py-12 px-6 text-center text-muted-foreground whitespace-nowrap">
                           هیچ پرداختی در این دسته‌بندی یافت نشد
                         </td>
                       </tr>
@@ -780,40 +780,40 @@ function AdminPaymentsListPage() {
 
                         return (
                           <tr key={pay.id} className="hover:bg-muted/20 transition-colors">
-                            <td className="py-3.5 px-4 font-mono font-medium text-foreground">
+                            <td className="py-4 px-6 font-mono font-medium text-foreground whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <Receipt className="h-4 w-4 text-emerald-500 shrink-0" />
                                 <span className="truncate max-w-[110px]">{pay.id}</span>
                               </div>
                             </td>
-                            <td className="py-3.5 px-4 font-mono font-bold text-foreground">
+                            <td className="py-4 px-6 font-mono font-bold text-foreground whitespace-nowrap">
                               {formatInvoiceNumber(pay.invoice?.invoiceNumber || pay.invoiceId)}
                             </td>
-                            <td className="py-3.5 px-4">
+                            <td className="py-4 px-6 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
                                   {custName.charAt(0) || "م"}
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-foreground block">
+                                  <span className="font-semibold text-foreground block whitespace-nowrap">
                                     {custName}
                                   </span>
                                   {custPhone && (
-                                    <span className="text-[10px] text-muted-foreground font-mono">
+                                    <span className="text-[10px] text-muted-foreground font-mono block whitespace-nowrap">
                                       {custPhone}
                                     </span>
                                   )}
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3.5 px-4 font-bold text-emerald-600 dark:text-emerald-400">
+                            <td className="py-4 px-6 font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                               {(pay.amountToman || 0).toLocaleString("fa-IR")} تومان
                             </td>
-                            <td className="py-3.5 px-4 font-mono text-muted-foreground">
+                            <td className="py-4 px-6 font-mono text-muted-foreground whitespace-nowrap">
                               {pay.gatewayRef || "---"}
                             </td>
-                            <td className="py-3.5 px-4">
-                              <span className="font-mono text-[11px] bg-muted px-2 py-0.5 rounded border">
+                            <td className="py-4 px-6 whitespace-nowrap">
+                              <span className="font-mono text-[11px] bg-muted px-2.5 py-1 rounded-lg border whitespace-nowrap inline-flex items-center">
                                 {pay.provider === "MANUAL_TRANSFER" ? "کارت به کارت / پایا" :
                                  pay.provider === "ZARINPAL" ? "زرین‌پال" :
                                  pay.provider === "PAYPING" ? "پی‌پینگ" :
@@ -821,25 +821,25 @@ function AdminPaymentsListPage() {
                                  pay.provider === "CASH" ? "نقدی" : pay.provider}
                               </span>
                             </td>
-                            <td className="py-3.5 px-4">
+                            <td className="py-4 px-6 whitespace-nowrap">
                               {isCustomer ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                                  <UserCheck className="h-3 w-3" />
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
+                                  <UserCheck className="h-3 w-3 shrink-0" />
                                   تایید مشتری (آنلاین)
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                                  <ShieldCheck className="h-3 w-3" />
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 whitespace-nowrap">
+                                  <ShieldCheck className="h-3 w-3 shrink-0" />
                                   تایید ادمین (دستی)
                                 </span>
                               )}
                             </td>
-                            <td className="py-3.5 px-4 text-muted-foreground font-mono text-[11px]">
+                            <td className="py-4 px-6 text-muted-foreground font-mono text-[11px] whitespace-nowrap">
                               {formatJalaliDateTime(pay.paidAt)}
                             </td>
-                            <td className="py-3.5 px-4">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                <CheckCircle className="h-3 w-3" />
+                            <td className="py-4 px-6 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                                <CheckCircle className="h-3 w-3 shrink-0" />
                                 تسویه شده
                               </span>
                             </td>
@@ -854,20 +854,20 @@ function AdminPaymentsListPage() {
                 <table className="w-full text-right text-xs">
                   <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
                     <tr>
-                      <th className="py-3.5 px-4">کلاینت / مشتری</th>
-                      <th className="py-3.5 px-4">شماره فاکتور</th>
-                      <th className="py-3.5 px-4">شرح خدمت / سرویس</th>
-                      <th className="py-3.5 px-4">مبلغ معلق (تومان)</th>
-                      <th className="py-3.5 px-4">تاریخ صدور</th>
-                      <th className="py-3.5 px-4">مهلت سررسید</th>
-                      <th className="py-3.5 px-4">وضعیت پرداخت</th>
-                      <th className="py-3.5 px-4 text-center">عملیات تسویه</th>
+                      <th className="py-4 px-6 whitespace-nowrap">کلاینت / مشتری</th>
+                      <th className="py-4 px-6 whitespace-nowrap">شماره فاکتور</th>
+                      <th className="py-4 px-6 whitespace-nowrap">شرح خدمت / سرویس</th>
+                      <th className="py-4 px-6 whitespace-nowrap">مبلغ معلق (تومان)</th>
+                      <th className="py-4 px-6 whitespace-nowrap">تاریخ صدور</th>
+                      <th className="py-4 px-6 whitespace-nowrap">مهلت سررسید</th>
+                      <th className="py-4 px-6 whitespace-nowrap">وضعیت پرداخت</th>
+                      <th className="py-4 px-6 text-center whitespace-nowrap">عملیات تسویه</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {paginatedItems.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                        <td colSpan={8} className="py-12 px-6 text-center text-muted-foreground whitespace-nowrap">
                           هیچ فاکتور معلق یا پرداخت‌نشده‌ای یافت نشد. تمامی حساب‌ها تسویه هستند.
                         </td>
                       </tr>
@@ -888,16 +888,16 @@ function AdminPaymentsListPage() {
 
                         return (
                           <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
-                            <td className="py-3.5 px-4">
+                            <td className="py-4 px-6 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
                                   {custName.charAt(0) || "ک"}
                                 </div>
                                 <div>
-                                  <span className="font-bold text-foreground block">
+                                  <span className="font-bold text-foreground block whitespace-nowrap">
                                     {custName}
                                   </span>
-                                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-0.5">
+                                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-0.5 whitespace-nowrap">
                                     {custPhone && <span>{custPhone}</span>}
                                     {custPhone && custEmail && <span>•</span>}
                                     {custEmail && <span className="truncate max-w-[120px]">{custEmail}</span>}
@@ -905,24 +905,24 @@ function AdminPaymentsListPage() {
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3.5 px-4 font-mono font-bold text-foreground">
+                            <td className="py-4 px-6 font-mono font-bold text-foreground whitespace-nowrap">
                               {formatInvoiceNumber(inv.invoiceNumber || inv.id)}
                             </td>
-                            <td className="py-3.5 px-4 max-w-[200px] truncate text-foreground font-medium">
+                            <td className="py-4 px-6 max-w-[200px] truncate text-foreground font-medium whitespace-nowrap">
                               {itemTitle}
                             </td>
-                            <td className="py-3.5 px-4 font-bold text-amber-600 dark:text-amber-400">
+                            <td className="py-4 px-6 font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">
                               {(inv.totalToman || 0).toLocaleString("fa-IR")} تومان
                             </td>
-                            <td className="py-3.5 px-4 text-muted-foreground font-mono text-[11px]">
+                            <td className="py-4 px-6 text-muted-foreground font-mono text-[11px] whitespace-nowrap">
                               {formatJalaliDateTime(inv.issuedAt || inv.createdAt)}
                             </td>
-                            <td className="py-3.5 px-4 font-mono text-[11px]">
+                            <td className="py-4 px-6 font-mono text-[11px] whitespace-nowrap">
                               {inv.dueDate ? (
-                                <span className={isOverdue ? "text-rose-600 font-bold" : "text-muted-foreground"}>
+                                <span className={isOverdue ? "text-rose-600 font-bold inline-flex items-center whitespace-nowrap" : "text-muted-foreground inline-flex items-center whitespace-nowrap"}>
                                   {formatJalaliDateTime(inv.dueDate)}
                                   {isOverdue && (
-                                    <span className="mr-1.5 px-1.5 py-0.5 rounded text-[9px] bg-rose-500/10 text-rose-600">
+                                    <span className="mr-1.5 px-1.5 py-0.5 rounded text-[9px] bg-rose-500/10 text-rose-600 whitespace-nowrap">
                                       سررسید گذشته
                                     </span>
                                   )}
@@ -931,20 +931,20 @@ function AdminPaymentsListPage() {
                                 "---"
                               )}
                             </td>
-                            <td className="py-3.5 px-4">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                <Clock className="h-3 w-3" />
+                            <td className="py-4 px-6 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                                <Clock className="h-3 w-3 shrink-0" />
                                 معلق / در انتظار پرداخت
                               </span>
                             </td>
-                            <td className="py-3.5 px-4 text-center">
+                            <td className="py-4 px-6 text-center whitespace-nowrap">
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleOpenRecordForInvoice(inv)}
-                                className="h-7 px-2.5 text-xs gap-1 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 font-medium cursor-pointer"
+                                className="h-7 px-2.5 text-xs gap-1 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 font-medium cursor-pointer whitespace-nowrap"
                               >
-                                <Check className="h-3.5 w-3.5" />
+                                <Check className="h-3.5 w-3.5 shrink-0" />
                                 تسویه دستی
                               </Button>
                             </td>

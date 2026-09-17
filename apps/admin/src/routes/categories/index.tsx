@@ -102,22 +102,28 @@ export function AdminCategoriesPage() {
 
   const categories = data?.items || [];
 
-  // Filtered categories
+  // Filtered categories (sorted newest first)
   const filteredCategories = useMemo(() => {
-    return categories.filter((cat) => {
-      const matchesSearch =
-        !searchQuery.trim() ||
-        cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cat.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (cat.description && cat.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    return categories
+      .filter((cat) => {
+        const matchesSearch =
+          !searchQuery.trim() ||
+          cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          cat.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (cat.description && cat.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        (statusFilter === "ACTIVE" && cat.isActive) ||
-        (statusFilter === "INACTIVE" && !cat.isActive);
+        const matchesStatus =
+          statusFilter === "ALL" ||
+          (statusFilter === "ACTIVE" && cat.isActive) ||
+          (statusFilter === "INACTIVE" && !cat.isActive);
 
-      return matchesSearch && matchesStatus;
-    });
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.createdAt || 0).getTime();
+        const timeB = new Date(b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
   }, [categories, searchQuery, statusFilter]);
 
   // Metrics

@@ -17,6 +17,8 @@ interface JalaliDatePickerProps {
   error?: string;
   className?: string;
   disabled?: boolean;
+  minYear?: number;
+  maxYear?: number;
 }
 
 const WEEK_DAYS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
@@ -29,6 +31,8 @@ export function JalaliDatePicker({
   error,
   className = "",
   disabled = false,
+  minYear,
+  maxYear,
 }: JalaliDatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -123,11 +127,13 @@ export function JalaliDatePicker({
   const yearOptions = useMemo(() => {
     const years: number[] = [];
     const currentY = todayJalali.jy;
-    for (let y = currentY - 5; y <= currentY + 10; y++) {
+    const minY = minYear ?? Math.min(viewYear, currentY - 5);
+    const maxY = maxYear ?? Math.max(viewYear, currentY + 10);
+    for (let y = minY; y <= maxY; y++) {
       years.push(y);
     }
     return years;
-  }, [todayJalali.jy]);
+  }, [todayJalali.jy, minYear, maxYear, viewYear]);
 
   return (
     <div ref={containerRef} className={`relative flex flex-col gap-1.5 ${className}`}>

@@ -11,6 +11,7 @@ import { Card, CardContent } from "@gecut-cloud/ui/components/card";
 import { toast } from "sonner";
 import { formatJalaliDate } from "@gecut-cloud/contracts";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
+import { ConfirmModal } from "@/components/common/confirm-modal";
 import {
   Server,
   Plus,
@@ -35,6 +36,7 @@ import {
   Play,
   Pause,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Tag,
 } from "lucide-react";
@@ -100,21 +102,27 @@ function getCategoryBadge(slug?: string, customName?: string) {
 function getServiceRemainingDetails(service: any) {
   const trackingType = (service.trackingType || "HYBRID").toUpperCase();
 
-  // Time calculation
-  let daysTotal = 30;
-  let daysPassed = 0;
-  let daysLeft = 0;
-  if (service.startDate && service.renewalDate) {
-    const start = new Date(service.purchaseDate || service.startDate).getTime();
-    const end = new Date(service.renewalDate).getTime();
-    const now = Date.now();
-    daysTotal = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
-    daysPassed = Math.max(0, Math.round((now - start) / (1000 * 60 * 60 * 24)));
-    daysLeft = Math.max(0, Math.round((end - now) / (1000 * 60 * 60 * 24)));
-  } else if (service.billingCycle && !isNaN(Number(service.billingCycle))) {
-    daysTotal = Number(service.billingCycle);
-    daysLeft = daysTotal;
-  }
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+  const start = new Date(service.purchaseDate || service.startDate || service.createdAt || Date.now());
+  const end = new Date(service.renewalDate || (start.getTime() + 30 * MS_PER_DAY));
+  const now = new Date();
+
+  // 1. بازه زمانی کلی (بازه زمانی تاریخ سررسید و تاریخ ثبت شده/خرید) یا دوره تعیین‌شده
+  const rawCycle = Number(service.billingCycle);
+  const configuredCycleDays = !isNaN(rawCycle) && rawCycle > 0 ? rawCycle : null;
+
+  const rawSpan = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY);
+  const spanDays = configuredCycleDays || Math.max(1, rawSpan);
+
+  // 2. محاسبه روزهای سپری‌شده از زمان ساخت/شروع سرویس
+  const creationMs = service.createdAt ? new Date(service.createdAt).getTime() : start.getTime();
+  const daysPassed = Math.max(0, Math.floor((now.getTime() - creationMs) / MS_PER_DAY));
+  const daysLeft = Math.max(0, spanDays - daysPassed);
+  const remainingPercent = Math.min(Math.max((daysLeft / spanDays) * 100, 0), 100);
+
+  // 3. آلارم در صورتی که دوره تعیین‌شده از بازه کلی تقویمی بیشتر باشد
+  const isAlarmExceeded = configuredCycleDays !== null && rawSpan > 0 && configuredCycleDays > rawSpan;
+  const isExpired = daysLeft === 0 || end.getTime() < now.getTime();
 
   // Quantity calculation
   const totalQty = service.quantity || 1;
@@ -123,9 +131,15 @@ function getServiceRemainingDetails(service: any) {
 
   return {
     trackingType,
-    daysTotal,
+    daysTotal: spanDays, // بازه کلی روزها
     daysPassed,
     daysLeft,
+    remainingPercent,
+    configuredCycleDays,
+    isAlarmExceeded,
+    isExpired,
+    startDate: start,
+    renewalDate: end,
     totalQty,
     usedQty,
     remainingQty,
@@ -147,6 +161,31 @@ function parsePriceInput(valStr: string): number {
     .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
     .replace(/[^0-9]/g, "");
   return standardDigits === "" ? 0 : Number(standardDigits);
+}
+
+function safeDate(val?: string | Date | null, fallback = new Date()): Date {
+  if (!val) return fallback;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? fallback : d;
+}
+
+function safeIso(val?: string | Date | null, fallback = new Date()): string {
+  return safeDate(val, fallback).toISOString();
+}
+
+function calcAddDays(baseIso: string | Date | null, days: number): string {
+  const d = safeDate(baseIso);
+  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate() + Number(days || 0));
+  return result.toISOString();
+}
+
+function calcDaysBetween(startIso: string | Date | null, endIso: string | Date | null): number {
+  const s = safeDate(startIso);
+  const e = safeDate(endIso);
+  const utcStart = Date.UTC(s.getFullYear(), s.getMonth(), s.getDate());
+  const utcEnd = Date.UTC(e.getFullYear(), e.getMonth(), e.getDate());
+  const diffDays = Math.round((utcEnd - utcStart) / (1000 * 60 * 60 * 24));
+  return Math.max(1, diffDays);
 }
 
 function AdminServicesListPage() {
@@ -172,7 +211,37 @@ function AdminServicesListPage() {
   const [durationDays, setDurationDays] = useState<number>(30);
   const [quantity, setQuantity] = useState<number>(1000);
   const [priceToman, setPriceToman] = useState<number>(0);
-  const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString());
+  const [purchaseDate, setPurchaseDate] = useState<string>(() => new Date().toISOString());
+  const [assignRenewalDate, setAssignRenewalDate] = useState<string>(() =>
+    calcAddDays(new Date().toISOString(), 30),
+  );
+
+  // Two-way reactive date handlers for Quick Assign
+  const handleAssignDurationChange = (days: number) => {
+    const cleanDays = Math.max(1, Number(days) || 1);
+    setDurationDays(cleanDays);
+    setAssignRenewalDate(calcAddDays(purchaseDate, cleanDays));
+  };
+
+  const handleAssignPurchaseDateChange = (val: string) => {
+    const cleanVal = safeIso(val);
+    setPurchaseDate(cleanVal);
+    if (assignRenewalDate) {
+      const calculatedDays = calcDaysBetween(cleanVal, assignRenewalDate);
+      setDurationDays(calculatedDays);
+    }
+  };
+
+  const handleAssignRenewalDateChange = (val: string) => {
+    const cleanVal = safeIso(val, new Date(calcAddDays(purchaseDate, durationDays)));
+    setAssignRenewalDate(cleanVal);
+    const calculatedDays = calcDaysBetween(purchaseDate, cleanVal);
+    setDurationDays(calculatedDays);
+  };
+
+  // Derived span and alarm for Quick Assign
+  const assignSpanDays = calcDaysBetween(purchaseDate, assignRenewalDate);
+  const isAssignAlarmExceeded = trackingType !== "QUANTITY" && durationDays > assignSpanDays;
 
   // Form states for Edit Service Template (Master Catalog)
   const [editName, setEditName] = useState("");
@@ -186,9 +255,53 @@ function AdminServicesListPage() {
   const [editSubDurationDays, setEditSubDurationDays] = useState<number>(30);
   const [editSubQuantity, setEditSubQuantity] = useState<number>(1000);
   const [editSubUsedQuantity, setEditSubUsedQuantity] = useState<number>(0);
-  const [editSubPurchaseDate, setEditSubPurchaseDate] = useState<string>(new Date().toISOString());
-  const [editSubRenewalDate, setEditSubRenewalDate] = useState<string>(new Date().toISOString());
+  const [editSubPurchaseDate, setEditSubPurchaseDate] = useState<string>(() => new Date().toISOString());
+  const [editSubRenewalDate, setEditSubRenewalDate] = useState<string>(() =>
+    calcAddDays(new Date().toISOString(), 30),
+  );
   const [editSubStatus, setEditSubStatus] = useState<string>("ACTIVE");
+
+  // Two-way reactive date handlers for Edit Sub-Service
+  const handleEditSubDurationChange = (days: number) => {
+    const cleanDays = Math.max(1, Number(days) || 1);
+    setEditSubDurationDays(cleanDays);
+    setEditSubRenewalDate(calcAddDays(editSubPurchaseDate, cleanDays));
+  };
+
+  const handleEditSubPurchaseDateChange = (val: string) => {
+    const cleanVal = safeIso(val);
+    setEditSubPurchaseDate(cleanVal);
+    if (editSubRenewalDate) {
+      const calculatedDays = calcDaysBetween(cleanVal, editSubRenewalDate);
+      setEditSubDurationDays(calculatedDays);
+    }
+  };
+
+  const handleEditSubRenewalDateChange = (val: string) => {
+    const cleanVal = safeIso(val, new Date(calcAddDays(editSubPurchaseDate, editSubDurationDays)));
+    setEditSubRenewalDate(cleanVal);
+    const calculatedDays = calcDaysBetween(editSubPurchaseDate, cleanVal);
+    setEditSubDurationDays(calculatedDays);
+  };
+
+  // Confirm Modals for Sub-Services
+  const [confirmStatusModal, setConfirmStatusModal] = useState<{
+    isOpen: boolean;
+    sub: any;
+    nextStatus: string;
+    customerName: string;
+  } | null>(null);
+
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState<{
+    isOpen: boolean;
+    sub: any;
+    customerName: string;
+  } | null>(null);
+
+  // Derived span and alarm for Edit Sub-Service
+  const editSubSpanDays = calcDaysBetween(editSubPurchaseDate, editSubRenewalDate);
+  const isEditSubAlarmExceeded =
+    editSubTrackingType !== "QUANTITY" && editSubDurationDays > editSubSpanDays;
 
   // Queries
   const { data: servicesData, isLoading, refetch } = useQuery({
@@ -287,11 +400,11 @@ function AdminServicesListPage() {
     const resultTemplates: any[] = [];
     const processedTopServiceIds = new Set<string>();
 
-    // 2. Process top-level services (prioritizing pure catalog templates without customer first)
+    // 2. Process top-level services (prioritizing pure catalog templates without customer first, then newest first)
     const sortedTopServices = [...topLevelServices].sort((a, b) => {
       if (!a.customerId && b.customerId) return -1;
       if (a.customerId && !b.customerId) return 1;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
     sortedTopServices.forEach((top: any) => {
@@ -383,6 +496,17 @@ function AdminServicesListPage() {
       }
     });
 
+    // Ensure assignedServices inside every service template group are sorted newest first
+    resultTemplates.forEach((t) => {
+      if (Array.isArray(t?.assignedServices)) {
+        t.assignedServices.sort((a: any, b: any) => {
+          const timeA = new Date(a?.createdAt || a?.purchaseDate || a?.startDate || 0).getTime() || 0;
+          const timeB = new Date(b?.createdAt || b?.purchaseDate || b?.startDate || 0).getTime() || 0;
+          return timeB - timeA;
+        });
+      }
+    });
+
     return resultTemplates;
   }, [allItems]);
 
@@ -402,12 +526,14 @@ function AdminServicesListPage() {
     })
     .sort((a: any, b: any) => {
       if (sortBy === "name") {
-        return a.name.localeCompare(b.name, "fa");
+        return (a?.name || "").localeCompare(b?.name || "", "fa");
       }
       if (sortBy === "type") {
-        return (a.categorySlug || "").localeCompare(b.categorySlug || "");
+        return (a?.categorySlug || "").localeCompare(b?.categorySlug || "");
       }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      const timeA = new Date(a?.createdAt || 0).getTime() || 0;
+      const timeB = new Date(b?.createdAt || 0).getTime() || 0;
+      return timeB - timeA;
     });
 
   const getTabCount = (tabSlug: string) => {
@@ -535,8 +661,8 @@ function AdminServicesListPage() {
     }
 
     const assignedName = assignSubServiceName.trim() || assigningToCatalog.name;
-    const pDate = purchaseDate ? new Date(purchaseDate) : new Date();
-    const renDate = new Date(pDate.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+    const pDate = safeDate(purchaseDate);
+    const renDate = safeDate(assignRenewalDate, new Date(calcAddDays(pDate, durationDays)));
 
     createServiceMutation.mutate({
       name: assignedName,
@@ -551,7 +677,7 @@ function AdminServicesListPage() {
       billingCycle: trackingType === "QUANTITY" ? "NONE" : String(durationDays),
       purchaseDate: pDate.toISOString(),
       startDate: pDate.toISOString(),
-      renewalDate: trackingType === "QUANTITY" ? new Date(pDate.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString() : renDate,
+      renewalDate: trackingType === "QUANTITY" ? calcAddDays(pDate, 365) : renDate.toISOString(),
     });
   };
 
@@ -585,8 +711,10 @@ function AdminServicesListPage() {
 
     setEditSubQuantity(Number(sub.quantity) || 1);
     setEditSubUsedQuantity(Number(sub.usedQuantity) || 0);
-    setEditSubPurchaseDate(sub.purchaseDate || sub.startDate || sub.createdAt || new Date().toISOString());
-    setEditSubRenewalDate(sub.renewalDate || new Date().toISOString());
+    const pDate = sub.purchaseDate || sub.startDate || sub.createdAt || new Date().toISOString();
+    const rDate = sub.renewalDate || calcAddDays(pDate, totalDays);
+    setEditSubPurchaseDate(safeIso(pDate));
+    setEditSubRenewalDate(safeIso(rDate));
     setEditSubStatus(sub.status || "ACTIVE");
   };
 
@@ -598,10 +726,8 @@ function AdminServicesListPage() {
       return;
     }
 
-    const pDate = editSubPurchaseDate ? new Date(editSubPurchaseDate) : new Date();
-    const renDate = editSubRenewalDate
-      ? new Date(editSubRenewalDate).toISOString()
-      : new Date(pDate.getTime() + editSubDurationDays * 24 * 60 * 60 * 1000).toISOString();
+    const pDate = safeDate(editSubPurchaseDate);
+    const renDate = safeDate(editSubRenewalDate, new Date(calcAddDays(pDate, editSubDurationDays)));
 
     updateServiceMutation.mutate({
       id: editingSubService.id,
@@ -614,7 +740,7 @@ function AdminServicesListPage() {
         billingCycle: editSubTrackingType === "QUANTITY" ? "NONE" : String(editSubDurationDays),
         purchaseDate: pDate.toISOString(),
         startDate: pDate.toISOString(),
-        renewalDate: editSubTrackingType === "QUANTITY" ? null : renDate,
+        renewalDate: editSubTrackingType === "QUANTITY" ? null : renDate.toISOString(),
         status: editSubStatus,
       },
     });
@@ -624,46 +750,38 @@ function AdminServicesListPage() {
   const handleToggleSubServiceStatus = (sub: any) => {
     const customerName = sub.customer?.displayName || sub.customer?.name || "مشترک";
     const nextStatus = sub.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
-    const actionLabel = nextStatus === "ACTIVE" ? "فعال‌سازی" : "تعلیق";
-
-    if (
-      window.confirm(
-        `آیا از ${actionLabel} سرویس «${sub.name}» متعلق به مشتری «${customerName}» اطمینان دارید؟`,
-      )
-    ) {
-      updateServiceMutation.mutate({
-        id: sub.id,
-        data: { status: nextStatus },
-      });
-    }
+    setConfirmStatusModal({
+      isOpen: true,
+      sub,
+      nextStatus,
+      customerName,
+    });
   };
 
   const handleDeleteSubService = (sub: any) => {
     const customerName = sub.customer?.displayName || sub.customer?.name || "مشترک";
-    if (
-      window.confirm(
-        `آیا از حذف دائم سرویس «${sub.name}» متعلق به مشتری «${customerName}» اطمینان دارید؟`,
-      )
-    ) {
-      deleteServiceMutation.mutate(sub.id);
-    }
+    setConfirmDeleteModal({
+      isOpen: true,
+      sub,
+      customerName,
+    });
   };
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full px-4 py-8 animate-entrance dir-rtl">
+      <div className="flex flex-col gap-8 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 animate-entrance dir-rtl">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shadow-xs">
                 <Server className="h-6 w-6" />
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                   مدیریت سرویس‌ها و کاتالوگ خدمات
                 </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 leading-relaxed">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
                   ساختار سلسله‌مراتبی سرویس‌های اصلی کاتالوگ و زیرمجموعه‌های تخصیص‌یافته به همراه مدل‌های مصرف زمانی و تعدادی
                 </p>
               </div>
@@ -675,7 +793,7 @@ function AdminServicesListPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-xs h-9 cursor-pointer rounded-xl border-border/70"
+                className="gap-2 text-xs h-9 cursor-pointer rounded-xl border-border/70 px-3.5"
               >
                 <Layers className="h-3.5 w-3.5 text-purple-500" />
                 مدیریت دسته‌بندی‌ها
@@ -685,7 +803,7 @@ function AdminServicesListPage() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="gap-1.5 text-xs h-9 cursor-pointer rounded-xl"
+              className="gap-2 text-xs h-9 cursor-pointer rounded-xl px-3.5"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
               بروزرسانی
@@ -701,7 +819,7 @@ function AdminServicesListPage() {
                 setTrackingType("HYBRID");
                 setIsCreateOpen(true);
               }}
-              className="gap-1.5 text-xs h-9 shadow-sm bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl"
+              className="gap-2 text-xs h-9 shadow-sm bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl px-4"
             >
               <Plus className="h-4 w-4" />
               ایجاد سرویس / بسته جدید
@@ -710,8 +828,8 @@ function AdminServicesListPage() {
         </div>
 
         {/* Dynamic Category Filters Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border/40">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/40">
+          <div className="flex flex-wrap items-center gap-2.5">
             {categoryTabs.map((cat) => {
               const Icon = cat.icon;
               const isSelected = selectedCategory === cat.slug;
@@ -722,7 +840,7 @@ function AdminServicesListPage() {
                   variant={isSelected ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSelectedCategory(cat.slug)}
-                  className={`gap-1.5 text-xs h-8 rounded-xl transition-all cursor-pointer ${
+                  className={`gap-2 text-xs h-8.5 px-3 rounded-xl transition-all cursor-pointer ${
                     isSelected
                       ? "shadow-xs bg-emerald-600 hover:bg-emerald-500 text-white"
                       : "bg-card hover:bg-muted/40 text-muted-foreground hover:text-foreground"
@@ -731,7 +849,7 @@ function AdminServicesListPage() {
                   <Icon className="h-3.5 w-3.5" />
                   <span>{cat.name}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                       isSelected ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
                     }`}
                   >
@@ -813,7 +931,7 @@ function AdminServicesListPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-5">
             {filteredServices.map((svc: any) => {
               const badge = getCategoryBadge(svc.categorySlug, svc.serviceType?.name);
               const BadgeIcon = badge.icon;
@@ -827,21 +945,21 @@ function AdminServicesListPage() {
                 >
                   <CardContent className="p-0">
                     {/* Catalog Header */}
-                    <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-muted/10 border-b border-border/30">
-                      <div className="flex items-start sm:items-center gap-3.5">
-                        <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shrink-0">
+                    <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5 bg-muted/10 border-b border-border/30">
+                      <div className="flex items-start sm:items-center gap-4">
+                        <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shrink-0">
                           <BadgeIcon className="h-5 w-5" />
                         </div>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-wrap items-center gap-2.5">
                             <span className="font-bold text-base text-foreground">{svc.name}</span>
                             <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.className}`}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${badge.className}`}
                             >
-                              <BadgeIcon className="h-3 w-3" />
+                              <BadgeIcon className="h-3.5 w-3.5" />
                               {badge.label}
                             </span>
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted font-mono text-muted-foreground">
+                            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted font-mono text-muted-foreground">
                               {svc.assignedCount} مشترک فعال
                             </span>
                           </div>
@@ -854,7 +972,7 @@ function AdminServicesListPage() {
                       </div>
 
                       {/* Right actions */}
-                      <div className="flex items-center gap-2 self-end sm:self-center">
+                      <div className="flex items-center gap-2.5 self-end sm:self-center">
                         <Button
                           size="sm"
                           variant="outline"
@@ -863,10 +981,13 @@ function AdminServicesListPage() {
                             setAssignSubServiceName("");
                             setSelectedCustomerId("");
                             setPriceToman(0);
-                            setPurchaseDate(new Date().toISOString());
+                            const nowIso = new Date().toISOString();
+                            setPurchaseDate(nowIso);
+                            setDurationDays(30);
+                            setAssignRenewalDate(calcAddDays(nowIso, 30));
                             setTrackingType("HYBRID");
                           }}
-                          className="h-8 text-xs gap-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 cursor-pointer rounded-xl"
+                          className="h-8.5 text-xs gap-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 cursor-pointer rounded-xl px-3"
                         >
                           <Plus className="h-3.5 w-3.5" />
                           <span>تخصیص به مشتری</span>
@@ -881,17 +1002,17 @@ function AdminServicesListPage() {
                             setEditCategory(svc.categorySlug || "hosting");
                             setEditDescription(svc.description || "");
                           }}
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg"
+                          className="h-8.5 w-8.5 text-muted-foreground hover:text-foreground cursor-pointer rounded-xl"
                           title="ویرایش قالب کاتالوگ"
                         >
-                          <Edit2 className="h-3.5 w-3.5" />
+                          <Edit2 className="h-4 w-4" />
                         </Button>
 
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => toggleExpand(svc.name)}
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg"
+                          className="h-8.5 w-8.5 text-muted-foreground hover:text-foreground cursor-pointer rounded-xl"
                           title={isExpanded ? "بستن زیرمجموعه‌ها" : "مشاهده زیرمجموعه‌ها"}
                         >
                           {isExpanded ? (
@@ -905,9 +1026,9 @@ function AdminServicesListPage() {
 
                     {/* Sub-services / Customer Instances Accordion */}
                     {isExpanded && (
-                      <div className="p-4 bg-card/30">
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center justify-between pb-2 border-b border-border/20">
+                      <div className="p-5 bg-card/30">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center justify-between pb-3 border-b border-border/20">
                             <span className="text-xs font-bold text-muted-foreground">
                               نمونه‌ها و زیرمجموعه‌های تخصیص‌یافته به مشتریان ({assignedList.length})
                             </span>
@@ -919,9 +1040,13 @@ function AdminServicesListPage() {
                                 setAssignSubServiceName("");
                                 setSelectedCustomerId("");
                                 setPriceToman(0);
-                                setPurchaseDate(new Date().toISOString());
+                                const nowIso = new Date().toISOString();
+                                setPurchaseDate(nowIso);
+                                setDurationDays(30);
+                                setAssignRenewalDate(calcAddDays(nowIso, 30));
+                                setTrackingType("HYBRID");
                               }}
-                              className="h-6 text-[11px] px-2 gap-1 text-emerald-600 hover:text-emerald-700 cursor-pointer rounded-lg"
+                              className="h-7 text-xs px-2.5 gap-1.5 text-emerald-600 hover:text-emerald-700 cursor-pointer rounded-lg"
                             >
                               <Plus className="h-3 w-3" />
                               تخصیص نمونه جدید
@@ -937,14 +1062,14 @@ function AdminServicesListPage() {
                               <table className="w-full text-right text-xs">
                                 <thead>
                                   <tr className="text-muted-foreground border-b border-border/30">
-                                    <th className="py-2.5 px-3">نام زیرسرویس و مشتری</th>
-                                    <th className="py-2.5 px-3">مدل ردگیری و باقیمانده</th>
-                                    <th className="py-2.5 px-3">تاریخ ساخت</th>
-                                    <th className="py-2.5 px-3">تاریخ خرید</th>
-                                    <th className="py-2.5 px-3">تاریخ پایان / سررسید</th>
-                                    <th className="py-2.5 px-3">مبلغ قرارداد</th>
-                                    <th className="py-2.5 px-3 text-center">وضعیت</th>
-                                    <th className="py-2.5 px-3 text-center">عملیات</th>
+                                    <th className="py-3 px-4">نام زیرسرویس و مشتری</th>
+                                    <th className="py-3 px-4">مدل ردگیری و باقیمانده</th>
+                                    <th className="py-3 px-4">تاریخ ساخت</th>
+                                    <th className="py-3 px-4">تاریخ خرید</th>
+                                    <th className="py-3 px-4">تاریخ پایان / سررسید</th>
+                                    <th className="py-3 px-4">مبلغ قرارداد</th>
+                                    <th className="py-3 px-4 text-center">وضعیت</th>
+                                    <th className="py-3 px-4 text-center">عملیات</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border/20">
@@ -1005,6 +1130,18 @@ function AdminServicesListPage() {
                                             <span className="text-[10px] text-muted-foreground">
                                               مدل: {details.trackingType === "TIME" ? "زمان‌محور (فقط زمان)" : details.trackingType === "QUANTITY" ? "تعدادمحور (فقط تعداد)" : "ترکیبی (زمان و تعداد)"}
                                             </span>
+                                            {details.isAlarmExceeded && (
+                                              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md font-medium mt-0.5 animate-pulse">
+                                                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                                <span>هشدار: دوره تعیین‌شده ({details.configuredCycleDays?.toLocaleString("fa-IR")} روز) بیشتر از بازه ({details.daysTotal.toLocaleString("fa-IR")} روز)</span>
+                                              </span>
+                                            )}
+                                            {details.isExpired && details.trackingType !== "QUANTITY" && (
+                                              <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 rounded-md font-medium mt-0.5">
+                                                <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
+                                                <span>سررسید منقضی شده</span>
+                                              </span>
+                                            )}
                                           </div>
                                         </td>
 
@@ -1561,8 +1698,9 @@ function AdminServicesListPage() {
                       <Label className="text-xs font-semibold">مدت اعتبار (روز) *</Label>
                       <Input
                         type="number"
+                        min={1}
                         value={durationDays}
-                        onChange={(e) => setDurationDays(Number(e.target.value))}
+                        onChange={(e) => handleAssignDurationChange(Number(e.target.value))}
                         className="rounded-xl h-9 text-xs font-mono"
                         required
                       />
@@ -1625,8 +1763,9 @@ function AdminServicesListPage() {
                       <Label className="text-xs font-semibold">مدت اعتبار (روز) *</Label>
                       <Input
                         type="number"
+                        min={1}
                         value={durationDays}
-                        onChange={(e) => setDurationDays(Number(e.target.value))}
+                        onChange={(e) => handleAssignDurationChange(Number(e.target.value))}
                         className="rounded-xl h-9 text-xs font-mono"
                         required
                       />
@@ -1646,20 +1785,56 @@ function AdminServicesListPage() {
 
                 {/* 5. Dates: Creation Date & Start/Purchase Date (Only for TIME and HYBRID) */}
                 {trackingType !== "QUANTITY" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">تاریخ ساخت و ایجاد سرویس (شمسی) *</Label>
-                      <JalaliDatePicker
-                        value={purchaseDate}
-                        onChange={(iso) => setPurchaseDate(iso)}
-                      />
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">تاریخ ثبت و خرید (شمسی) *</Label>
+                        <JalaliDatePicker
+                          value={purchaseDate}
+                          onChange={handleAssignPurchaseDateChange}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">تاریخ سررسید / پایان (شمسی) *</Label>
+                        <JalaliDatePicker
+                          value={assignRenewalDate}
+                          onChange={handleAssignRenewalDateChange}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">تاریخ شروع / خرید (شمسی) *</Label>
-                      <JalaliDatePicker
-                        value={purchaseDate}
-                        onChange={(iso) => setPurchaseDate(iso)}
-                      />
+
+                    {/* Live Span & Alarm indicator */}
+                    <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">بازه زمانی کلی سررسید:</span>
+                        <span className="font-bold text-foreground font-mono">
+                          {assignSpanDays.toLocaleString("fa-IR")} روز
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">دوره تعیین‌شده برای سرویس:</span>
+                        <span className="font-bold text-foreground font-mono">
+                          {durationDays.toLocaleString("fa-IR")} روز
+                        </span>
+                      </div>
+
+                      {isAssignAlarmExceeded && (
+                        <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-pulse mt-1">
+                          <div className="flex items-center gap-1.5">
+                            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                            <span>
+                              هشدار: دوره تعیین‌شده ({durationDays.toLocaleString("fa-IR")} روز) از بازه سررسید ({assignSpanDays.toLocaleString("fa-IR")} روز) بیشتر است!
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleAssignDurationChange(assignSpanDays)}
+                            className="text-[11px] underline text-amber-800 dark:text-amber-200 font-bold hover:text-amber-900 cursor-pointer shrink-0"
+                          >
+                            تطبیق دوره با بازه
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1885,8 +2060,9 @@ function AdminServicesListPage() {
                       <Label className="text-xs font-semibold">مدت اعتبار (روز) *</Label>
                       <Input
                         type="number"
+                        min={1}
                         value={editSubDurationDays}
-                        onChange={(e) => setEditSubDurationDays(Number(e.target.value))}
+                        onChange={(e) => handleEditSubDurationChange(Number(e.target.value))}
                         className="rounded-xl h-9 text-xs font-mono"
                         required
                       />
@@ -1958,8 +2134,9 @@ function AdminServicesListPage() {
                       <Label className="text-xs font-semibold">اعتبار (روز) *</Label>
                       <Input
                         type="number"
+                        min={1}
                         value={editSubDurationDays}
-                        onChange={(e) => setEditSubDurationDays(Number(e.target.value))}
+                        onChange={(e) => handleEditSubDurationChange(Number(e.target.value))}
                         className="rounded-xl h-9 text-xs font-mono"
                         required
                       />
@@ -1988,20 +2165,56 @@ function AdminServicesListPage() {
 
                 {/* 4. Dates (Only for TIME and HYBRID) */}
                 {editSubTrackingType !== "QUANTITY" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">تاریخ ساخت و خرید (شمسی) *</Label>
-                      <JalaliDatePicker
-                        value={editSubPurchaseDate}
-                        onChange={(iso) => setEditSubPurchaseDate(iso)}
-                      />
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">تاریخ ساخت و خرید (شمسی) *</Label>
+                        <JalaliDatePicker
+                          value={editSubPurchaseDate}
+                          onChange={handleEditSubPurchaseDateChange}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">تاریخ سررسید / پایان (شمسی) *</Label>
+                        <JalaliDatePicker
+                          value={editSubRenewalDate}
+                          onChange={handleEditSubRenewalDateChange}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">تاریخ سررسید / پایان (شمسی) *</Label>
-                      <JalaliDatePicker
-                        value={editSubRenewalDate}
-                        onChange={(iso) => setEditSubRenewalDate(iso)}
-                      />
+
+                    {/* Live Span & Alarm indicator for Edit */}
+                    <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col gap-2 mt-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">بازه زمانی کلی سررسید:</span>
+                        <span className="font-bold text-foreground font-mono">
+                          {editSubSpanDays.toLocaleString("fa-IR")} روز
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">دوره تعیین‌شده برای سرویس:</span>
+                        <span className="font-bold text-foreground font-mono">
+                          {editSubDurationDays.toLocaleString("fa-IR")} روز
+                        </span>
+                      </div>
+
+                      {isEditSubAlarmExceeded && (
+                        <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-pulse mt-1">
+                          <div className="flex items-center gap-1.5">
+                            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                            <span>
+                              هشدار: دوره تعیین‌شده ({editSubDurationDays.toLocaleString("fa-IR")} روز) از بازه سررسید ({editSubSpanDays.toLocaleString("fa-IR")} روز) بیشتر است!
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleEditSubDurationChange(editSubSpanDays)}
+                            className="text-[11px] underline text-amber-800 dark:text-amber-200 font-bold hover:text-amber-900 cursor-pointer shrink-0"
+                          >
+                            تطبیق دوره با بازه
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2040,6 +2253,63 @@ function AdminServicesListPage() {
               </form>
             </div>
           </div>
+        )}
+
+        {/* Confirm Modal for Status Toggle */}
+        {confirmStatusModal && (
+          <ConfirmModal
+            isOpen={confirmStatusModal.isOpen}
+            onClose={() => setConfirmStatusModal(null)}
+            onConfirm={() => {
+              updateServiceMutation.mutate({
+                id: confirmStatusModal.sub.id,
+                data: { status: confirmStatusModal.nextStatus },
+              });
+              setConfirmStatusModal(null);
+            }}
+            title={confirmStatusModal.nextStatus === "ACTIVE" ? "فعال‌سازی سرویس" : "تعلیق و غیرفعال‌سازی سرویس"}
+            description={
+              <div className="space-y-2 text-xs">
+                <p>
+                  آیا از {confirmStatusModal.nextStatus === "ACTIVE" ? "فعال‌سازی مجدد" : "تعلیق و غیرفعال‌سازی موقت"} سرویس <strong className="text-foreground font-semibold">«{confirmStatusModal.sub?.name}»</strong> متعلق به مشتری <strong className="text-foreground font-semibold">«{confirmStatusModal.customerName}»</strong> اطمینان دارید؟
+                </p>
+                {confirmStatusModal.nextStatus !== "ACTIVE" && (
+                  <p className="text-amber-600 dark:text-amber-400 font-medium">
+                    توجه: با تعلیق سرویس، وضعیت آن در پنل مشترک نیز به حالت معلق تغییر می‌یابد.
+                  </p>
+                )}
+              </div>
+            }
+            confirmText={confirmStatusModal.nextStatus === "ACTIVE" ? "بله، فعال شود" : "بله، تعلیق شود"}
+            variant={confirmStatusModal.nextStatus === "ACTIVE" ? "success" : "warning"}
+            isLoading={updateServiceMutation.isPending}
+          />
+        )}
+
+        {/* Confirm Modal for Sub-Service Deletion */}
+        {confirmDeleteModal && (
+          <ConfirmModal
+            isOpen={confirmDeleteModal.isOpen}
+            onClose={() => setConfirmDeleteModal(null)}
+            onConfirm={() => {
+              deleteServiceMutation.mutate(confirmDeleteModal.sub.id);
+              setConfirmDeleteModal(null);
+            }}
+            title="حذف دائم سرویس"
+            description={
+              <div className="space-y-2 text-xs">
+                <p>
+                  آیا از حذف کامل و دائمی سرویس <strong className="text-foreground font-semibold">«{confirmDeleteModal.sub?.name}»</strong> متعلق به مشتری <strong className="text-foreground font-semibold">«{confirmDeleteModal.customerName}»</strong> اطمینان دارید؟
+                </p>
+                <p className="text-rose-600 dark:text-rose-400 font-medium">
+                  هشدار: این عملیات غیرقابل بازگشت است و رکورد این سرویس به صورت کامل حذف خواهد شد.
+                </p>
+              </div>
+            }
+            confirmText="بله، حذف دائم شود"
+            variant="danger"
+            isLoading={deleteServiceMutation.isPending}
+          />
         )}
       </div>
     </AppShell>

@@ -20,6 +20,12 @@ export class CreateCustomerHandler
         },
       });
 
+      const parsedBirthDate = dto.birthDate ? new Date(dto.birthDate) : null;
+      const validBirthDate = parsedBirthDate && !isNaN(parsedBirthDate.getTime()) ? parsedBirthDate : null;
+
+      const parsedCoopDate = dto.cooperationStartDate ? new Date(dto.cooperationStartDate) : null;
+      const validCoopDate = parsedCoopDate && !isNaN(parsedCoopDate.getTime()) ? parsedCoopDate : null;
+
       if (!user) {
         user = await tx.user.create({
           data: {
@@ -27,13 +33,25 @@ export class CreateCustomerHandler
             phone: cleanPhone,
             email: dto.email || null,
             role: "CUSTOMER",
+            birthDate: validBirthDate,
+            cooperationStartDate: validCoopDate,
+            telegramChatId: dto.telegramChatId || null,
+            address: dto.address || null,
           },
         });
-      } else if (user.phone !== cleanPhone) {
-        user = await tx.user.update({
-          where: { id: user.id },
-          data: { phone: cleanPhone },
-        });
+      } else {
+        const userUpdateData: any = {};
+        if (user.phone !== cleanPhone) userUpdateData.phone = cleanPhone;
+        if (validBirthDate && !user.birthDate) userUpdateData.birthDate = validBirthDate;
+        if (validCoopDate && !user.cooperationStartDate) userUpdateData.cooperationStartDate = validCoopDate;
+        if (dto.telegramChatId) userUpdateData.telegramChatId = dto.telegramChatId;
+        if (dto.address) userUpdateData.address = dto.address;
+        if (Object.keys(userUpdateData).length > 0) {
+          user = await tx.user.update({
+            where: { id: user.id },
+            data: userUpdateData,
+          });
+        }
       }
 
       // Generate sequential numeric system ID starting from 30001
@@ -59,6 +77,11 @@ export class CreateCustomerHandler
           displayName: dto.displayName || dto.company || null,
           phone: cleanPhone,
           email: dto.email || null,
+          birthDate: validBirthDate,
+          cooperationStartDate: validCoopDate,
+          telegramChatId: dto.telegramChatId || null,
+          description: dto.description || null,
+          address: dto.address || null,
           status: "ACTIVE",
         },
         include: {

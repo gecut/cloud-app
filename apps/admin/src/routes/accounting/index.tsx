@@ -369,23 +369,23 @@ function AdminAccountingPage() {
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-6 animate-entrance">
+      <div className="flex flex-col gap-8 animate-entrance">
         {/* Page Title & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/30">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/40">
           <div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
               حسابداری، تراز مالی و گردش وجوه
             </h1>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
               بررسی همزمان درآمدها و وصولی‌های فروش در برابر هزینه‌ها و بدهی‌های تامین‌کنندگان زیرساخت
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <Button
               variant="outline"
               size="sm"
               onClick={handleRefresh}
-              className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               بروزرسانی
@@ -393,7 +393,7 @@ function AdminAccountingPage() {
             <Link to="/invoices">
               <Button
                 size="sm"
-                className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
+                className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
               >
                 <FileText className="h-4 w-4" />
                 مدیریت فاکتورها
@@ -403,88 +403,88 @@ function AdminAccountingPage() {
         </div>
 
         {/* Top KPI Metrics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* 1. Collected Revenue */}
-          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between">
+          <div className="rounded-2xl border border-border/50 bg-card/50 p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">وصول‌شده ماه (فروش)</span>
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+              <span className="text-xs font-semibold text-muted-foreground">وصول‌شده ماه (فروش)</span>
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
                 <ArrowDownLeft className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-xl sm:text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400">
+            <div className="mt-5 space-y-1">
+              <div className="text-xl sm:text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
                 {collectedSalesToman.toLocaleString("fa-IR")}{" "}
-                <span className="text-xs font-normal text-muted-foreground">تومان</span>
+                <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
               </div>
-              <span className="text-[11px] text-muted-foreground font-medium">فاکتورهای تایید و تسویه‌شده</span>
+              <span className="text-xs text-muted-foreground font-medium">فاکتورهای تایید و تسویه‌شده</span>
             </div>
           </div>
 
           {/* 2. Supplier Expenses */}
-          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between">
+          <div className="rounded-2xl border border-border/50 bg-card/50 p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-rose-500/30 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">هزینه‌های تامین‌کنندگان</span>
-              <div className="p-2 rounded-xl bg-rose-500/10 text-rose-500">
+              <span className="text-xs font-semibold text-muted-foreground">هزینه‌های تامین‌کنندگان</span>
+              <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">
                 <ArrowUpRight className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-xl sm:text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400">
+            <div className="mt-5 space-y-1">
+              <div className="text-xl sm:text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400 font-mono">
                 {supplierExpensesToman.toLocaleString("fa-IR")}{" "}
-                <span className="text-xs font-normal text-muted-foreground">تومان</span>
+                <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
               </div>
-              <span className="text-[11px] text-muted-foreground font-medium">هزینه سرورها، هاست و لایسنس</span>
+              <span className="text-xs text-muted-foreground font-medium">هزینه سرورها، هاست و لایسنس</span>
             </div>
           </div>
 
           {/* 3. Net Margin */}
-          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between">
+          <div className="rounded-2xl border border-border/50 bg-card/50 p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-indigo-500/30 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">تراز مالی (سود عملیاتی)</span>
-              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
+              <span className="text-xs font-semibold text-muted-foreground">تراز مالی (سود عملیاتی)</span>
+              <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">
                 <Wallet className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
+            <div className="mt-5 space-y-1">
               <div
-                className={`text-xl sm:text-2xl font-black tracking-tight ${
+                className={`text-xl sm:text-2xl font-black tracking-tight font-mono ${
                   netBalanceToman >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                 }`}
               >
                 {netBalanceToman.toLocaleString("fa-IR")}{" "}
-                <span className="text-xs font-normal text-muted-foreground">تومان</span>
+                <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
               </div>
-              <span className="text-[11px] text-muted-foreground font-medium">تفاضل وصولی از کل هزینه‌ها</span>
+              <span className="text-xs text-muted-foreground font-medium">تفاضل وصولی از کل هزینه‌ها</span>
             </div>
           </div>
 
           {/* 4. Customer Receivables */}
-          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between">
+          <div className="rounded-2xl border border-border/50 bg-card/50 p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-amber-500/30 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">مطالبات معوق از مشتریان</span>
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+              <span className="text-xs font-semibold text-muted-foreground">مطالبات معوق از مشتریان</span>
+              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
                 <AlertCircle className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-xl sm:text-2xl font-black tracking-tight text-amber-600 dark:text-amber-400">
+            <div className="mt-5 space-y-1">
+              <div className="text-xl sm:text-2xl font-black tracking-tight text-amber-600 dark:text-amber-400 font-mono">
                 {receivableSalesToman.toLocaleString("fa-IR")}{" "}
-                <span className="text-xs font-normal text-muted-foreground">تومان</span>
+                <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
               </div>
-              <span className="text-[11px] text-muted-foreground font-medium">مانده فاکتورهای پرداخت‌نشده</span>
+              <span className="text-xs text-muted-foreground font-medium">مانده فاکتورهای پرداخت‌نشده</span>
             </div>
           </div>
         </div>
 
         {/* Two-Tabs Navigation: Sales vs Procurement */}
-        <div className="flex items-center gap-2 border-b border-border/30 pb-1">
+        <div className="flex items-center gap-3 border-b border-border/40 pb-2">
           <Button
             variant={activeTab === "sales" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("sales")}
-            className={`rounded-xl text-xs gap-2 cursor-pointer ${
-              activeTab === "sales" ? "bg-emerald-600 text-white hover:bg-emerald-500" : "text-muted-foreground"
+            className={`rounded-xl text-xs gap-2 cursor-pointer h-9 px-4 font-semibold ${
+              activeTab === "sales" ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : "text-muted-foreground"
             }`}
           >
             <CreditCard className="h-4 w-4" />
@@ -495,8 +495,8 @@ function AdminAccountingPage() {
             variant={activeTab === "procurement" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("procurement")}
-            className={`rounded-xl text-xs gap-2 cursor-pointer ${
-              activeTab === "procurement" ? "bg-emerald-600 text-white hover:bg-emerald-500" : "text-muted-foreground"
+            className={`rounded-xl text-xs gap-2 cursor-pointer h-9 px-4 font-semibold ${
+              activeTab === "procurement" ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : "text-muted-foreground"
             }`}
           >
             <Building2 className="h-4 w-4" />
@@ -508,7 +508,7 @@ function AdminAccountingPage() {
         {activeTab === "sales" && (
           <div className="flex flex-col gap-4">
             {/* Content-Based Category Tabs */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
               <span className="text-xs text-muted-foreground font-semibold ml-1">دسته‌بندی موضوعی اسناد:</span>
               {ACCOUNTING_CONTENT_CATEGORIES.map((cat) => {
                 const Icon = cat.icon;
@@ -521,11 +521,11 @@ function AdminAccountingPage() {
                       setSelectedCategory(cat.id);
                       setPage(1);
                     }}
-                    className={`text-xs gap-1.5 rounded-xl h-8 cursor-pointer ${
-                      selectedCategory === cat.id ? "bg-emerald-600 text-white hover:bg-emerald-500" : ""
+                    className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
+                      selectedCategory === cat.id ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
                     }`}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="h-4 w-4" />
                     {cat.label}
                   </Button>
                 );
@@ -533,24 +533,24 @@ function AdminAccountingPage() {
             </div>
 
             {/* Comprehensive Multi-Filter Bar */}
-            <div className="rounded-2xl border border-border/60 bg-card/50 p-4 shadow-xs backdrop-blur-xs flex flex-col gap-3">
-              <div className="flex items-center justify-between pb-2 border-b border-border/30">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600">
+            <div className="rounded-2xl border border-border/60 bg-card/50 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
+              <div className="flex items-center justify-between pb-3 border-b border-border/30">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
                     <Filter className="h-4 w-4" />
                   </div>
                   <span className="text-xs font-bold text-foreground">فیلترهای پیشرفته اسناد مالی و فاکتورها</span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   {hasActiveFilters && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={resetAllFilters}
-                      className="h-7 px-2.5 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 text-[11px] gap-1 cursor-pointer"
+                      className="h-8 px-3 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 text-xs gap-1.5 cursor-pointer rounded-xl"
                     >
-                      <RotateCcw className="h-3 w-3" />
+                      <RotateCcw className="h-3.5 w-3.5" />
                       پاکسازی فیلترها
                     </Button>
                   )}
@@ -560,17 +560,17 @@ function AdminAccountingPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                 {/* 1. Customer Filter */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">فیلتر بر اساس مشتری:</span>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">فیلتر بر اساس مشتری:</span>
                   <select
                     value={filterCustomerId}
                     onChange={(e) => {
                       setFilterCustomerId(e.target.value);
                       setPage(1);
                     }}
-                    className="w-full h-8 rounded-xl border border-input bg-card px-2.5 text-xs text-foreground shadow-xs font-medium cursor-pointer"
+                    className="w-full h-9 rounded-xl border border-input bg-card px-3 text-xs text-foreground shadow-xs font-medium cursor-pointer"
                   >
                     <option value="ALL">همه مشتریان</option>
                     {customersList.map((c: any) => (
@@ -582,15 +582,15 @@ function AdminAccountingPage() {
                 </div>
 
                 {/* 2. Settlement Status Filter */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">وضعیت تسویه فاکتور:</span>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">وضعیت تسویه فاکتور:</span>
                   <select
                     value={filterStatus}
                     onChange={(e) => {
                       setFilterStatus(e.target.value);
                       setPage(1);
                     }}
-                    className="w-full h-8 rounded-xl border border-input bg-card px-2.5 text-xs text-foreground shadow-xs font-medium cursor-pointer"
+                    className="w-full h-9 rounded-xl border border-input bg-card px-3 text-xs text-foreground shadow-xs font-medium cursor-pointer"
                   >
                     <option value="ALL">همه وضعیت‌ها</option>
                     <option value="PAID">وصول‌شده (پرداخت شده)</option>
@@ -600,8 +600,8 @@ function AdminAccountingPage() {
                 </div>
 
                 {/* 3. Min Amount */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">حداقل مبلغ (تومان):</span>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">حداقل مبلغ (تومان):</span>
                   <Input
                     type="number"
                     value={minAmount}
@@ -610,13 +610,13 @@ function AdminAccountingPage() {
                       setPage(1);
                     }}
                     placeholder="مثال: ۱۰۰۰۰۰"
-                    className="h-8 text-xs bg-card"
+                    className="h-9 text-xs bg-card rounded-xl font-mono"
                   />
                 </div>
 
                 {/* 4. Max Amount */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">حداکثر مبلغ (تومان):</span>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">حداکثر مبلغ (تومان):</span>
                   <Input
                     type="number"
                     value={maxAmount}
@@ -625,23 +625,23 @@ function AdminAccountingPage() {
                       setPage(1);
                     }}
                     placeholder="مثال: ۵۰۰۰۰۰۰"
-                    className="h-8 text-xs bg-card"
+                    className="h-9 text-xs bg-card rounded-xl font-mono"
                   />
                 </div>
               </div>
 
               {/* Date Filters Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-border/30 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-border/30 text-xs">
                 {/* Date Criteria Toggle */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">مبنای تاریخ جستجو:</span>
-                  <div className="grid grid-cols-2 gap-1.5">
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">مبنای تاریخ جستجو:</span>
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
                       type="button"
                       variant={filterDateType === "issuedAt" ? "default" : "outline"}
                       size="sm"
                       onClick={() => setFilterDateType("issuedAt")}
-                      className={`h-8 text-xs cursor-pointer ${
+                      className={`h-9 text-xs rounded-xl cursor-pointer font-medium ${
                         filterDateType === "issuedAt" ? "bg-emerald-600 text-white" : ""
                       }`}
                     >
@@ -652,7 +652,7 @@ function AdminAccountingPage() {
                       variant={filterDateType === "dueDate" ? "default" : "outline"}
                       size="sm"
                       onClick={() => setFilterDateType("dueDate")}
-                      className={`h-8 text-xs cursor-pointer ${
+                      className={`h-9 text-xs rounded-xl cursor-pointer font-medium ${
                         filterDateType === "dueDate" ? "bg-emerald-600 text-white" : ""
                       }`}
                     >
@@ -662,8 +662,8 @@ function AdminAccountingPage() {
                 </div>
 
                 {/* From Date */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">از تاریخ (شمسی):</span>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">از تاریخ (شمسی):</span>
                   <JalaliDatePicker
                     value={filterFromDate}
                     onChange={(iso) => {
@@ -674,8 +674,8 @@ function AdminAccountingPage() {
                 </div>
 
                 {/* To Date */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">تا تاریخ (شمسی):</span>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">تا تاریخ (شمسی):</span>
                   <JalaliDatePicker
                     value={filterToDate}
                     onChange={(iso) => {
@@ -687,7 +687,7 @@ function AdminAccountingPage() {
               </div>
 
               {/* Sort Dropdown */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/30">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/30">
                 <span className="text-xs text-muted-foreground font-medium">مرتب‌سازی نتایج:</span>
                 <select
                   value={sortBy}
@@ -695,7 +695,7 @@ function AdminAccountingPage() {
                     setSortBy(e.target.value as any);
                     setPage(1);
                   }}
-                  className="h-8 rounded-xl border border-input bg-card/60 px-3 text-xs font-medium text-foreground shadow-xs focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                  className="h-9 rounded-xl border border-input bg-card/60 px-3.5 text-xs font-medium text-foreground shadow-xs focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
                 >
                   <option value="newest">جدیدترین</option>
                   <option value="oldest">قدیمی‌ترین</option>
@@ -711,50 +711,50 @@ function AdminAccountingPage() {
                 <table className="w-full text-right text-xs">
                   <thead className="bg-muted/30 text-muted-foreground font-semibold border-b border-border/30">
                     <tr>
-                      <th className="py-3 px-4 text-[11px]">شماره فاکتور</th>
-                      <th className="py-3 px-4 text-[11px]">مشتری</th>
-                      <th className="py-3 px-4 text-[11px]">مبلغ کل</th>
-                      <th className="py-3 px-4 text-[11px]">وضعیت تسویه</th>
-                      <th className="py-3 px-4 text-[11px]">تاریخ صدور / شروع</th>
-                      <th className="py-3 px-4 text-[11px]">تاریخ سررسید</th>
+                      <th className="py-3.5 px-5 text-xs">شماره فاکتور</th>
+                      <th className="py-3.5 px-5 text-xs">مشتری</th>
+                      <th className="py-3.5 px-5 text-xs">مبلغ کل</th>
+                      <th className="py-3.5 px-5 text-xs">وضعیت تسویه</th>
+                      <th className="py-3.5 px-5 text-xs">تاریخ صدور / شروع</th>
+                      <th className="py-3.5 px-5 text-xs">تاریخ سررسید</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/20">
                     {loadingInvoices ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
+                        <td colSpan={6} className="py-10 text-center text-xs text-muted-foreground">
                           در حال بارگذاری اطلاعات فاکتورها...
                         </td>
                       </tr>
                     ) : filteredInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
+                        <td colSpan={6} className="py-10 text-center text-xs text-muted-foreground">
                           هیچ صورت‌حسابی با فیلترهای انتخابی یافت نشد
                         </td>
                       </tr>
                     ) : (
                       paginatedInvoices.map((inv: any) => (
                         <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="py-3.5 px-4 font-mono font-bold text-foreground">
+                          <td className="py-4 px-5 font-mono font-bold text-foreground">
                             {formatInvoiceNumber(inv.invoiceNumber || inv.id)}
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-5">
                             <Link
                               to="/customers/$id"
                               params={{ id: String(inv.customerId) }}
-                              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-emerald-500 transition-colors"
+                              className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-emerald-500 transition-colors"
                             >
-                              <User className="h-3.5 w-3.5 opacity-60" />
+                              <User className="h-4 w-4 opacity-60" />
                               <span>{inv.customer?.displayName || inv.customer?.name || inv.customerId}</span>
                             </Link>
                           </td>
-                          <td className="py-3.5 px-4 font-bold text-foreground">
+                          <td className="py-4 px-5 font-bold text-foreground font-mono">
                             {(inv.totalToman || 0).toLocaleString("fa-IR")}{" "}
-                            <span className="text-[10px] font-normal text-muted-foreground">تومان</span>
+                            <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-5">
                             <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                              className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold border ${
                                 inv.status === "PAID"
                                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                   : inv.status === "UNPAID"
@@ -769,10 +769,10 @@ function AdminAccountingPage() {
                                 : "لغو شده"}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-muted-foreground font-mono text-[10px]">
+                          <td className="py-4 px-5 text-muted-foreground font-mono text-xs">
                             {formatJalaliDate(inv.issuedAt || inv.createdAt)}
                           </td>
-                          <td className="py-3.5 px-4 text-muted-foreground font-mono text-[10px]">
+                          <td className="py-4 px-5 text-muted-foreground font-mono text-xs">
                             {formatJalaliDate(inv.dueDate)}
                           </td>
                         </tr>
@@ -784,18 +784,18 @@ function AdminAccountingPage() {
 
               {/* Pagination Controls */}
               {filteredInvoices.length > 0 && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 px-5 bg-muted/20 border-t text-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 px-6 bg-muted/20 border-t text-xs">
                   <div className="text-muted-foreground font-medium">
                     نمایش {paginatedInvoices.length} از {sortedInvoices.length} سند (صفحه {page} از {totalInvoicePages})
                   </div>
                   {totalInvoicePages > 1 && (
-                    <div className="flex items-center gap-1.5 self-end sm:self-center">
+                    <div className="flex items-center gap-2 self-end sm:self-center">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="h-7 text-xs px-2.5 rounded-lg"
+                        className="h-8 text-xs px-3 rounded-xl"
                       >
                         قبلی
                       </Button>
@@ -805,7 +805,7 @@ function AdminAccountingPage() {
                           variant={page === p ? "default" : "outline"}
                           size="sm"
                           onClick={() => setPage(p)}
-                          className={`h-7 w-7 p-0 text-xs rounded-lg ${page === p ? "bg-emerald-600 text-white" : ""}`}
+                          className={`h-8 w-8 p-0 text-xs rounded-xl ${page === p ? "bg-emerald-600 text-white" : ""}`}
                         >
                           {p}
                         </Button>
@@ -815,7 +815,7 @@ function AdminAccountingPage() {
                         size="sm"
                         onClick={() => setPage((p) => Math.min(totalInvoicePages, p + 1))}
                         disabled={page === totalInvoicePages}
-                        className="h-7 text-xs px-2.5 rounded-lg"
+                        className="h-8 text-xs px-3 rounded-xl"
                       >
                         بعدی
                       </Button>
@@ -831,7 +831,7 @@ function AdminAccountingPage() {
         {activeTab === "procurement" && (
           <div className="flex flex-col gap-4">
             {/* Content-Based Category Tabs for Procurement */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
               <span className="text-xs text-muted-foreground font-semibold ml-1">دسته‌بندی موضوعی اسناد تامین:</span>
               {ACCOUNTING_CONTENT_CATEGORIES.map((cat) => {
                 const Icon = cat.icon;
@@ -844,11 +844,11 @@ function AdminAccountingPage() {
                       setSelectedSupplierCategory(cat.id);
                       setSupplierPage(1);
                     }}
-                    className={`text-xs gap-1.5 rounded-xl h-8 cursor-pointer ${
-                      selectedSupplierCategory === cat.id ? "bg-emerald-600 text-white hover:bg-emerald-500" : ""
+                    className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
+                      selectedSupplierCategory === cat.id ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
                     }`}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="h-4 w-4" />
                     {cat.label}
                   </Button>
                 );
@@ -856,24 +856,24 @@ function AdminAccountingPage() {
             </div>
 
             {/* Comprehensive Multi-Filter Bar for Procurement */}
-            <div className="rounded-2xl border border-border/60 bg-card/50 p-4 shadow-xs backdrop-blur-xs flex flex-col gap-3">
-              <div className="flex items-center justify-between pb-2 border-b border-border/30">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-600">
+            <div className="rounded-2xl border border-border/60 bg-card/50 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
+              <div className="flex items-center justify-between pb-3 border-b border-border/30">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
                     <Filter className="h-4 w-4" />
                   </div>
                   <span className="text-xs font-bold text-foreground">فیلترهای پیشرفته هزینه‌ها و تامین‌کنندگان</span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   {hasActiveSupplierFilters && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={resetAllSupplierFilters}
-                      className="h-7 px-2.5 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 text-[11px] gap-1 cursor-pointer"
+                      className="h-8 px-3 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 text-xs gap-1.5 cursor-pointer rounded-xl"
                     >
-                      <RotateCcw className="h-3 w-3" />
+                      <RotateCcw className="h-3.5 w-3.5" />
                       پاکسازی فیلترها
                     </Button>
                   )}
@@ -885,17 +885,17 @@ function AdminAccountingPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                 {/* 1. Supplier Filter */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">فیلتر بر اساس تامین‌کننده:</span>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">فیلتر بر اساس تامین‌کننده:</span>
                   <select
                     value={filterSupplierId}
                     onChange={(e) => {
                       setFilterSupplierId(e.target.value);
                       setSupplierPage(1);
                     }}
-                    className="w-full h-8 rounded-xl border border-input bg-card px-2.5 text-xs text-foreground shadow-xs font-medium cursor-pointer"
+                    className="w-full h-9 rounded-xl border border-input bg-card px-3 text-xs text-foreground shadow-xs font-medium cursor-pointer"
                   >
                     <option value="ALL">همه شرکت‌های تامین‌کننده</option>
                     {suppliers.map((s: any) => (
@@ -907,15 +907,15 @@ function AdminAccountingPage() {
                 </div>
 
                 {/* 2. Supplier Status Filter */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">وضعیت همکاری / سرویس:</span>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">وضعیت همکاری / سرویس:</span>
                   <select
                     value={filterSupplierStatus}
                     onChange={(e) => {
                       setFilterSupplierStatus(e.target.value);
                       setSupplierPage(1);
                     }}
-                    className="w-full h-8 rounded-xl border border-input bg-card px-2.5 text-xs text-foreground shadow-xs font-medium cursor-pointer"
+                    className="w-full h-9 rounded-xl border border-input bg-card px-3 text-xs text-foreground shadow-xs font-medium cursor-pointer"
                   >
                     <option value="ALL">همه وضعیت‌ها</option>
                     <option value="ACTIVE">فعال / جاری</option>
@@ -924,9 +924,9 @@ function AdminAccountingPage() {
                 </div>
 
                 {/* 3. Amount Range (Min/Max) */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">محدوده هزینه (تومان):</span>
-                  <div className="flex items-center gap-1.5">
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground">محدوده هزینه (تومان):</span>
+                  <div className="flex items-center gap-2">
                     <Input
                       type="number"
                       placeholder="از مبلغ"
@@ -935,9 +935,9 @@ function AdminAccountingPage() {
                         setMinSupplierAmount(e.target.value);
                         setSupplierPage(1);
                       }}
-                      className="h-8 text-xs font-mono"
+                      className="h-9 text-xs font-mono rounded-xl bg-card"
                     />
-                    <span className="text-muted-foreground text-[10px]">—</span>
+                    <span className="text-muted-foreground text-xs">—</span>
                     <Input
                       type="number"
                       placeholder="تا مبلغ"
@@ -946,20 +946,20 @@ function AdminAccountingPage() {
                         setMaxSupplierAmount(e.target.value);
                         setSupplierPage(1);
                       }}
-                      className="h-8 text-xs font-mono"
+                      className="h-9 text-xs font-mono rounded-xl bg-card"
                     />
                   </div>
                 </div>
 
                 {/* 4. Date Range Type & Date Pickers */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-muted-foreground">بازه زمانی تاریخ:</span>
-                    <div className="flex items-center gap-1 text-[10px]">
+                    <span className="text-xs font-semibold text-muted-foreground">بازه زمانی تاریخ:</span>
+                    <div className="flex items-center gap-1 text-[11px]">
                       <button
                         type="button"
                         onClick={() => setFilterSupplierDateType("renewalDate")}
-                        className={`px-1.5 py-0.5 rounded cursor-pointer ${
+                        className={`px-2 py-0.5 rounded-lg cursor-pointer ${
                           filterSupplierDateType === "renewalDate"
                             ? "bg-rose-500/20 text-rose-600 font-bold"
                             : "text-muted-foreground hover:text-foreground"
@@ -970,7 +970,7 @@ function AdminAccountingPage() {
                       <button
                         type="button"
                         onClick={() => setFilterSupplierDateType("purchaseDate")}
-                        className={`px-1.5 py-0.5 rounded cursor-pointer ${
+                        className={`px-2 py-0.5 rounded-lg cursor-pointer ${
                           filterSupplierDateType === "purchaseDate"
                             ? "bg-rose-500/20 text-rose-600 font-bold"
                             : "text-muted-foreground hover:text-foreground"
@@ -980,7 +980,7 @@ function AdminAccountingPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-2">
                     <JalaliDatePicker
                       placeholder="از تاریخ"
                       value={filterSupplierFromDate}
@@ -1004,19 +1004,19 @@ function AdminAccountingPage() {
 
             {/* Procurement View Selector & Table Card */}
             <div className="rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs">
-              <div className="p-4 px-5 border-b border-border/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+              <div className="p-4.5 px-6 border-b border-border/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-2.5">
                   <Building2 className="h-4 w-4 text-rose-500" />
                   <h3 className="font-bold text-sm text-foreground">هزینه‌ها و اسناد تامین زیرساخت</h3>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <div className="flex items-center rounded-xl bg-muted/40 p-1 border border-border/30 text-xs">
                     <Button
                       variant={procurementView === "services" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setProcurementView("services")}
-                      className={`h-7 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
+                      className={`h-7.5 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
                         procurementView === "services" ? "bg-emerald-600 text-white" : "text-muted-foreground"
                       }`}
                     >
@@ -1026,7 +1026,7 @@ function AdminAccountingPage() {
                       variant={procurementView === "suppliers" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setProcurementView("suppliers")}
-                      className={`h-7 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
+                      className={`h-7.5 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
                         procurementView === "suppliers" ? "bg-emerald-600 text-white" : "text-muted-foreground"
                       }`}
                     >
@@ -1035,7 +1035,7 @@ function AdminAccountingPage() {
                   </div>
 
                   <Link to="/servers">
-                    <Button size="sm" variant="outline" className="h-8 rounded-xl text-xs">
+                    <Button size="sm" variant="outline" className="h-8.5 px-3 rounded-xl text-xs font-medium">
                       مدیریت تامین‌کنندگان
                     </Button>
                   </Link>
@@ -1048,25 +1048,25 @@ function AdminAccountingPage() {
                   <table className="w-full text-right text-xs">
                     <thead className="bg-muted/30 text-muted-foreground font-semibold border-b border-border/30">
                       <tr>
-                        <th className="py-3 px-4 text-[11px]">شرح خدمت / هزینه تامین</th>
-                        <th className="py-3 px-4 text-[11px]">شرکت تامین‌کننده</th>
-                        <th className="py-3 px-4 text-[11px]">دسته‌بندی موضوعی</th>
-                        <th className="py-3 px-4 text-[11px]">هزینه ماهانه</th>
-                        <th className="py-3 px-4 text-[11px]">وضعیت</th>
-                        <th className="py-3 px-4 text-[11px]">تاریخ ثبت / خرید</th>
-                        <th className="py-3 px-4 text-[11px]">سررسید تمدید</th>
+                        <th className="py-3.5 px-5 text-xs">شرح خدمت / هزینه تامین</th>
+                        <th className="py-3.5 px-5 text-xs">شرکت تامین‌کننده</th>
+                        <th className="py-3.5 px-5 text-xs">دسته‌بندی موضوعی</th>
+                        <th className="py-3.5 px-5 text-xs">هزینه ماهانه</th>
+                        <th className="py-3.5 px-5 text-xs">وضعیت</th>
+                        <th className="py-3.5 px-5 text-xs">تاریخ ثبت / خرید</th>
+                        <th className="py-3.5 px-5 text-xs">سررسید تمدید</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
                       {loadingSuppliers ? (
                         <tr>
-                          <td colSpan={7} className="py-8 text-center text-xs text-muted-foreground">
+                          <td colSpan={7} className="py-10 text-center text-xs text-muted-foreground">
                             در حال بارگذاری لیست اقلام تامین‌کنندگان...
                           </td>
                         </tr>
                       ) : paginatedSupplierServices.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="py-8 text-center text-xs text-muted-foreground">
+                          <td colSpan={7} className="py-10 text-center text-xs text-muted-foreground">
                             هیچ قلم هزینه‌ای با فیلترهای انتخابی یافت نشد.
                           </td>
                         </tr>
@@ -1078,28 +1078,28 @@ function AdminAccountingPage() {
 
                           return (
                             <tr key={svc.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="py-3.5 px-4 font-bold text-foreground">
+                              <td className="py-4 px-5 font-bold text-foreground">
                                 <div>{svc.name}</div>
                                 {svc.notes && (
-                                  <div className="text-[10px] text-muted-foreground mt-0.5">{svc.notes}</div>
+                                  <div className="text-[11px] text-muted-foreground mt-1">{svc.notes}</div>
                                 )}
                               </td>
-                              <td className="py-3.5 px-4 font-medium text-foreground">
+                              <td className="py-4 px-5 font-medium text-foreground">
                                 {svc.supplierName || "—"}
                               </td>
-                              <td className="py-3.5 px-4">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/40">
-                                  <CatIcon className="h-3 w-3" />
+                              <td className="py-4 px-5">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-muted/60 text-muted-foreground border border-border/40">
+                                  <CatIcon className="h-3.5 w-3.5" />
                                   {catMeta.label}
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4 font-bold text-rose-600 dark:text-rose-400 font-mono">
+                              <td className="py-4 px-5 font-bold text-rose-600 dark:text-rose-400 font-mono">
                                 {(Number(svc.monthlyExpenseToman || svc.priceToman) || 0).toLocaleString("fa-IR")}{" "}
-                                <span className="text-[10px] font-normal text-muted-foreground">تومان</span>
+                                <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
                               </td>
-                              <td className="py-3.5 px-4">
+                              <td className="py-4 px-5">
                                 <span
-                                  className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                                  className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold border ${
                                     svc.status === "ACTIVE"
                                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                       : "bg-muted/50 text-muted-foreground border-border/40"
@@ -1108,10 +1108,10 @@ function AdminAccountingPage() {
                                   {svc.status === "ACTIVE" ? "فعال" : "غیرفعال"}
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4 text-muted-foreground font-mono text-[10px]">
+                              <td className="py-4 px-5 text-muted-foreground font-mono text-xs">
                                 {formatJalaliDate(svc.purchaseDate || svc.createdAt)}
                               </td>
-                              <td className="py-3.5 px-4 text-muted-foreground font-mono text-[10px]">
+                              <td className="py-4 px-5 text-muted-foreground font-mono text-xs">
                                 {formatJalaliDate(svc.renewalDate)}
                               </td>
                             </tr>
@@ -1120,46 +1120,46 @@ function AdminAccountingPage() {
                       )}
                     </tbody>
                   </table>
+                </div>
+              )}
 
-                  {/* Supplier Services Pagination */}
-                  {totalSupplierPages > 1 && (
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 px-5 bg-muted/20 border-t text-xs">
-                      <div className="text-muted-foreground font-medium">
-                        نمایش {paginatedSupplierServices.length} از {sortedSupplierServices.length} قلم هزینه (صفحه {supplierPage} از {totalSupplierPages})
-                      </div>
-                      <div className="flex items-center gap-1.5 self-end sm:self-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSupplierPage((p) => Math.max(1, p - 1))}
-                          disabled={supplierPage === 1}
-                          className="h-7 text-xs px-2.5 rounded-lg"
-                        >
-                          قبلی
-                        </Button>
-                        {Array.from({ length: totalSupplierPages }, (_, i) => i + 1).map((p) => (
-                          <Button
-                            key={p}
-                            variant={supplierPage === p ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setSupplierPage(p)}
-                            className={`h-7 w-7 p-0 text-xs rounded-lg ${supplierPage === p ? "bg-emerald-600 text-white" : ""}`}
-                          >
-                            {p}
-                          </Button>
-                        ))}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSupplierPage((p) => Math.min(totalSupplierPages, p + 1))}
-                          disabled={supplierPage === totalSupplierPages}
-                          className="h-7 text-xs px-2.5 rounded-lg"
-                        >
-                          بعدی
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+              {/* Supplier Services Pagination */}
+              {procurementView === "services" && totalSupplierPages > 1 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 px-6 bg-muted/20 border-t text-xs">
+                  <div className="text-muted-foreground font-medium">
+                    نمایش {paginatedSupplierServices.length} از {sortedSupplierServices.length} قلم هزینه (صفحه {supplierPage} از {totalSupplierPages})
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSupplierPage((p) => Math.max(1, p - 1))}
+                      disabled={supplierPage === 1}
+                      className="h-8 text-xs px-3 rounded-xl"
+                    >
+                      قبلی
+                    </Button>
+                    {Array.from({ length: totalSupplierPages }, (_, i) => i + 1).map((p) => (
+                      <Button
+                        key={p}
+                        variant={supplierPage === p ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSupplierPage(p)}
+                        className={`h-8 w-8 p-0 text-xs rounded-xl ${supplierPage === p ? "bg-emerald-600 text-white" : ""}`}
+                      >
+                        {p}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSupplierPage((p) => Math.min(totalSupplierPages, p + 1))}
+                      disabled={supplierPage === totalSupplierPages}
+                      className="h-8 text-xs px-3 rounded-xl"
+                    >
+                      بعدی
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -1169,33 +1169,33 @@ function AdminAccountingPage() {
                   <table className="w-full text-right text-xs">
                     <thead className="bg-muted/30 text-muted-foreground font-semibold border-b border-border/30">
                       <tr>
-                        <th className="py-3 px-4 text-[11px]">نام تامین‌کننده</th>
-                        <th className="py-3 px-4 text-[11px]">اطلاعات تماس</th>
-                        <th className="py-3 px-4 text-[11px]">تعداد سرویس</th>
-                        <th className="py-3 px-4 text-[11px]">مبلغ بدهی / هزینه ماهانه</th>
-                        <th className="py-3 px-4 text-[11px]">وضعیت همکاری</th>
+                        <th className="py-3.5 px-5 text-xs">نام تامین‌کننده</th>
+                        <th className="py-3.5 px-5 text-xs">اطلاعات تماس</th>
+                        <th className="py-3.5 px-5 text-xs">تعداد سرویس</th>
+                        <th className="py-3.5 px-5 text-xs">مبلغ بدهی / هزینه ماهانه</th>
+                        <th className="py-3.5 px-5 text-xs">وضعیت همکاری</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
                       {loadingSuppliers ? (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                          <td colSpan={5} className="py-10 text-center text-xs text-muted-foreground">
                             در حال بارگذاری لیست تامین‌کنندگان...
                           </td>
                         </tr>
                       ) : filteredSuppliers.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                          <td colSpan={5} className="py-10 text-center text-xs text-muted-foreground">
                             هیچ تامین‌کننده‌ای با این فیلترها ثبت نشده است.
                           </td>
                         </tr>
                       ) : (
                         filteredSuppliers.map((sup: any) => (
                           <tr key={sup.id} className="hover:bg-muted/20 transition-colors">
-                            <td className="py-3.5 px-4 font-bold text-foreground">
+                            <td className="py-4 px-5 font-bold text-foreground">
                               {sup.name}
                             </td>
-                            <td className="py-3.5 px-4 text-muted-foreground">
+                            <td className="py-4 px-5 text-muted-foreground">
                               {sup.contactPerson || sup.email || sup.phone || "—"}
                             </td>
                             <td className="py-3.5 px-4 font-mono">

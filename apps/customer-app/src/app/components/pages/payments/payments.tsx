@@ -14,6 +14,8 @@ export function Payments() {
   const activeUser = getActiveCustomerUser();
   const [selectedTab, setSelectedTab] = useState<string>("payments");
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
 
   const { data: invoicesData, isLoading: isLoadingInvoices } = useQuery({
     queryKey: ["customer", "invoices", activeUser?.id, activeUser?.customerId],
@@ -72,8 +74,14 @@ export function Payments() {
     .filter((s: any) => s.status === "ACTIVE")
     .reduce((sum: number, s: any) => sum + Number(s.priceToman || s.price || 0), 0);
 
-  // Map real backend invoices
-  const mappedInvoices: PaymentsType[] = (invoicesData?.items || []).map((inv: any) => {
+  // Map real backend invoices (newest first)
+  const sortedRawInvoices = [...(invoicesData?.items || [])].sort((a: any, b: any) => {
+    const timeA = new Date(a.issuedAt || a.createdAt || 0).getTime();
+    const timeB = new Date(b.issuedAt || b.createdAt || 0).getTime();
+    return timeB - timeA;
+  });
+
+  const mappedInvoices: PaymentsType[] = sortedRawInvoices.map((inv: any) => {
     const firstItem = inv.items?.[0];
     const title = firstItem?.title || inv.invoiceNumber || "صورتحساب خدمات";
     const subTitle =
@@ -114,8 +122,14 @@ export function Payments() {
     };
   });
 
-  // Map real backend payments (or paid invoices as fallback)
-  const rawPayments = paymentsData?.items || [];
+  // Map real backend payments (or paid invoices as fallback) (newest first)
+  const sortedRawPayments = [...(paymentsData?.items || [])].sort((a: any, b: any) => {
+    const timeA = new Date(a.paidAt || a.createdAt || 0).getTime();
+    const timeB = new Date(b.paidAt || b.createdAt || 0).getTime();
+    return timeB - timeA;
+  });
+
+  const rawPayments = sortedRawPayments;
   const mappedTransactions: PaymentsType[] = rawPayments.map((pay: any) => {
     const inv = pay.invoice;
     const firstItem = inv?.items?.[0];
@@ -191,10 +205,61 @@ export function Payments() {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: async (invoice: PaymentsType) => {
+      if (!invoice.id) throw new Error("شناسه فاکتور معتبر نیست");
+      return apiClient(`/invoices/${invoice.id}/cancel`, {
+        method: "PATCH",
+        body: JSON.stringify({ reason: "لغو توسط مشتری" }),
+      });
+    },
+    onSuccess: () => {
+      toast.success("فاکتور با موفقیت لغو شد");
+      queryClient.invalidateQueries({ queryKey: ["customer", "invoices"] });
+    },
+    onError: (err: any) => {
+      toast.danger(err.message || "خطا در لغو فاکتور");
+    },
+    onSettled: () => {
+      setCancellingId(null);
+    },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: async (invoice: PaymentsType) => {
+      if (!invoice.id) throw new Error("شناسه فاکتور معتبر نیست");
+      return apiClient(`/invoices/${invoice.id}/reactivate`, {
+        method: "PATCH",
+      });
+    },
+    onSuccess: () => {
+      toast.success("فاکتور مجدداً با موفقیت فعال شد و آماده پرداخت است");
+      queryClient.invalidateQueries({ queryKey: ["customer", "invoices"] });
+    },
+    onError: (err: any) => {
+      toast.danger(err.message || "خطا در فعال‌سازی مجدد فاکتور");
+    },
+    onSettled: () => {
+      setReactivatingId(null);
+    },
+  });
+
   const handlePay = (invoice: PaymentsType) => {
     if (payMutation.isPending) return;
     setPayingId(invoice.id || "current");
     payMutation.mutate(invoice);
+  };
+
+  const handleCancel = (invoice: PaymentsType) => {
+    if (cancelMutation.isPending || !invoice.id) return;
+    setCancellingId(invoice.id);
+    cancelMutation.mutate(invoice);
+  };
+
+  const handleReactivate = (invoice: PaymentsType) => {
+    if (reactivateMutation.isPending || !invoice.id) return;
+    setReactivatingId(invoice.id);
+    reactivateMutation.mutate(invoice);
   };
 
   const handlePayFirstUnpaid = () => {
@@ -207,8 +272,8 @@ export function Payments() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-3 p-0">
-      <div className="w-full flex flex-col gap-2">
+    <div className="w-full flex flex-col gap-5 p-0">
+      <div className="w-full flex flex-col gap-3">
         <Factor
           price={unpaidTotal}
           title={unpaidTotal > 0 ? "مانده فاکتورهای پرداخت نشده" : "مانده بدهی (حساب تسویه شده)"}
@@ -218,9 +283,9 @@ export function Payments() {
         />
 
         {totalPeriodicCost > 0 && (
-          <div className="w-full flex items-center justify-between px-5 py-2.5 rounded-[16px] bg-surface/70 border border-border/40 text-xs">
+          <div className="w-full flex items-center justify-between px-5 py-3 rounded-2xl bg-surface/70 border border-border/40 text-xs">
             <span className="text-muted-foreground">مجموع هزینه دوره سرویس‌های فعال</span>
-            <span className="font-semibold text-foreground">
+            <span className="font-semibold text-foreground font-mono">
               {totalPeriodicCost.toLocaleString("fa-IR")}{" "}
               <span className="text-[10px] text-muted-foreground font-normal">تومان / دوره‌ای</span>
             </span>
@@ -231,7 +296,7 @@ export function Payments() {
       <Tabs
         selectedKey={selectedTab}
         onSelectionChange={(key) => setSelectedTab(String(key))}
-        className="w-full max-w-md p-0"
+        className="w-full p-0"
       >
         <Tabs.ListContainer>
           <Tabs.List className="bg-surface " aria-label="Options">
@@ -282,6 +347,10 @@ export function Payments() {
                 data={mappedInvoices}
                 onPay={handlePay}
                 payingId={payingId}
+                onCancel={handleCancel}
+                cancellingId={cancellingId}
+                onReactivate={handleReactivate}
+                reactivatingId={reactivatingId}
               />
             </Tabs.Panel>
           </>

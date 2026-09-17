@@ -29,8 +29,14 @@ export function Services() {
     enabled: true,
   });
 
-  // Map real backend services without any fake mock fallbacks
-  const allServices: Service[] = (apiServices?.items || []).map((item: any, idx: number) => {
+  // Map real backend services without any fake mock fallbacks (newest first)
+  const sortedRawServices = [...(apiServices?.items || [])].sort((a: any, b: any) => {
+    const timeA = new Date(a.createdAt || a.purchaseDate || a.startDate || 0).getTime();
+    const timeB = new Date(b.createdAt || b.purchaseDate || b.startDate || 0).getTime();
+    return timeB - timeA;
+  });
+
+  const allServices: Service[] = sortedRawServices.map((item: any, idx: number) => {
     const slug = (item.serviceType?.slug || "").toLowerCase();
     const name = (item.name || "").toLowerCase();
     const typeName = (item.serviceType?.name || "").toLowerCase();
@@ -104,6 +110,12 @@ export function Services() {
     remainedVolume: s.remainedQuantity ?? s.quantity ?? 1,
     buyData: s.purchaseDate || s.startDate,
     price: s.priceToman,
+    startDate: s.startDate,
+    purchaseDate: s.purchaseDate,
+    renewalDate: s.renewalDate,
+    createdAt: s.createdAt,
+    trackingType: s.trackingType,
+    billingCycle: s.billingCycle,
   }));
 
   const tabs = [

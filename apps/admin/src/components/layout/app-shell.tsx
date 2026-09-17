@@ -89,11 +89,11 @@ export function AppShell({ header, children }: AppShellProps) {
       {header}
       <div className="flex-1 flex relative">
         {/* Sleek Minimalist Sidebar */}
-        <aside className="w-60 border-l border-border/40 bg-card/20 backdrop-blur-md p-4 hidden md:flex flex-col gap-1 shrink-0 select-none">
-          <div className="px-3 py-2 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+        <aside className="w-64 border-l border-border/40 bg-card/20 backdrop-blur-md p-5 hidden md:flex flex-col gap-1.5 shrink-0 select-none">
+          <div className="px-3.5 py-2 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
             مدیریت و نظارت
           </div>
-          <nav className="flex flex-col gap-1 mt-1">
+          <nav className="flex flex-col gap-1.5 mt-1.5">
             {navItems.map((item, idx) => {
               const Icon = item.icon;
               const isActive = item.exact
@@ -104,7 +104,7 @@ export function AppShell({ header, children }: AppShellProps) {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
+                  className={`group relative flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
                     isActive
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
@@ -125,8 +125,8 @@ export function AppShell({ header, children }: AppShellProps) {
             })}
           </nav>
 
-          <div className="mt-auto pt-4 border-t border-border/30 flex flex-col gap-2">
-            <div className="p-3 rounded-xl bg-card/40 border border-border/40 text-xs flex flex-col gap-1.5 backdrop-blur-xs">
+          <div className="mt-auto pt-5 border-t border-border/30 flex flex-col gap-2.5">
+            <div className="p-3.5 rounded-xl bg-card/40 border border-border/40 text-xs flex flex-col gap-1.5 backdrop-blur-xs">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-foreground text-[11px]">جیکات کلود v1.0</span>
                 <span className="flex h-2 w-2 relative">
@@ -151,7 +151,7 @@ export function AppShell({ header, children }: AppShellProps) {
         </aside>
 
         {/* Main Content Area with Entrance Animation */}
-        <main className="flex-1 p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto animate-entrance">
+        <main className="flex-1 p-6 md:p-8 lg:p-10 max-w-7xl mx-auto w-full overflow-y-auto animate-entrance">
           {children}
         </main>
       </div>

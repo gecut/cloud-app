@@ -11,6 +11,7 @@ import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
 import { formatJalaliDate } from "@gecut-cloud/contracts";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
+import { ConfirmModal } from "@/components/common/confirm-modal";
 import {
   Building2,
   Server,
@@ -251,7 +252,7 @@ function AdminSuppliersPage() {
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name" | "payable-desc" | "services-desc">("newest");
-  const [servicesSortBy, setServicesSortBy] = useState<"due-asc" | "newest-purchase" | "price-desc" | "price-asc" | "name">("due-asc");
+  const [servicesSortBy, setServicesSortBy] = useState<"due-asc" | "newest-purchase" | "price-desc" | "price-asc" | "name">("newest-purchase");
   const [page, setPage] = useState(1);
   const PAGE_LIMIT = 12;
 
@@ -263,6 +264,10 @@ function AdminSuppliersPage() {
   const [isServicesPanelOpen, setIsServicesPanelOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [editingService, setEditingService] = useState<any>(null);
+
+  // Confirm Modals
+  const [confirmDeleteSupplierModal, setConfirmDeleteSupplierModal] = useState<any | null>(null);
+  const [confirmDeleteServiceModal, setConfirmDeleteServiceModal] = useState<any | null>(null);
 
   // Form State: Supplier
   const [supplierName, setSupplierName] = useState("");
@@ -721,28 +726,28 @@ function AdminSuppliersPage() {
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-6 animate-entrance">
+      <div className="flex flex-col gap-8 animate-entrance">
         {/* Page Title & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/30">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border/30">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
                 تامین‌کنندگان و زیرساخت
               </h1>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
                 مدیریت مخارج سرور و هاست
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
               مدیریت دیتاسنترها، ماشین‌های ابری، خدمات دامنه و گزارش هزینه‌های زیرساخت
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <Link to="/categories">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+                className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
               >
                 <Layers className="h-3.5 w-3.5 text-purple-500" />
                 <span>مدیریت دسته‌بندی‌ها</span>
@@ -752,7 +757,7 @@ function AdminSuppliersPage() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               بروزرسانی
@@ -763,7 +768,7 @@ function AdminSuppliersPage() {
                 resetSupplierForm();
                 setIsCreateSupplierOpen(true);
               }}
-              className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer"
+              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               تامین‌کننده جدید
@@ -772,15 +777,15 @@ function AdminSuppliersPage() {
         </div>
 
         {/* Monthly Expense & Nearest Due Highlight Banner */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {/* Monthly Commitment Summary with Month Selector */}
-          <div className="rounded-2xl border border-border/50 bg-card/60 p-4 shadow-xs backdrop-blur-xs flex flex-col justify-between gap-3">
+          <div className="rounded-2xl border border-border/50 bg-card/60 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between gap-4">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground font-medium">مجموع هزینه‌های دوره تامین</span>
               <select
                 value={String(selectedPeriodMonth)}
                 onChange={(e) => setSelectedPeriodMonth(e.target.value === "ALL" ? "ALL" : Number(e.target.value))}
-                className="h-7 text-[11px] rounded-lg border border-input bg-card px-2 py-0 text-foreground font-medium shadow-xs focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                className="h-8 text-xs rounded-xl border border-input bg-card px-2.5 py-0 text-foreground font-medium shadow-xs focus:ring-1 focus:ring-purple-500 cursor-pointer"
               >
                 {monthOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -790,29 +795,29 @@ function AdminSuppliersPage() {
               </select>
             </div>
             <div className="flex items-end justify-between">
-              <div className="space-y-0.5">
-                <div className="text-lg font-black text-foreground font-mono">
+              <div className="space-y-1">
+                <div className="text-xl font-black text-foreground font-mono">
                   {periodExpensesData.totalToman.toLocaleString("fa-IR")}{" "}
                   <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground">
                   بر اساس {periodExpensesData.count.toLocaleString("fa-IR")} سرویس در {periodExpensesData.label}
                 </p>
               </div>
-              <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+              <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
                 <Wallet className="h-5 w-5" />
               </div>
             </div>
           </div>
 
           {/* Nearest Upcoming Payment Highlight */}
-          <div className={`md:col-span-2 rounded-2xl border p-4 shadow-xs backdrop-blur-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+          <div className={`md:col-span-2 rounded-2xl border p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
             nearestPayment && nearestPayment.diffDays <= 7
               ? "bg-amber-500/5 border-amber-500/30 text-amber-950 dark:text-amber-100"
               : "bg-card/60 border-border/50 text-foreground"
           }`}>
-            <div className="flex items-start sm:items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-500 shrink-0">
                 <Clock className="h-5 w-5" />
               </div>
               <div>
@@ -848,8 +853,8 @@ function AdminSuppliersPage() {
         </div>
 
         {/* Content-Based Category Tabs (Dynamic) */}
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-3.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-xs text-muted-foreground font-semibold ml-1">دسته‌بندی موضوعی:</span>
             {supplierCategoryTabs.map((cat) => {
               const Icon = cat.icon;
@@ -864,7 +869,7 @@ function AdminSuppliersPage() {
                     setSelectedCategory(cat.id);
                     setPage(1);
                   }}
-                  className={`h-8 px-3 rounded-xl text-xs gap-1.5 transition-all ${
+                  className={`h-8.5 px-3.5 rounded-xl text-xs gap-2 transition-all cursor-pointer ${
                     isSelected
                       ? "bg-purple-600 hover:bg-purple-500 text-white shadow-xs"
                       : "border-border/60 hover:bg-muted/40 text-muted-foreground"
@@ -873,7 +878,7 @@ function AdminSuppliersPage() {
                   <Icon className="h-3.5 w-3.5" />
                   <span>{cat.label}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
                       isSelected
                         ? "bg-white/20 text-white"
                         : "bg-muted text-muted-foreground"
@@ -887,7 +892,7 @@ function AdminSuppliersPage() {
           </div>
 
           {/* Search, Sort and Service Sort Toolbar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-2xl border border-border/50 bg-card/30">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl border border-border/50 bg-card/30">
             <div className="relative w-full sm:w-80">
               <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -902,12 +907,12 @@ function AdminSuppliersPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end text-xs">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">مرتب‌سازی تامین‌کنندگان:</span>
                 <select
                   value={sortBy}
                   onChange={(e: any) => setSortBy(e.target.value)}
-                  className="h-9 px-2.5 rounded-xl border border-border/60 bg-background text-xs"
+                  className="h-9 px-3 rounded-xl border border-border/60 bg-background text-xs cursor-pointer"
                 >
                   <option value="newest">جدیدترین</option>
                   <option value="oldest">قدیمی‌ترین</option>
@@ -917,12 +922,12 @@ function AdminSuppliersPage() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">سورت سرویس‌ها:</span>
                 <select
                   value={servicesSortBy}
                   onChange={(e: any) => setServicesSortBy(e.target.value)}
-                  className="h-9 px-2.5 rounded-xl border border-border/60 bg-background text-xs"
+                  className="h-9 px-3 rounded-xl border border-border/60 bg-background text-xs cursor-pointer"
                 >
                   <option value="due-asc">نزدیک‌ترین سررسید</option>
                   <option value="newest-purchase">جدیدترین تاریخ خرید</option>
@@ -937,7 +942,7 @@ function AdminSuppliersPage() {
 
         {/* Suppliers Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-5">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-44 rounded-2xl border border-border/40 bg-card/20 animate-pulse" />
             ))}
@@ -1029,11 +1034,9 @@ function AdminSuppliersPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => {
-                          if (confirm(`آیا از حذف تامین‌کننده ${supplier.name} اطمینان دارید؟`)) {
-                            deleteSupplierMutation.mutate(supplier.id);
-                          }
+                          setConfirmDeleteSupplierModal(supplier);
                         }}
-                        className="h-8 w-8 rounded-xl text-rose-500 hover:bg-rose-500/10"
+                        className="h-8 w-8 rounded-xl text-rose-500 hover:bg-rose-500/10 cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -1041,23 +1044,23 @@ function AdminSuppliersPage() {
                   </div>
 
                   {/* Purchased Services List for this Supplier */}
-                  <div>
-                    <div className="flex items-center justify-between text-xs font-semibold text-foreground/80 mb-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                  <div className="pt-2 border-t border-border/40">
+                    <div className="flex items-center justify-between text-xs font-semibold text-foreground/80 mb-3.5">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                         <span>سرویس‌های خریداری‌شده ({sortedServices.length}):</span>
                       </div>
-                      <span className="text-[11px] text-muted-foreground font-mono">
-                        مجموع هزینه دوره: {Number(supplier.totalPayableToman || 0).toLocaleString("fa-IR")} تومان
+                      <span className="text-xs text-muted-foreground font-mono bg-muted/30 px-2.5 py-1 rounded-lg">
+                        مجموع هزینه دوره: <strong className="text-foreground">{Number(supplier.totalPayableToman || 0).toLocaleString("fa-IR")}</strong> تومان
                       </span>
                     </div>
 
                     {sortedServices.length === 0 ? (
-                      <div className="p-3 rounded-xl bg-muted/10 border border-dashed border-border/40 text-xs text-muted-foreground text-center">
+                      <div className="p-5 rounded-2xl bg-muted/10 border border-dashed border-border/50 text-xs text-muted-foreground text-center">
                         هنوز سرویسی از این تامین‌کننده ثبت نشده است. با کلیک روی دکمه «سرویس جدید» هاست، سرور یا دامنه خریداری شده را اضافه کنید.
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {sortedServices.map((svc: any) => {
                           const badge = getSupplierServiceBadge(svc.type, dynamicCategories);
                           const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
@@ -1068,39 +1071,37 @@ function AdminSuppliersPage() {
                           return (
                             <div
                               key={svc.id}
-                              className="p-3.5 rounded-xl bg-card/60 border border-border/40 flex flex-col justify-between text-xs hover:border-border transition-colors group"
+                              className="p-4 rounded-xl bg-card/70 border border-border/50 flex flex-col justify-between text-xs hover:border-purple-500/40 hover:shadow-sm transition-all group"
                             >
-                              <div>
-                                <div className="flex items-start justify-between gap-2">
-                                  <span className="font-bold text-foreground text-xs leading-tight">{svc.name}</span>
+                              <div className="space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <span className="font-bold text-foreground text-xs leading-relaxed">{svc.name}</span>
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button
                                       onClick={() => openEditServiceModal(svc)}
-                                      className="p-1 text-muted-foreground hover:text-purple-600 transition-colors"
+                                      className="p-1.5 text-muted-foreground hover:text-purple-600 hover:bg-purple-500/10 rounded-lg transition-colors cursor-pointer"
                                       title="ویرایش سرویس"
                                     >
-                                      <Edit className="h-3 w-3" />
+                                      <Edit className="h-3.5 w-3.5" />
                                     </button>
                                     <button
                                       onClick={() => {
-                                        if (confirm(`آیا از حذف سرویس ${svc.name} اطمینان دارید؟`)) {
-                                          deleteServiceMutation.mutate(svc.id);
-                                        }
+                                        setConfirmDeleteServiceModal(svc);
                                       }}
-                                      className="p-1 text-muted-foreground hover:text-rose-600 transition-colors"
+                                      className="p-1.5 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
                                       title="حذف سرویس"
                                     >
-                                      <Trash2 className="h-3 w-3" />
+                                      <Trash2 className="h-3.5 w-3.5" />
                                     </button>
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-1.5 mt-2">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
                                     {badge.label}
                                   </span>
                                   {daysLeft !== null && (
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
                                       daysLeft <= 3 ? "bg-rose-500/10 text-rose-600 font-bold" : "bg-muted text-muted-foreground"
                                     }`}>
                                       {daysLeft <= 0 ? "سررسید رسیده" : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
@@ -1108,24 +1109,24 @@ function AdminSuppliersPage() {
                                   )}
                                 </div>
 
-                                <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-3 pt-2 border-t border-border/30">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border/30">
                                   <span>مبلغ دوره:</span>
                                   <span className="font-bold text-foreground font-mono">
                                     {amt.toLocaleString("fa-IR")} تومان
                                   </span>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-1 text-[10px] text-muted-foreground mt-1.5">
+                                <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground pt-1">
                                   {svc.purchaseDate && (
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-3 w-3 text-muted-foreground" />
-                                      <span>خرید: {formatJalaliDate(svc.purchaseDate)}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar className="h-3 w-3 text-muted-foreground shrink-0" />
+                                      <span className="truncate">خرید: {formatJalaliDate(svc.purchaseDate)}</span>
                                     </div>
                                   )}
                                   {svc.renewalDate && (
-                                    <div className="flex items-center gap-1 justify-end">
-                                      <Clock className="h-3 w-3 text-amber-500" />
-                                      <span>سررسید: {formatJalaliDate(svc.renewalDate)}</span>
+                                    <div className="flex items-center gap-1.5 justify-end">
+                                      <Clock className="h-3 w-3 text-amber-500 shrink-0" />
+                                      <span className="truncate">سررسید: {formatJalaliDate(svc.renewalDate)}</span>
                                     </div>
                                   )}
                                 </div>
@@ -1145,43 +1146,43 @@ function AdminSuppliersPage() {
         {/* Modal: Create Supplier */}
         {isCreateSupplierOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-md rounded-2xl border border-border/60 bg-card p-6 shadow-2xl">
+            <div className="relative w-full max-w-md rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
               <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-purple-600" />
+                <div className="flex items-center gap-2.5">
+                  <Building2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   <h3 className="font-bold text-sm text-foreground">تعریف تامین‌کننده جدید</h3>
                 </div>
-                <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8" onClick={() => setIsCreateSupplierOpen(false)}>
+                <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsCreateSupplierOpen(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              <form onSubmit={handleCreateSupplierSubmit} className="flex flex-col gap-4 mt-4 text-xs">
-                <div className="space-y-1.5">
-                  <Label>نام تامین‌کننده یا دیتاسنتر *</Label>
-                  <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="مثال: دیتاسنتر هتزنر (Hetzner)" required className="rounded-xl" />
+              <form onSubmit={handleCreateSupplierSubmit} className="flex flex-col gap-5 mt-5 text-xs">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">نام تامین‌کننده یا دیتاسنتر *</Label>
+                  <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="مثال: دیتاسنتر هتزنر (Hetzner)" required className="h-10 text-xs rounded-xl" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>مسئول ارتباط / فروش</Label>
-                    <Input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} placeholder="مثال: آقای حسینی" className="rounded-xl" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">مسئول ارتباط / فروش</Label>
+                    <Input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} placeholder="مثال: آقای حسینی" className="h-10 text-xs rounded-xl" />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>تلفن تماس / پشتیبانی</Label>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="021..." dir="ltr" className="rounded-xl" />
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">تلفن تماس / پشتیبانی</Label>
+                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="021..." dir="ltr" className="h-10 text-xs rounded-xl" />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>ایمیل ارتباطی</Label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="support@domain.com" dir="ltr" className="rounded-xl" />
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">ایمیل ارتباطی</Label>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="support@domain.com" dir="ltr" className="h-10 text-xs rounded-xl" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>یادداشت‌ها</Label>
-                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="توضیحات تکمیلی، نحوه تسویه یا پنل مدیریت" className="rounded-xl" />
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">یادداشت‌ها</Label>
+                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="توضیحات تکمیلی، نحوه تسویه یا پنل مدیریت" className="h-10 text-xs rounded-xl" />
                 </div>
-                <div className="flex justify-end gap-2 pt-4 border-t border-border/40 mt-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsCreateSupplierOpen(false)} className="rounded-xl">انصراف</Button>
-                  <Button type="submit" size="sm" disabled={createSupplierMutation.isPending} className="rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold">
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsCreateSupplierOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
+                  <Button type="submit" size="sm" disabled={createSupplierMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
                     {createSupplierMutation.isPending ? "در حال ثبت..." : "ثبت تامین‌کننده"}
                   </Button>
                 </div>
@@ -1193,52 +1194,52 @@ function AdminSuppliersPage() {
         {/* Modal: Edit Supplier */}
         {isEditSupplierOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-md rounded-2xl border border-border/60 bg-card p-6 shadow-2xl">
+            <div className="relative w-full max-w-md rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
               <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-2">
-                  <Edit className="h-5 w-5 text-purple-600" />
+                <div className="flex items-center gap-2.5">
+                  <Edit className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   <h3 className="font-bold text-sm text-foreground">ویرایش تامین‌کننده {supplierName}</h3>
                 </div>
-                <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8" onClick={() => setIsEditSupplierOpen(false)}>
+                <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsEditSupplierOpen(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              <form onSubmit={handleEditSupplierSubmit} className="flex flex-col gap-4 mt-4 text-xs">
-                <div className="space-y-1.5">
-                  <Label>نام تامین‌کننده *</Label>
-                  <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} required className="rounded-xl" />
+              <form onSubmit={handleEditSupplierSubmit} className="flex flex-col gap-5 mt-5 text-xs">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">نام تامین‌کننده *</Label>
+                  <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} required className="h-10 text-xs rounded-xl" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>مسئول ارتباط</Label>
-                    <Input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="rounded-xl" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">مسئول ارتباط</Label>
+                    <Input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="h-10 text-xs rounded-xl" />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>تلفن تماس</Label>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="rounded-xl" />
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">تلفن تماس</Label>
+                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="h-10 text-xs rounded-xl" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>ایمیل</Label>
-                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="rounded-xl" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">ایمیل</Label>
+                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="h-10 text-xs rounded-xl" />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>وضعیت</Label>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">وضعیت</Label>
                     <select
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
-                      className="w-full h-9 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
                     >
                       <option value="ACTIVE">فعال (همکاری مستمر)</option>
                       <option value="INACTIVE">غیرفعال / قطع همکاری</option>
                     </select>
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 pt-4 border-t border-border/40 mt-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditSupplierOpen(false)} className="rounded-xl">انصراف</Button>
-                  <Button type="submit" size="sm" disabled={updateSupplierMutation.isPending} className="rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold">
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditSupplierOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
+                  <Button type="submit" size="sm" disabled={updateSupplierMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
                     {updateSupplierMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
                   </Button>
                 </div>
@@ -1250,24 +1251,24 @@ function AdminSuppliersPage() {
         {/* Modal: Add Service to Supplier */}
         {isAddServiceOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-lg rounded-2xl border border-border/60 bg-card p-6 shadow-2xl">
+            <div className="relative w-full max-w-lg rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
               <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-2">
-                  <Server className="h-5 w-5 text-purple-600" />
+                <div className="flex items-center gap-2.5">
+                  <Server className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   <h3 className="font-bold text-sm text-foreground">ثبت خدمت / سرویس خریداری‌شده از تامین‌کننده</h3>
                 </div>
-                <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8" onClick={() => setIsAddServiceOpen(false)}>
+                <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsAddServiceOpen(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              <form onSubmit={handleAddServiceSubmit} className="flex flex-col gap-4 mt-4 text-xs">
-                <div className="space-y-1.5">
-                  <Label>تامین‌کننده مربوطه *</Label>
+              <form onSubmit={handleAddServiceSubmit} className="flex flex-col gap-5 mt-5 text-xs">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">تامین‌کننده مربوطه *</Label>
                   <select
                     value={targetSupplierId}
                     onChange={(e) => setTargetSupplierId(e.target.value)}
-                    className="w-full h-9 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                    className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
                     required
                   >
                     <option value="">-- انتخاب تامین‌کننده --</option>
@@ -1277,18 +1278,18 @@ function AdminSuppliersPage() {
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label>عنوان خدمت / ماشین *</Label>
-                  <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="مثال: سرور اختصاصی لینوکس AX41" required className="rounded-xl" />
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">عنوان خدمت / ماشین *</Label>
+                  <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="مثال: سرور اختصاصی لینوکس AX41" required className="h-10 text-xs rounded-xl" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>دسته‌بندی خدمت</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
                     <select
                       value={serviceType}
                       onChange={(e) => setServiceType(e.target.value)}
-                      className="w-full h-9 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
                     >
                       {dynamicCategories.length > 0 ? (
                         dynamicCategories.map((c: any) => (
@@ -1307,8 +1308,8 @@ function AdminSuppliersPage() {
                       )}
                     </select>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>مبلغ دوره (تومان) *</Label>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
                     <Input
                       type="text"
                       inputMode="numeric"
@@ -1317,7 +1318,7 @@ function AdminSuppliersPage() {
                       onChange={(e) => setServicePriceToman(parsePriceInput(e.target.value))}
                       placeholder="0"
                       required
-                      className="rounded-xl font-mono text-left"
+                      className="h-10 rounded-xl font-mono text-left text-xs"
                     />
                     {Number(servicePriceToman) > 0 && (
                       <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
@@ -1327,15 +1328,15 @@ function AdminSuppliersPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <JalaliDatePicker
                       label="تاریخ خرید (شمسی)"
                       value={servicePurchaseDate}
                       onChange={(val) => setServicePurchaseDate(val)}
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <JalaliDatePicker
                       label="موعد سررسید تمدید (شمسی)"
                       value={serviceRenewalDate}
@@ -1344,9 +1345,9 @@ function AdminSuppliersPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4 border-t border-border/40 mt-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddServiceOpen(false)} className="rounded-xl">انصراف</Button>
-                  <Button type="submit" size="sm" disabled={addServiceMutation.isPending} className="rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold">
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddServiceOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
+                  <Button type="submit" size="sm" disabled={addServiceMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
                     {addServiceMutation.isPending ? "در حال ثبت..." : "افزودن به خدمات تامین‌کننده"}
                   </Button>
                 </div>
@@ -1358,30 +1359,30 @@ function AdminSuppliersPage() {
         {/* Modal: Edit Service of Supplier */}
         {isEditServiceOpen && editingService && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-lg rounded-2xl border border-border/60 bg-card p-6 shadow-2xl">
+            <div className="relative w-full max-w-lg rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
               <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-2">
-                  <Edit className="h-5 w-5 text-purple-600" />
+                <div className="flex items-center gap-2.5">
+                  <Edit className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   <h3 className="font-bold text-sm text-foreground">ویرایش خدمت: {editingService.name}</h3>
                 </div>
-                <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8" onClick={() => setIsEditServiceOpen(false)}>
+                <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsEditServiceOpen(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              <form onSubmit={handleEditServiceSubmit} className="flex flex-col gap-4 mt-4 text-xs">
-                <div className="space-y-1.5">
-                  <Label>عنوان خدمت *</Label>
-                  <Input value={editServiceName} onChange={(e) => setEditServiceName(e.target.value)} required className="rounded-xl" />
+              <form onSubmit={handleEditServiceSubmit} className="flex flex-col gap-5 mt-5 text-xs">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">عنوان خدمت *</Label>
+                  <Input value={editServiceName} onChange={(e) => setEditServiceName(e.target.value)} required className="h-10 text-xs rounded-xl" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>دسته‌بندی خدمت</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
                     <select
                       value={editServiceType}
                       onChange={(e) => setEditServiceType(e.target.value)}
-                      className="w-full h-9 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
                     >
                       {dynamicCategories.length > 0 ? (
                         dynamicCategories.map((c: any) => (
@@ -1400,8 +1401,8 @@ function AdminSuppliersPage() {
                       )}
                     </select>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>مبلغ دوره (تومان) *</Label>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
                     <Input
                       type="text"
                       inputMode="numeric"
@@ -1410,7 +1411,7 @@ function AdminSuppliersPage() {
                       onChange={(e) => setEditServicePriceToman(parsePriceInput(e.target.value))}
                       placeholder="0"
                       required
-                      className="rounded-xl font-mono text-left"
+                      className="h-10 rounded-xl font-mono text-left text-xs"
                     />
                     {Number(editServicePriceToman) > 0 && (
                       <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
@@ -1420,15 +1421,15 @@ function AdminSuppliersPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <JalaliDatePicker
                       label="تاریخ خرید (شمسی)"
                       value={editServicePurchaseDate}
                       onChange={(val) => setEditServicePurchaseDate(val)}
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <JalaliDatePicker
                       label="موعد سررسید تمدید (شمسی)"
                       value={editServiceRenewalDate}
@@ -1437,27 +1438,27 @@ function AdminSuppliersPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>وضعیت سرویس</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">وضعیت سرویس</Label>
                     <select
                       value={editServiceStatus}
                       onChange={(e) => setEditServiceStatus(e.target.value)}
-                      className="w-full h-9 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
                     >
                       <option value="ACTIVE">فعال (ACTIVE)</option>
                       <option value="INACTIVE">غیرفعال (INACTIVE)</option>
                     </select>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>یادداشت</Label>
-                    <Input value={editServiceNotes} onChange={(e) => setEditServiceNotes(e.target.value)} placeholder="توضیحات اختیاری" className="rounded-xl" />
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">یادداشت</Label>
+                    <Input value={editServiceNotes} onChange={(e) => setEditServiceNotes(e.target.value)} placeholder="توضیحات اختیاری" className="h-10 text-xs rounded-xl" />
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4 border-t border-border/40 mt-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditServiceOpen(false)} className="rounded-xl">انصراف</Button>
-                  <Button type="submit" size="sm" disabled={updateServiceMutation.isPending} className="rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold">
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditServiceOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
+                  <Button type="submit" size="sm" disabled={updateServiceMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
                     {updateServiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
                   </Button>
                 </div>
@@ -1469,59 +1470,59 @@ function AdminSuppliersPage() {
         {/* Modal / Dedicated Panel: Supplier Services Panel */}
         {isServicesPanelOpen && selectedSupplier && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl border border-border/60 bg-card p-6 shadow-2xl flex flex-col gap-4">
+            <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-3xl border border-border/60 bg-card p-6 sm:p-8 shadow-2xl flex flex-col gap-6">
               <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                    <Building2 className="h-5 w-5" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                    <Building2 className="h-6 w-6" />
                   </div>
                   <div>
                     <h3 className="font-bold text-base text-foreground">پنل خدمات تامین‌کننده: {selectedSupplier.name}</h3>
-                    <p className="text-xs text-muted-foreground">مشاهده، ویرایش و مدیریت تمامی ماشین‌ها و سرویس‌های فعال</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">مشاهده، ویرایش و مدیریت تمامی ماشین‌ها و سرویس‌های فعال</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <Button
                     size="sm"
                     onClick={() => {
                       setIsServicesPanelOpen(false);
                       openAddServiceForSupplier(selectedSupplier.id);
                     }}
-                    className="h-8 gap-1 text-xs rounded-xl bg-purple-600 hover:bg-purple-500 text-white"
+                    className="h-9 px-3.5 gap-1.5 text-xs rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold"
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <Plus className="h-4 w-4" />
                     خدمت جدید
                   </Button>
-                  <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8" onClick={() => setIsServicesPanelOpen(false)}>
+                  <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsServicesPanelOpen(false)}>
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
 
               {/* Summary in Panel */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-muted/20 border text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 sm:p-5 rounded-2xl bg-muted/20 border border-border/40 text-xs">
                 <div>
-                  <span className="text-muted-foreground text-[11px]">تعداد خدمات:</span>
-                  <div className="font-bold font-mono text-foreground text-sm">{(selectedSupplier.services?.length || 0).toLocaleString("fa-IR")} سرویس</div>
+                  <span className="text-muted-foreground text-xs">تعداد خدمات:</span>
+                  <div className="font-bold font-mono text-foreground text-base mt-1">{(selectedSupplier.services?.length || 0).toLocaleString("fa-IR")} سرویس</div>
                 </div>
                 <div>
-                  <span className="text-muted-foreground text-[11px]">مجموع هزینه دوره:</span>
-                  <div className="font-bold font-mono text-purple-600 dark:text-purple-400 text-sm">
+                  <span className="text-muted-foreground text-xs">مجموع هزینه دوره:</span>
+                  <div className="font-bold font-mono text-purple-600 dark:text-purple-400 text-base mt-1">
                     {Number(selectedSupplier.totalPayableToman || 0).toLocaleString("fa-IR")} تومان
                   </div>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <span className="text-muted-foreground text-[11px]">وضعیت تامین‌کننده:</span>
-                  <div className="font-bold text-emerald-600 text-sm">
+                  <span className="text-muted-foreground text-xs">وضعیت تامین‌کننده:</span>
+                  <div className="font-bold text-emerald-600 text-base mt-1">
                     {selectedSupplier.status === "ACTIVE" ? "همکاری فعال" : "غیرفعال"}
                   </div>
                 </div>
               </div>
 
               {/* Service Cards inside Panel */}
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-3.5">
                 {(!selectedSupplier.services || selectedSupplier.services.length === 0) ? (
-                  <div className="p-8 text-center text-xs text-muted-foreground border border-dashed rounded-xl">
+                  <div className="p-10 text-center text-xs text-muted-foreground border border-dashed rounded-2xl">
                     هیچ خدمتی برای این تامین‌کننده ثبت نشده است.
                   </div>
                 ) : (
@@ -1535,34 +1536,34 @@ function AdminSuppliersPage() {
                     return (
                       <div
                         key={svc.id}
-                        className="p-4 rounded-xl border bg-card/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:border-purple-500/30 transition-all"
+                        className="p-4.5 rounded-2xl border border-border/50 bg-card/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs hover:border-purple-500/40 hover:shadow-sm transition-all"
                       >
-                        <div className="space-y-1.5 flex-1">
-                          <div className="flex items-center gap-2">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex flex-wrap items-center gap-2.5">
                             <span className="font-bold text-sm text-foreground">{svc.name}</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
+                            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
                               {badge.label}
                             </span>
                             {daysLeft !== null && (
-                              <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${
+                              <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
                                 daysLeft <= 3 ? "bg-rose-500/10 text-rose-600 font-bold" : "bg-muted text-muted-foreground"
                               }`}>
                                 {daysLeft <= 0 ? "سررسید رسیده" : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
                               </span>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                             {svc.purchaseDate && <span>تاریخ خرید: {formatJalaliDate(svc.purchaseDate)}</span>}
-                            {svc.renewalDate && <span className="text-amber-600 dark:text-amber-400">سررسید بعدی: {formatJalaliDate(svc.renewalDate)}</span>}
+                            {svc.renewalDate && <span className="text-amber-600 dark:text-amber-400 font-medium">سررسید بعدی: {formatJalaliDate(svc.renewalDate)}</span>}
                             {svc.notes && <span className="italic">یادداشت: {svc.notes}</span>}
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                        <div className="flex items-center justify-between sm:justify-end gap-3.5 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/40">
                           <div className="font-mono font-bold text-foreground text-sm">
                             {amt.toLocaleString("fa-IR")} <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
                           </div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-2">
                             <Button
                               variant="outline"
                               size="sm"
@@ -1570,22 +1571,20 @@ function AdminSuppliersPage() {
                                 setIsServicesPanelOpen(false);
                                 openEditServiceModal(svc);
                               }}
-                              className="h-8 px-2.5 rounded-lg text-xs gap-1"
+                              className="h-8.5 px-3 rounded-xl text-xs gap-1.5"
                             >
-                              <Edit className="h-3 w-3" />
+                              <Edit className="h-3.5 w-3.5" />
                               ویرایش
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => {
-                                if (confirm(`آیا از حذف سرویس ${svc.name} اطمینان دارید؟`)) {
-                                  deleteServiceMutation.mutate(svc.id);
-                                }
+                                setConfirmDeleteServiceModal(svc);
                               }}
-                              className="h-8 w-8 rounded-lg text-rose-500 hover:bg-rose-500/10"
+                              className="h-8.5 w-8.5 rounded-xl text-rose-500 hover:bg-rose-500/10 cursor-pointer"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
@@ -1596,6 +1595,58 @@ function AdminSuppliersPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Confirm Modal for Deleting Supplier */}
+        {confirmDeleteSupplierModal && (
+          <ConfirmModal
+            isOpen={!!confirmDeleteSupplierModal}
+            onClose={() => setConfirmDeleteSupplierModal(null)}
+            onConfirm={() => {
+              deleteSupplierMutation.mutate(confirmDeleteSupplierModal.id);
+              setConfirmDeleteSupplierModal(null);
+            }}
+            title="حذف تامین‌کننده"
+            description={
+              <div className="space-y-2 text-xs">
+                <p>
+                  آیا از حذف کامل تامین‌کننده <strong className="text-foreground font-semibold">«{confirmDeleteSupplierModal.name}»</strong> اطمینان دارید؟
+                </p>
+                <p className="text-rose-600 dark:text-rose-400 font-medium">
+                  هشدار: کلیه سرویس‌ها و هزینه‌های ثبت‌شده تحت این تامین‌کننده نیز لغو و پاکسازی خواهند شد.
+                </p>
+              </div>
+            }
+            confirmText="بله، حذف شود"
+            variant="danger"
+            isLoading={deleteSupplierMutation.isPending}
+          />
+        )}
+
+        {/* Confirm Modal for Deleting Supplier Purchased Service */}
+        {confirmDeleteServiceModal && (
+          <ConfirmModal
+            isOpen={!!confirmDeleteServiceModal}
+            onClose={() => setConfirmDeleteServiceModal(null)}
+            onConfirm={() => {
+              deleteServiceMutation.mutate(confirmDeleteServiceModal.id);
+              setConfirmDeleteServiceModal(null);
+            }}
+            title="حذف سرویس خریداری‌شده"
+            description={
+              <div className="space-y-2 text-xs">
+                <p>
+                  آیا از حذف سرویس <strong className="text-foreground font-semibold">«{confirmDeleteServiceModal.name}»</strong> اطمینان دارید؟
+                </p>
+                <p className="text-rose-600 dark:text-rose-400 font-medium">
+                  این عملیات غیرقابل بازگشت است و رکورد هزینه این سرویس از محاسبات تامین‌کننده کسر می‌شود.
+                </p>
+              </div>
+            }
+            confirmText="بله، حذف سرویس"
+            variant="danger"
+            isLoading={deleteServiceMutation.isPending}
+          />
         )}
       </div>
     </AppShell>

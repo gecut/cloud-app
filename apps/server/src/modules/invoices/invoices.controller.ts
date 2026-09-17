@@ -16,6 +16,7 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { CancelInvoiceCommand } from "./commands/cancel-invoice/cancel-invoice.command";
 import { CreateInvoiceCommand } from "./commands/create-invoice/create-invoice.command";
 import { CreateInvoiceDto } from "./commands/create-invoice/create-invoice.dto";
+import { ReactivateInvoiceCommand } from "./commands/reactivate-invoice/reactivate-invoice.command";
 import { UpdateInvoiceCommand } from "./commands/update-invoice/update-invoice.command";
 import { UpdateInvoiceDto } from "./commands/update-invoice/update-invoice.dto";
 import { GetInvoiceQuery } from "./queries/get-invoice/get-invoice.query";
@@ -82,9 +83,16 @@ export class InvoicesController {
   }
 
   @Patch(":id/cancel")
-  @Roles("ADMIN")
+  @Roles("ADMIN", "CUSTOMER")
   @ApiOperation({ summary: "Cancel an unpaid invoice" })
   async cancel(@Param("id") id: string, @Body("reason") reason?: string) {
     return this.commandBus.execute(new CancelInvoiceCommand(id, reason));
+  }
+
+  @Patch(":id/reactivate")
+  @Roles("ADMIN", "CUSTOMER")
+  @ApiOperation({ summary: "Reactivate a cancelled invoice" })
+  async reactivate(@Param("id") id: string) {
+    return this.commandBus.execute(new ReactivateInvoiceCommand(id));
   }
 }

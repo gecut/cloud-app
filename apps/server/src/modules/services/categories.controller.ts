@@ -14,13 +14,6 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 
-const DEFAULT_CATEGORIES = [
-  { name: "ثبت و تمدید دامنه", slug: "domain", description: "دامنه‌های ملی (.ir) و بین‌المللی" },
-  { name: "سرور ابری و اختصاصی", slug: "server", description: "سرورهای مجازی، ابری و اختصاصی" },
-  { name: "میزبانی وب و هاست", slug: "hosting", description: "هاست ابری پرسرعت NVMe و اشتراکی" },
-  { name: "سرویس‌های ابری و API", slug: "api", description: "وب‌سرویس‌ها، هوش مصنوعی و رابط‌های ابری" },
-  { name: "بسته و پکیج خدمات", slug: "package", description: "پکیج‌ها و بسته‌های مصرفی یا تعدادی" },
-];
 
 function generateSlug(name: string): string {
   const englishOnly = name
@@ -51,31 +44,8 @@ export class CategoriesController {
           select: { services: true },
         },
       },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ createdAt: "desc" }],
     });
-
-    // Auto-seed defaults if table is empty
-    if (items.length === 0) {
-      for (const def of DEFAULT_CATEGORIES) {
-        await this.prisma.serviceType.create({
-          data: {
-            name: def.name,
-            slug: def.slug,
-            description: def.description,
-            isActive: true,
-          },
-        }).catch(() => {});
-      }
-
-      items = await this.prisma.serviceType.findMany({
-        include: {
-          _count: {
-            select: { services: true },
-          },
-        },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      });
-    }
 
     return {
       items: items.map((cat) => ({
@@ -144,7 +114,9 @@ export class CategoriesController {
       sortOrder?: number;
     },
   ) {
-    const target = await this.prisma.serviceType.findUnique({ where: { id } });
+    const target =
+      (await this.prisma.serviceType.findUnique({ where: { id } })) ||
+      (await this.prisma.serviceType.findFirst({ where: { slug: id } }));
     if (!target) {
       throw new BadRequestException("دسته‌بندی مورد نظر یافت نشد");
     }
@@ -158,7 +130,7 @@ export class CategoriesController {
     if (body.slug && body.slug.trim() !== target.slug) {
       const slugCandidate = body.slug.trim().toLowerCase();
       const existing = await this.prisma.serviceType.findFirst({
-        where: { slug: slugCandidate, id: { not: id } },
+        where: { slug: slugCandidate, id: { not: target.id } },
       });
       if (existing) {
         throw new BadRequestException("این شناسه انگلیسی (اسلاگ) قبلاً استفاده شده است");
@@ -167,7 +139,7 @@ export class CategoriesController {
     }
 
     const updated = await this.prisma.serviceType.update({
-      where: { id },
+      where: { id: target.id },
       data: updateData,
     });
 
@@ -178,22 +150,28 @@ export class CategoriesController {
   @Roles("ADMIN")
   @ApiOperation({ summary: "Delete a category" })
   async deleteCategory(@Param("id") id: string) {
-    const target = await this.prisma.serviceType.findUnique({
-      where: { id },
-      include: { _count: { select: { services: true } } },
-    });
+    const target =
+      (await this.prisma.serviceType.findUnique({
+        where: { id },
+        include: { _count: { select: { services: true } } },
+      })) ||
+      (await this.prisma.serviceType.findFirst({
+        where: { slug: id },
+        include: { _count: { select: { services: true } } },
+      }));
 
     if (!target) {
       throw new BadRequestException("دسته‌بندی مورد نظر یافت نشد");
     }
 
-    if (target._count.services > 0) {
+    const servicesCount = target._count?.services || 0;
+    if (servicesCount > 0) {
       throw new BadRequestException(
-        `امکان حذف این دسته‌بندی وجود ندارد؛ در حال حاضر ${target._count.services} سرویس به آن متصل هستند. لطفاً ابتدا سرویس‌ها را انتقال دهید یا این دسته‌بندی را غیرفعال کنید.`,
+        `امکان حذف این دسته‌بندی وجود ندارد؛ در حال حاضر ${servicesCount} سرویس به آن متصل هستند. لطفاً ابتدا سرویس‌ها را انتقال دهید یا این دسته‌بندی را غیرفعال کنید.`,
       );
     }
 
-    await this.prisma.serviceType.delete({ where: { id } });
+    await this.prisma.serviceType.delete({ where: { id: target.id } });
     return { success: true, message: "دسته‌بندی با موفقیت حذف شد" };
   }
 }

@@ -13,11 +13,9 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AppTestIndexRouteImport } from './routes/_app/test/index'
 import { Route as AppSupportsIndexRouteImport } from './routes/_app/supports/index'
 import { Route as AppServicesIndexRouteImport } from './routes/_app/services/index'
 import { Route as AppPaymentsIndexRouteImport } from './routes/_app/payments/index'
-import { Route as AppTestIdRouteImport } from './routes/_app/test/$id'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -38,11 +36,6 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppTestIndexRoute = AppTestIndexRouteImport.update({
-  id: '/test/',
-  path: '/test/',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppSupportsIndexRoute = AppSupportsIndexRouteImport.update({
   id: '/supports/',
   path: '/supports/',
@@ -58,31 +51,22 @@ const AppPaymentsIndexRoute = AppPaymentsIndexRouteImport.update({
   path: '/payments/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppTestIdRoute = AppTestIdRouteImport.update({
-  id: '/test/$id',
-  path: '/test/$id',
-  getParentRoute: () => AppRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/test/$id': typeof AppTestIdRoute
   '/payments/': typeof AppPaymentsIndexRoute
   '/services/': typeof AppServicesIndexRoute
   '/supports/': typeof AppSupportsIndexRoute
-  '/test/': typeof AppTestIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/': typeof AppIndexRoute
-  '/test/$id': typeof AppTestIdRoute
   '/payments': typeof AppPaymentsIndexRoute
   '/services': typeof AppServicesIndexRoute
   '/supports': typeof AppSupportsIndexRoute
-  '/test': typeof AppTestIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -90,11 +74,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/_app/': typeof AppIndexRoute
-  '/_app/test/$id': typeof AppTestIdRoute
   '/_app/payments/': typeof AppPaymentsIndexRoute
   '/_app/services/': typeof AppServicesIndexRoute
   '/_app/supports/': typeof AppSupportsIndexRoute
-  '/_app/test/': typeof AppTestIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -102,32 +84,20 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
-    | '/test/$id'
     | '/payments/'
     | '/services/'
     | '/supports/'
-    | '/test/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/login'
-    | '/register'
-    | '/'
-    | '/test/$id'
-    | '/payments'
-    | '/services'
-    | '/supports'
-    | '/test'
+  to: '/login' | '/register' | '/' | '/payments' | '/services' | '/supports'
   id:
     | '__root__'
     | '/_app'
     | '/login'
     | '/register'
     | '/_app/'
-    | '/_app/test/$id'
     | '/_app/payments/'
     | '/_app/services/'
     | '/_app/supports/'
-    | '/_app/test/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -166,13 +136,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/test/': {
-      id: '/_app/test/'
-      path: '/test'
-      fullPath: '/test/'
-      preLoaderRoute: typeof AppTestIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/supports/': {
       id: '/_app/supports/'
       path: '/supports'
@@ -194,32 +157,21 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPaymentsIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/test/$id': {
-      id: '/_app/test/$id'
-      path: '/test/$id'
-      fullPath: '/test/$id'
-      preLoaderRoute: typeof AppTestIdRouteImport
-      parentRoute: typeof AppRoute
-    }
   }
 }
 
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
-  AppTestIdRoute: typeof AppTestIdRoute
   AppPaymentsIndexRoute: typeof AppPaymentsIndexRoute
   AppServicesIndexRoute: typeof AppServicesIndexRoute
   AppSupportsIndexRoute: typeof AppSupportsIndexRoute
-  AppTestIndexRoute: typeof AppTestIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
-  AppTestIdRoute: AppTestIdRoute,
   AppPaymentsIndexRoute: AppPaymentsIndexRoute,
   AppServicesIndexRoute: AppServicesIndexRoute,
   AppSupportsIndexRoute: AppSupportsIndexRoute,
-  AppTestIndexRoute: AppTestIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

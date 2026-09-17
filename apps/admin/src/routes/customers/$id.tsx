@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
 import { AppShell } from "@/components/layout/app-shell";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
+import { ConfirmModal } from "@/components/common/confirm-modal";
 import { apiClient } from "@/utils/api-client";
 import {
   Card,
@@ -16,7 +17,7 @@ import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
-import { normalizePhoneNumber } from "@/utils/phone";
+import { normalizePhoneNumber, getTelegramChatUrl } from "@/utils/phone";
 import { formatJalaliDate, formatJalaliDateWords, formatJalaliDateTime } from "@gecut-cloud/contracts";
 import {
   User,
@@ -50,6 +51,7 @@ import {
   Cpu,
   Package,
   Repeat,
+  MapPin,
 } from "lucide-react";
 import { InvoiceDetailModal } from "@/components/invoices/invoice-detail-modal";
 
@@ -131,6 +133,31 @@ function parsePriceInput(valStr: string): string {
   return standardDigits;
 }
 
+function safeDate(val?: string | Date | null, fallback = new Date()): Date {
+  if (!val) return fallback;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? fallback : d;
+}
+
+function safeIso(val?: string | Date | null, fallback = new Date()): string {
+  return safeDate(val, fallback).toISOString();
+}
+
+function calcAddDays(baseIso: string | Date | null, days: number): string {
+  const d = safeDate(baseIso);
+  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate() + Number(days || 0));
+  return result.toISOString();
+}
+
+function calcDaysBetween(startIso: string | Date | null, endIso: string | Date | null): number {
+  const s = safeDate(startIso);
+  const e = safeDate(endIso);
+  const utcStart = Date.UTC(s.getFullYear(), s.getMonth(), s.getDate());
+  const utcEnd = Date.UTC(e.getFullYear(), e.getMonth(), e.getDate());
+  const diffDays = Math.round((utcEnd - utcStart) / (1000 * 60 * 60 * 24));
+  return Math.max(1, diffDays);
+}
+
 export const Route = createFileRoute("/customers/$id")({
   component: AdminCustomerProfileDetailPage,
 });
@@ -199,6 +226,11 @@ function AdminCustomerProfileDetailPage() {
   const [profilePhone, setProfilePhone] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
   const [profileStatus, setProfileStatus] = useState<string>("ACTIVE");
+  const [profileBirthDate, setProfileBirthDate] = useState<string | null>(null);
+  const [profileCooperationStartDate, setProfileCooperationStartDate] = useState<string | null>(null);
+  const [profileTelegramChatId, setProfileTelegramChatId] = useState("");
+  const [profileAddress, setProfileAddress] = useState("");
+  const [profileDescription, setProfileDescription] = useState("");
   const [hasProfileInitialized, setHasProfileInitialized] = useState(false);
 
   useEffect(() => {
@@ -208,6 +240,11 @@ function AdminCustomerProfileDetailPage() {
       setProfilePhone(customer.phone || customer.user?.phone || "");
       setProfileEmail(customer.email || customer.user?.email || "");
       setProfileStatus(customer.status || "ACTIVE");
+      setProfileBirthDate(customer.birthDate || null);
+      setProfileCooperationStartDate(customer.cooperationStartDate || null);
+      setProfileTelegramChatId(customer.telegramChatId || "");
+      setProfileAddress(customer.address || customer.user?.address || "");
+      setProfileDescription(customer.description || "");
       setHasProfileInitialized(true);
     }
   }, [customer, hasProfileInitialized]);
@@ -221,10 +258,37 @@ function AdminCustomerProfileDetailPage() {
   const [serviceAutoRenew, setServiceAutoRenew] = useState<boolean>(true);
   const [serviceCreateInvoice, setServiceCreateInvoice] = useState<boolean>(true);
   const [serviceTrackingType, setServiceTrackingType] = useState<"TIME" | "QUANTITY" | "HYBRID">("HYBRID");
-  const [servicePurchaseDate, setServicePurchaseDate] = useState<string | null>(new Date().toISOString());
-  const [newServiceRenewalDate, setNewServiceRenewalDate] = useState(
-    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+  const [servicePurchaseDate, setServicePurchaseDate] = useState<string | null>(() => new Date().toISOString());
+  const [newServiceRenewalDate, setNewServiceRenewalDate] = useState<string>(() =>
+    calcAddDays(new Date().toISOString(), 30),
   );
+
+  // Two-way reactive date handlers for Assign Service
+  const handleAssignDurationChange = (days: number) => {
+    const cleanDays = Math.max(1, Number(days) || 1);
+    setServiceDurationDays(cleanDays);
+    setNewServiceRenewalDate(calcAddDays(servicePurchaseDate, cleanDays));
+  };
+
+  const handleAssignPurchaseDateChange = (val: string) => {
+    const cleanVal = safeIso(val);
+    setServicePurchaseDate(cleanVal);
+    if (newServiceRenewalDate) {
+      const calculatedDays = calcDaysBetween(cleanVal, newServiceRenewalDate);
+      setServiceDurationDays(calculatedDays);
+    }
+  };
+
+  const handleAssignRenewalDateChange = (val: string) => {
+    const cleanVal = safeIso(val, new Date(calcAddDays(servicePurchaseDate, serviceDurationDays)));
+    setNewServiceRenewalDate(cleanVal);
+    const calculatedDays = calcDaysBetween(servicePurchaseDate, cleanVal);
+    setServiceDurationDays(calculatedDays);
+  };
+
+  // Derived span and alarm for Assign Service
+  const assignSpanDays = calcDaysBetween(servicePurchaseDate, newServiceRenewalDate);
+  const isAssignAlarmExceeded = serviceTrackingType !== "QUANTITY" && serviceDurationDays > assignSpanDays;
 
   const activeSelectedService =
     catalogServices.find((s: any) => s.id === selectedCatalogServiceId) ||
@@ -253,12 +317,58 @@ function AdminCustomerProfileDetailPage() {
   const [editServiceStatus, setEditServiceStatus] = useState("ACTIVE");
   const [editServiceRenewalDate, setEditServiceRenewalDate] = useState("");
 
+  // Derived span and alarm for Edit Service
+  const editServiceSpanDays = calcDaysBetween(
+    editServicePurchaseDate || selectedService?.purchaseDate || selectedService?.startDate,
+    editServiceRenewalDate,
+  );
+  const isEditServiceAlarmExceeded =
+    editServiceTrackingType !== "QUANTITY" && editServiceDurationDays > editServiceSpanDays;
+
+  const handleEditServiceDurationChange = (days: number) => {
+    const cleanDays = Math.max(1, Number(days) || 1);
+    setEditServiceDurationDays(cleanDays);
+    const base = editServicePurchaseDate || selectedService?.purchaseDate || selectedService?.startDate || new Date().toISOString();
+    setEditServiceRenewalDate(calcAddDays(base, cleanDays));
+  };
+
+  const handleEditServicePurchaseDateChange = (val: string) => {
+    const cleanVal = safeIso(val);
+    setEditServicePurchaseDate(cleanVal);
+    if (editServiceRenewalDate) {
+      const calculatedDays = calcDaysBetween(cleanVal, editServiceRenewalDate);
+      setEditServiceDurationDays(calculatedDays);
+    }
+  };
+
+  const handleEditServiceRenewalDateChange = (val: string) => {
+    const base = editServicePurchaseDate || selectedService?.purchaseDate || selectedService?.startDate || new Date().toISOString();
+    const cleanVal = safeIso(val, new Date(calcAddDays(base, editServiceDurationDays)));
+    setEditServiceRenewalDate(cleanVal);
+    const calculatedDays = calcDaysBetween(base, cleanVal);
+    setEditServiceDurationDays(calculatedDays);
+  };
+
+  const [confirmDeactivateModal, setConfirmDeactivateModal] = useState<{
+    isOpen: boolean;
+    nextStatus: string;
+  } | null>(null);
+
   // Create Invoice Form State
   const [invoiceItemTitle, setInvoiceItemTitle] = useState("");
   const [invoiceItemAmount, setInvoiceItemAmount] = useState("2500000");
   const [invoiceDueDate, setInvoiceDueDate] = useState(
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
   );
+
+  // Edit Invoice Form State
+  const [isEditInvoiceOpen, setIsEditInvoiceOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<any>(null);
+  const [editInvoiceTitle, setEditInvoiceTitle] = useState("");
+  const [editInvoiceAmount, setEditInvoiceAmount] = useState<number>(0);
+  const [editInvoiceNotes, setEditInvoiceNotes] = useState("");
+  const [editInvoiceStatus, setEditInvoiceStatus] = useState<string>("UNPAID");
+  const [editInvoiceDueDays, setEditInvoiceDueDays] = useState<number>(7);
 
   // Send Notification Form State
   const [notificationType, setNotificationType] = useState<"SMS" | "EMAIL">("SMS");
@@ -384,6 +494,84 @@ function AdminCustomerProfileDetailPage() {
     },
   });
 
+  // Reactivate Invoice Mutation
+  const reactivateInvoiceMutation = useMutation({
+    mutationFn: (invoiceId: string) =>
+      apiClient(`/invoices/${invoiceId}/reactivate`, {
+        method: "PATCH",
+      }),
+    onSuccess: () => {
+      toast.success("فاکتور با موفقیت مجدداً فعال شد");
+      queryClient.invalidateQueries({ queryKey: ["admin", "customer", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در فعال‌سازی مجدد فاکتور");
+    },
+  });
+
+  // Update Invoice Mutation
+  const updateInvoiceMutation = useMutation({
+    mutationFn: ({ invId, payload }: { invId: string; payload: any }) =>
+      apiClient(`/invoices/${invId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      toast.success("فاکتور با موفقیت ویرایش شد");
+      queryClient.invalidateQueries({ queryKey: ["admin", "customer", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+      setIsEditInvoiceOpen(false);
+      setEditingInvoice(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در ویرایش فاکتور");
+    },
+  });
+
+  const handleOpenEditInvoice = (inv: any) => {
+    setEditingInvoice(inv);
+    setEditInvoiceTitle(inv.items?.[0]?.title || "");
+    setEditInvoiceAmount(inv.totalToman || 0);
+    setEditInvoiceNotes(inv.notes || "");
+    setEditInvoiceStatus(inv.status || "UNPAID");
+    const remainingDays = inv.dueDate
+      ? Math.max(1, Math.round((new Date(inv.dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+      : 7;
+    setEditInvoiceDueDays(remainingDays);
+    setIsEditInvoiceOpen(true);
+  };
+
+  const handleEditInvoiceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInvoice) return;
+    if (!editInvoiceTitle.trim()) {
+      toast.error("عنوان ردیف فاکتور الزامی است");
+      return;
+    }
+
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + Number(editInvoiceDueDays));
+
+    updateInvoiceMutation.mutate({
+      invId: editingInvoice.id,
+      payload: {
+        status: editInvoiceStatus,
+        dueDate: dueDate.toISOString(),
+        notes: editInvoiceNotes,
+        items: [
+          {
+            title: editInvoiceTitle,
+            unitPriceToman: Number(editInvoiceAmount),
+            quantity: 1,
+          },
+        ],
+      },
+    });
+  };
+
   // Send Notification Mutation
   const sendNotificationMutation = useMutation({
     mutationFn: (data: any) =>
@@ -400,6 +588,16 @@ function AdminCustomerProfileDetailPage() {
       toast.error(err.message || "خطا در ارسال اعلان");
     },
   });
+
+  // Handle direct Telegram PV by chat ID / username
+  const handleOpenTelegram = () => {
+    if (!activeCustomer.telegramChatId) {
+      toast.error("شناسه تلگرام برای این مشتری ثبت نشده است");
+      return;
+    }
+    const cleanId = activeCustomer.telegramChatId.trim().replace(/^@/, "");
+    window.open(`https://t.me/${cleanId}`, "_blank", "noopener,noreferrer");
+  };
 
   // Delete Customer Mutation
   const deleteCustomerMutation = useMutation({
@@ -427,6 +625,11 @@ function AdminCustomerProfileDetailPage() {
       phone: cleanPhone,
       email: profileEmail || undefined,
       status: profileStatus,
+      birthDate: profileBirthDate || null,
+      cooperationStartDate: profileCooperationStartDate || null,
+      telegramChatId: profileTelegramChatId ? profileTelegramChatId.trim() : null,
+      address: profileAddress ? profileAddress.trim() : null,
+      description: profileDescription ? profileDescription.trim() : null,
     });
   };
 
@@ -441,12 +644,11 @@ function AdminCustomerProfileDetailPage() {
     const finalPrice = Math.round(Number(servicePrice)) || 0;
     const finalName = serviceCustomName.trim() || activeSelectedService.name;
 
+    const pDate = safeDate(servicePurchaseDate);
     const renewalDateIso =
       serviceTrackingType === "QUANTITY"
         ? null
-        : newServiceRenewalDate
-        ? new Date(newServiceRenewalDate).toISOString()
-        : new Date(Date.now() + (serviceDurationDays || 30) * 24 * 60 * 60 * 1000).toISOString();
+        : safeIso(newServiceRenewalDate, new Date(calcAddDays(pDate, serviceDurationDays)));
 
     createServiceMutation.mutate({
       customerId: activeCustomer?.id || id,
@@ -459,10 +661,10 @@ function AdminCustomerProfileDetailPage() {
       autoRenew: serviceTrackingType === "QUANTITY" ? false : serviceAutoRenew,
       quantity: qty,
       trackingType: serviceTrackingType,
-      purchaseDate: servicePurchaseDate || new Date().toISOString(),
-      description: activeSelectedService.description || undefined,
-      startDate: new Date().toISOString(),
+      purchaseDate: pDate.toISOString(),
+      startDate: pDate.toISOString(),
       renewalDate: renewalDateIso,
+      description: activeSelectedService.description || undefined,
     });
   };
 
@@ -481,12 +683,12 @@ function AdminCustomerProfileDetailPage() {
         usedQuantity: editServiceTrackingType === "TIME" ? 0 : Math.max(0, Number(editServiceUsedQuantity) || 0),
         status: editServiceStatus,
         trackingType: editServiceTrackingType,
-        purchaseDate: editServicePurchaseDate || undefined,
+        purchaseDate: editServicePurchaseDate ? safeIso(editServicePurchaseDate) : undefined,
         renewalDate:
           editServiceTrackingType === "QUANTITY"
             ? null
             : editServiceRenewalDate
-            ? new Date(editServiceRenewalDate).toISOString()
+            ? safeIso(editServiceRenewalDate)
             : undefined,
       },
     });
@@ -576,7 +778,13 @@ function AdminCustomerProfileDetailPage() {
     );
   }
 
-  const servicesList = activeCustomer.services || [];
+  const servicesList = useMemo(() => {
+    return [...(activeCustomer.services || [])].sort((a: any, b: any) => {
+      const timeA = new Date(a.createdAt || a.purchaseDate || a.startDate || 0).getTime();
+      const timeB = new Date(b.createdAt || b.purchaseDate || b.startDate || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [activeCustomer?.services]);
   
   // Calculate summary metrics
   const activeServicesCount = servicesList.filter((s: any) => s.status === "ACTIVE").length;
@@ -587,12 +795,12 @@ function AdminCustomerProfileDetailPage() {
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         {/* Navigation & Breadcrumb */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Link to="/customers">
-              <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground text-xs hover:text-foreground">
+              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground text-xs hover:text-foreground h-9 px-3">
                 <ArrowRight className="h-4 w-4" />
                 بازگشت به مشتریان
               </Button>
@@ -601,12 +809,12 @@ function AdminCustomerProfileDetailPage() {
             <span className="font-semibold text-sm">پروفایل و مدیریت مشتری</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="gap-1.5"
+              className="gap-2 h-9 px-3.5"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               بروزرسانی
@@ -618,7 +826,7 @@ function AdminCustomerProfileDetailPage() {
                 variant="outline"
                 onClick={() => toggleCustomerStatusMutation.mutate("INACTIVE")}
                 disabled={toggleCustomerStatusMutation.isPending}
-                className="gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-300 dark:border-rose-900/50 cursor-pointer"
+                className="gap-2 h-9 px-3.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-300 dark:border-rose-900/50 cursor-pointer"
               >
                 <Ban className="h-3.5 w-3.5" />
                 <span>غیرفعال‌سازی مشتری</span>
@@ -630,7 +838,7 @@ function AdminCustomerProfileDetailPage() {
                 variant="outline"
                 onClick={() => toggleCustomerStatusMutation.mutate("ACTIVE")}
                 disabled={toggleCustomerStatusMutation.isPending}
-                className="gap-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 cursor-pointer"
+                className="gap-2 h-9 px-3.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 cursor-pointer"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>فعال‌سازی مشتری</span>
@@ -639,18 +847,19 @@ function AdminCustomerProfileDetailPage() {
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => setIsSendNotificationOpen(true)}
-              className="gap-1.5"
+              onClick={handleOpenTelegram}
+              className="gap-2 h-9 px-3.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 cursor-pointer shadow-xs font-semibold"
+              title={activeCustomer.telegramChatId ? `ارسال پیام به ${activeCustomer.telegramChatId} در تلگرام` : "ارسال پیام در تلگرام"}
             >
-              <Send className="h-3.5 w-3.5" />
-              ارسال پیام
+              <Send className="h-3.5 w-3.5 text-sky-500" />
+              <span>ارسال پیام</span>
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={() => setIsDeleteCustomerOpen(true)}
               disabled={deleteCustomerMutation.isPending}
-              className="gap-1.5 text-rose-600 hover:text-white hover:bg-rose-600 border-rose-300 dark:border-rose-900/50 cursor-pointer transition-colors"
+              className="gap-2 h-9 px-3.5 text-rose-600 hover:text-white hover:bg-rose-600 border-rose-300 dark:border-rose-900/50 cursor-pointer transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
               <span>حذف مشتری</span>
@@ -669,20 +878,20 @@ function AdminCustomerProfileDetailPage() {
           >
             {/* Customer Top Header Profile Card */}
             <Card className="rounded-2xl border bg-card shadow-xs overflow-hidden">
-          <CardContent className="p-6">
+          <CardContent className="p-6 sm:p-7">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               {/* Avatar & Main Info */}
-              <div className="flex items-center gap-4">
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 flex items-center justify-center text-primary text-2xl font-bold">
+              <div className="flex items-center gap-5">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 flex items-center justify-center text-primary text-2xl font-bold shadow-xs">
                   {activeCustomer.name ? activeCustomer.name.charAt(0) : "U"}
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5">
                   <div className="flex items-center gap-3">
                     <h1 className="text-xl font-bold tracking-tight text-foreground">
                       {activeCustomer.name}
                     </h1>
                     <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
                         activeCustomer.status === "ACTIVE"
                           ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                           : "bg-muted text-muted-foreground"
@@ -692,23 +901,44 @@ function AdminCustomerProfileDetailPage() {
                       <span>{activeCustomer.status === "ACTIVE" ? "حساب فعال" : "غیرفعال / معلق"}</span>
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-1">
+                  <div className="flex flex-wrap items-center gap-5 text-xs text-muted-foreground mt-1.5">
                     {activeCustomer.displayName && (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1.5">
                         <Building className="h-3.5 w-3.5" />
                         {activeCustomer.displayName}
                       </span>
                     )}
                     {activeCustomer.phone && (
-                      <span className="flex items-center gap-1 font-mono">
+                      <span className="flex items-center gap-1.5 font-mono">
                         <Phone className="h-3.5 w-3.5" />
                         {activeCustomer.phone}
                       </span>
                     )}
+                    {activeCustomer.telegramChatId && (
+                      <a
+                        href={
+                          activeCustomer.telegramChatId.startsWith("@")
+                            ? `https://t.me/${activeCustomer.telegramChatId.slice(1)}`
+                            : `https://t.me/${activeCustomer.telegramChatId}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 font-mono text-sky-600 dark:text-sky-400 hover:underline"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        {activeCustomer.telegramChatId}
+                      </a>
+                    )}
                     {activeCustomer.email && (
-                      <span className="flex items-center gap-1 font-mono">
+                      <span className="flex items-center gap-1.5 font-mono">
                         <Mail className="h-3.5 w-3.5" />
                         {activeCustomer.email}
+                      </span>
+                    )}
+                    {activeCustomer.cooperationStartDate && (
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-primary" />
+                        <span>همکاری از: {formatJalaliDate(activeCustomer.cooperationStartDate)}</span>
                       </span>
                     )}
                   </div>
@@ -716,14 +946,14 @@ function AdminCustomerProfileDetailPage() {
               </div>
 
               {/* Badges / ID Info */}
-              <div className="flex flex-row md:flex-col items-end justify-between md:justify-center border-t md:border-t-0 pt-4 md:pt-0 border-border">
+              <div className="flex flex-row md:flex-col items-end justify-between md:justify-center border-t md:border-t-0 pt-4 md:pt-0 border-border gap-2">
                 <div className="text-left">
                   <span className="text-[11px] text-muted-foreground">شناسه سیستمی:</span>
                   <p className="font-mono text-xs font-semibold text-foreground">{activeCustomer.id}</p>
                 </div>
-                <div className="text-left mt-2">
+                <div className="text-left">
                   <span className="text-[11px] text-muted-foreground">تاریخ عضویت:</span>
-                  <p className="text-xs text-foreground">
+                  <p className="text-xs text-foreground font-mono">
                     {formatJalaliDate(activeCustomer.createdAt)}
                   </p>
                 </div>
@@ -733,63 +963,63 @@ function AdminCustomerProfileDetailPage() {
         </Card>
 
         {/* Quick Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <Card className="rounded-2xl border bg-card shadow-xs p-5 sm:p-6">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 p-0">
               <CardTitle className="text-xs font-medium text-muted-foreground">
                 سرویس‌های فعال
               </CardTitle>
               <Server className="h-4 w-4 text-emerald-500" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <div className="text-xl font-bold">
                 {activeServicesCount} <span className="text-xs font-normal text-muted-foreground">از {servicesList.length} سرویس</span>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <Card className="rounded-2xl border bg-card shadow-xs p-5 sm:p-6">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 p-0">
               <CardTitle className="text-xs font-medium text-muted-foreground">
                 بدهی در انتظار پرداخت
               </CardTitle>
               <AlertCircle className="h-4 w-4 text-amber-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold text-amber-600 dark:text-amber-400">
+            <CardContent className="p-0">
+              <div className="text-xl font-bold text-amber-600 dark:text-amber-400 font-mono">
                 {unpaidTotalToman.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{unpaidInvoices.length} فاکتور باز</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{unpaidInvoices.length} فاکتور باز</p>
             </CardContent>
           </Card>
 
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <Card className="rounded-2xl border bg-card shadow-xs p-5 sm:p-6">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 p-0">
               <CardTitle className="text-xs font-medium text-muted-foreground">
                 مجموع پرداختی‌های موفق
               </CardTitle>
               <CreditCard className="h-4 w-4 text-indigo-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold text-foreground">
+            <CardContent className="p-0">
+              <div className="text-xl font-bold text-foreground font-mono">
                 {paidTotalToman.toLocaleString("fa-IR")} <span className="text-xs font-normal">تومان</span>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{paidInvoices.length} پرداخت ثبت شده</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{paidInvoices.length} پرداخت ثبت شده</p>
             </CardContent>
           </Card>
 
-          <Card className="rounded-xl border bg-card shadow-xs">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <Card className="rounded-2xl border bg-card shadow-xs p-5 sm:p-6">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 p-0">
               <CardTitle className="text-xs font-medium text-muted-foreground">
                 وضعیت کلی زیرساخت
               </CardTitle>
               <Activity className="h-4 w-4 text-emerald-500" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
                 ۹۹.۹٪ پایداری
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">تمام اندپوینت‌ها در دسترس</p>
+              <p className="text-[11px] text-muted-foreground mt-1">تمام اندپوینت‌ها در دسترس</p>
             </CardContent>
           </Card>
         </div>
@@ -798,7 +1028,7 @@ function AdminCustomerProfileDetailPage() {
         <div className="flex border-b border-border gap-2 pb-px overflow-x-auto">
           <button
             onClick={() => setActiveTab("profile")}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all border-b-2 whitespace-nowrap ${
+            className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === "profile"
                 ? "border-primary text-primary bg-primary/5"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
@@ -810,7 +1040,7 @@ function AdminCustomerProfileDetailPage() {
 
           <button
             onClick={() => setActiveTab("services")}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all border-b-2 whitespace-nowrap ${
+            className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === "services"
                 ? "border-primary text-primary bg-primary/5"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
@@ -822,7 +1052,7 @@ function AdminCustomerProfileDetailPage() {
 
           <button
             onClick={() => setActiveTab("invoices")}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all border-b-2 whitespace-nowrap ${
+            className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === "invoices"
                 ? "border-primary text-primary bg-primary/5"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
@@ -834,7 +1064,7 @@ function AdminCustomerProfileDetailPage() {
 
           <button
             onClick={() => setActiveTab("notifications")}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all border-b-2 whitespace-nowrap ${
+            className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === "notifications"
                 ? "border-primary text-primary bg-primary/5"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
@@ -848,16 +1078,16 @@ function AdminCustomerProfileDetailPage() {
         {/* TAB 1: PROFILE & EDIT */}
         {activeTab === "profile" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 rounded-xl border bg-card shadow-xs">
-              <CardHeader>
+            <Card className="lg:col-span-2 rounded-2xl border bg-card shadow-xs">
+              <CardHeader className="p-6 pb-4">
                 <CardTitle className="text-base font-semibold">ویرایش مشخصات مشتری</CardTitle>
                 <CardDescription className="text-xs">
                   اطلاعات هویتی، شرکتی و وضعیت دسترسی این حساب کاربری را ویرایش کنید
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleProfileSubmit} className="flex flex-col gap-4">
-                  <div className="space-y-1.5">
+              <CardContent className="p-6 pt-0">
+                <form onSubmit={handleProfileSubmit} className="flex flex-col gap-5">
+                  <div className="space-y-2">
                     <Label htmlFor="prof-name" className="text-xs font-semibold">
                       نام و نام خانوادگی / نام مدیر حساب *
                     </Label>
@@ -866,12 +1096,13 @@ function AdminCustomerProfileDetailPage() {
                       value={profileName}
                       onChange={(e) => setProfileName(e.target.value)}
                       placeholder="نام مشتری"
+                      className="h-10 text-xs"
                       required
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="space-y-2">
                       <Label htmlFor="prof-display" className="text-xs font-semibold">
                         نام برند / شرکت
                       </Label>
@@ -880,10 +1111,11 @@ function AdminCustomerProfileDetailPage() {
                         value={profileDisplayName}
                         onChange={(e) => setProfileDisplayName(e.target.value)}
                         placeholder="عنوان برند تجاری"
+                        className="h-10 text-xs"
                       />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <Label htmlFor="prof-phone" className="text-xs font-semibold">
                         شماره تماس اصلی
                       </Label>
@@ -892,12 +1124,13 @@ function AdminCustomerProfileDetailPage() {
                         value={profilePhone}
                         onChange={(e) => setProfilePhone(e.target.value)}
                         placeholder="0912xxxxxxx"
+                        className="h-10 text-xs font-mono"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="space-y-2">
                       <Label htmlFor="prof-email" className="text-xs font-semibold">
                         آدرس ایمیل
                       </Label>
@@ -907,10 +1140,11 @@ function AdminCustomerProfileDetailPage() {
                         value={profileEmail}
                         onChange={(e) => setProfileEmail(e.target.value)}
                         placeholder="user@example.com"
+                        className="h-10 text-xs font-mono"
                       />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <Label htmlFor="prof-status" className="text-xs font-semibold">
                         وضعیت حساب کاربری
                       </Label>
@@ -918,7 +1152,7 @@ function AdminCustomerProfileDetailPage() {
                         id="prof-status"
                         value={profileStatus}
                         onChange={(e) => setProfileStatus(e.target.value)}
-                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1.5 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium"
                       >
                         <option value="ACTIVE">فعال (ACTIVE)</option>
                         <option value="SUSPENDED">معلق (SUSPENDED)</option>
@@ -927,11 +1161,85 @@ function AdminCustomerProfileDetailPage() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">
+                        تاریخ تولد
+                      </Label>
+                      <JalaliDatePicker
+                        value={profileBirthDate}
+                        onChange={(val) => setProfileBirthDate(val)}
+                        placeholder="انتخاب تاریخ تولد..."
+                        minYear={1300}
+                        className="h-10 text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">
+                        تاریخ شروع همکاری
+                      </Label>
+                      <JalaliDatePicker
+                        value={profileCooperationStartDate}
+                        onChange={(val) => setProfileCooperationStartDate(val)}
+                        placeholder="انتخاب تاریخ شروع همکاری..."
+                        className="h-10 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="prof-telegram" className="text-xs font-semibold">
+                      شناسه / آیدی تلگرام (Chat ID یا Username)
+                    </Label>
+                    <div className="relative">
+                      <Send className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
+                      <Input
+                        id="prof-telegram"
+                        value={profileTelegramChatId}
+                        onChange={(e) => setProfileTelegramChatId(e.target.value)}
+                        placeholder="@username یا 123456789"
+                        dir="ltr"
+                        className="font-mono pl-9 text-xs h-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="prof-address" className="text-xs font-semibold">
+                      نشانی و آدرس پستی
+                    </Label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
+                      <Input
+                        id="prof-address"
+                        value={profileAddress}
+                        onChange={(e) => setProfileAddress(e.target.value)}
+                        placeholder="مثال: تهران، خیابان ولیعصر، پلاک ..."
+                        className="pl-9 text-xs h-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="prof-desc" className="text-xs font-semibold">
+                      توضیحات و یادداشت‌های پرونده مشتری
+                    </Label>
+                    <textarea
+                      id="prof-desc"
+                      value={profileDescription}
+                      onChange={(e) => setProfileDescription(e.target.value)}
+                      placeholder="توضیحات تکمیلی، شرایط خاص قرارداد یا یادداشت‌های اداری مشتری..."
+                      rows={3}
+                      className="w-full rounded-xl border border-input bg-background p-3 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  </div>
+
                   <div className="flex items-center justify-end pt-4 border-t mt-2">
                     <Button
                       type="submit"
                       disabled={updateProfileMutation.isPending}
-                      className="gap-1.5"
+                      className="gap-2 h-9 px-5"
                     >
                       {updateProfileMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات مشخصات"}
                     </Button>
@@ -940,14 +1248,14 @@ function AdminCustomerProfileDetailPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-xl border bg-card shadow-xs">
-              <CardHeader>
+            <Card className="rounded-2xl border bg-card shadow-xs">
+              <CardHeader className="p-6 pb-4">
                 <CardTitle className="text-base font-semibold">اطلاعات احراز هویت و امنیت</CardTitle>
                 <CardDescription className="text-xs">
                   جزئیات حساب کاربری متصل و ورود به سامانه
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 text-xs">
+              <CardContent className="p-6 pt-0 space-y-4 text-xs">
                 <div className="flex items-center justify-between py-2 border-b">
                   <span className="text-muted-foreground">نقش کاربری:</span>
                   <span className="font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px]">
@@ -964,6 +1272,62 @@ function AdminCustomerProfileDetailPage() {
                     {activeCustomer.userId || activeCustomer.id}
                   </span>
                 </div>
+                {activeCustomer.birthDate && (
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-muted-foreground">تاریخ تولد:</span>
+                    <span className="text-foreground font-mono">
+                      {formatJalaliDate(activeCustomer.birthDate)}
+                    </span>
+                  </div>
+                )}
+                {activeCustomer.cooperationStartDate && (
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-muted-foreground">شروع همکاری:</span>
+                    <span className="text-foreground font-mono">
+                      {formatJalaliDate(activeCustomer.cooperationStartDate)}
+                    </span>
+                  </div>
+                )}
+                {activeCustomer.telegramChatId && (
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-muted-foreground">چت آیدی تلگرام:</span>
+                    <a
+                      href={
+                        activeCustomer.telegramChatId.startsWith("@")
+                          ? `https://t.me/${activeCustomer.telegramChatId.slice(1)}`
+                          : `https://t.me/${activeCustomer.telegramChatId}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1"
+                    >
+                      <Send className="h-3 w-3" />
+                      {activeCustomer.telegramChatId}
+                    </a>
+                  </div>
+                )}
+                {activeCustomer.address && (
+                  <div className="flex flex-col gap-1 py-2 border-b">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-muted-foreground" />
+                      آدرس پستی:
+                    </span>
+                    <span className="text-foreground text-[11px] leading-relaxed pr-4">
+                      {activeCustomer.address}
+                    </span>
+                  </div>
+                )}
+                {activeCustomer.description && (
+                  <div className="flex flex-col gap-1 py-2 border-b">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <FileText className="h-3 w-3 text-muted-foreground" />
+                      توضیحات و یادداشت:
+                    </span>
+                    <span className="text-muted-foreground text-[11px] leading-relaxed pr-4 italic">
+                      {activeCustomer.description}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between py-2 border-b">
                   <span className="text-muted-foreground">عضویت از:</span>
                   <span className="text-foreground font-mono">
@@ -1016,35 +1380,42 @@ function AdminCustomerProfileDetailPage() {
                 </Button>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-5">
                 {servicesList.map((svc: any) => {
                   const catBadge = getServiceCategoryBadge(svc.serviceType?.slug);
                   const CatIcon = catBadge.icon;
                   const isPackage = svc.serviceType?.slug === "package" || svc.quantity;
 
                   return (
-                    <Card key={svc.id} className="rounded-xl border bg-card shadow-xs overflow-hidden">
-                      <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b bg-muted/20">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                    <Card key={svc.id} className="rounded-2xl border bg-card shadow-xs overflow-hidden">
+                      <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-5 border-b bg-muted/20">
+                        <div className="flex items-center gap-3.5">
+                          <div className="p-3 rounded-xl bg-primary/10 text-primary">
                             <CatIcon className="h-5 w-5" />
                           </div>
                           <div>
                             {(() => {
                               const rawCycle = Number(svc.billingCycle);
-                              const totalDays =
-                                !isNaN(rawCycle) && rawCycle > 0
-                                  ? rawCycle
-                                  : svc.billingCycle === "ANNUAL"
-                                  ? 365
-                                  : svc.billingCycle === "SEMI_ANNUAL"
-                                  ? 180
-                                  : svc.billingCycle === "QUARTERLY"
-                                  ? 90
-                                  : 30;
-                              const renewalMs = svc.renewalDate ? new Date(svc.renewalDate).getTime() : 0;
+                              let totalDays = 30;
+                              if (!isNaN(rawCycle) && rawCycle > 0) {
+                                totalDays = rawCycle;
+                              } else if (svc.renewalDate && (svc.purchaseDate || svc.startDate)) {
+                                const startMs = new Date(svc.purchaseDate || svc.startDate).getTime();
+                                const endMs = new Date(svc.renewalDate).getTime();
+                                const diff = Math.round((endMs - startMs) / 86400000);
+                                if (diff > 0) totalDays = diff;
+                              } else if (svc.billingCycle === "ANNUAL") {
+                                totalDays = 365;
+                              } else if (svc.billingCycle === "SEMI_ANNUAL") {
+                                totalDays = 180;
+                              } else if (svc.billingCycle === "QUARTERLY") {
+                                totalDays = 90;
+                              }
+
                               const now = Date.now();
-                              const remainingDays = renewalMs > 0 ? Math.max(0, Math.ceil((renewalMs - now) / 86400000)) : 0;
+                              const creationMs = svc.createdAt ? new Date(svc.createdAt).getTime() : now;
+                              const daysPassed = Math.max(0, Math.floor((now - creationMs) / 86400000));
+                              const remainingDays = Math.max(0, totalDays - daysPassed);
                               const totalQty = Number(svc.quantity) || 1;
                               const usedQty = Number(svc.usedQuantity) || 0;
                               const remainingQty = Math.max(0, totalQty - usedQty);
@@ -1248,20 +1619,20 @@ function AdminCustomerProfileDetailPage() {
                       </div>
 
                       {/* Endpoints Sub-Section */}
-                    <div className="p-4 bg-card">
-                      <h5 className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
-                        <Activity className="h-3.5 w-3.5 text-primary" />
+                    <div className="p-5 bg-card">
+                      <h5 className="text-xs font-semibold text-muted-foreground mb-3.5 flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-primary" />
                         اندپوینت‌ها و وضعیت پایداری (Uptime Visibility)
                       </h5>
 
                       {svc.endpoints && svc.endpoints.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                           {svc.endpoints.map((ep: any) => (
                             <div
                               key={ep.id}
-                              className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 text-xs"
+                              className="flex items-center justify-between p-3.5 rounded-xl border bg-muted/30 text-xs"
                             >
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2.5">
                                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                                 <div className="flex flex-col">
                                   <span className="font-semibold">{ep.label}</span>
@@ -1272,7 +1643,7 @@ function AdminCustomerProfileDetailPage() {
                                     className="text-[11px] text-primary hover:underline flex items-center gap-1 font-mono direction-ltr text-right"
                                   >
                                     {ep.url}
-                                    <ExternalLink className="h-2.5 w-2.5" />
+                                    <ExternalLink className="h-3 w-3" />
                                   </a>
                                 </div>
                               </div>
@@ -1288,16 +1659,18 @@ function AdminCustomerProfileDetailPage() {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-[11px] text-muted-foreground">اندپوینتی برای مانیتورینگ ثبت نشده است.</p>
+                        <p className="text-xs text-muted-foreground italic">
+                          هیچ اندپوینتی برای این سرویس تعریف نشده است.
+                        </p>
                       )}
                     </div>
                   </Card>
                 );
               })}
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
+      )}
 
         {/* TAB 3: INVOICES & PAYMENTS */}
         {activeTab === "invoices" && (
@@ -1305,14 +1678,14 @@ function AdminCustomerProfileDetailPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-base">صورت‌حساب‌ها و پرداخت‌ها</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs text-muted-foreground mt-1">
                   مشاهده سوابق مالی، صدور فاکتور جدید و بررسی رسیدهای تراکنش آنلاین
                 </p>
               </div>
               <Button
                 size="sm"
                 onClick={() => setIsCreateInvoiceOpen(true)}
-                className="gap-1.5"
+                className="gap-2 h-9 px-4"
               >
                 <Plus className="h-4 w-4" />
                 صدور فاکتور جدید
@@ -1320,8 +1693,8 @@ function AdminCustomerProfileDetailPage() {
             </div>
 
             {/* Invoices Table */}
-            <Card className="rounded-xl border bg-card shadow-xs overflow-hidden">
-              <CardHeader className="pb-3 border-b">
+            <Card className="rounded-2xl border bg-card shadow-xs overflow-hidden">
+              <CardHeader className="p-5 pb-3 border-b">
                 <CardTitle className="text-sm font-semibold">لیست صورت‌حساب‌ها</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -1329,37 +1702,37 @@ function AdminCustomerProfileDetailPage() {
                   <table className="w-full text-right text-xs">
                     <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
                       <tr>
-                        <th className="py-3.5 px-4">شماره فاکتور</th>
-                        <th className="py-3.5 px-4">مبلغ (تومان)</th>
-                        <th className="py-3.5 px-4">وضعیت</th>
-                        <th className="py-3.5 px-4">تاریخ صدور</th>
-                        <th className="py-3.5 px-4">مهلت پرداخت</th>
-                        <th className="py-3.5 px-4">رسید پرداخت</th>
-                        <th className="py-3.5 px-4 text-center">عملیات</th>
+                        <th className="py-4 px-5">شماره فاکتور</th>
+                        <th className="py-4 px-5">مبلغ (تومان)</th>
+                        <th className="py-4 px-5">وضعیت</th>
+                        <th className="py-4 px-5">تاریخ صدور</th>
+                        <th className="py-4 px-5">مهلت پرداخت</th>
+                        <th className="py-4 px-5">رسید پرداخت</th>
+                        <th className="py-4 px-5 text-center">عملیات</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {invoicesList.map((inv: any) => (
                         <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="py-3.5 px-4 font-mono font-bold text-primary">
+                          <td className="py-4 px-5 font-mono font-bold text-primary">
                             <button
                               type="button"
                               onClick={() => {
                                 setViewingInvoice(inv);
                                 setIsViewInvoiceOpen(true);
                               }}
-                              className="font-bold text-primary hover:underline flex items-center gap-1"
+                              className="font-bold text-primary hover:underline flex items-center gap-1.5 cursor-pointer"
                             >
-                              <FileText className="h-3.5 w-3.5" />
+                              <FileText className="h-4 w-4" />
                               {inv.invoiceNumber || inv.id}
                             </button>
                           </td>
-                          <td className="py-3.5 px-4 font-semibold">
+                          <td className="py-4 px-5 font-semibold font-mono">
                             {(inv.totalToman || 0).toLocaleString("fa-IR")} تومان
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-5">
                             <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium ${
                                 inv.status === "PAID"
                                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                   : inv.status === "UNPAID"
@@ -1374,13 +1747,13 @@ function AdminCustomerProfileDetailPage() {
                                 : "لغو شده"}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 font-mono text-[11px] text-muted-foreground">
+                          <td className="py-4 px-5 font-mono text-[11px] text-muted-foreground">
                             {formatJalaliDate(inv.issuedAt || inv.createdAt)}
                           </td>
-                          <td className="py-3.5 px-4 font-mono text-[11px] text-muted-foreground">
+                          <td className="py-4 px-5 font-mono text-[11px] text-muted-foreground">
                             {formatJalaliDate(inv.dueDate)}
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-5">
                             {inv.payment ? (
                               <div className="flex flex-col text-[10px] font-mono">
                                 <span className="font-semibold text-emerald-600 dark:text-emerald-400">
@@ -1392,8 +1765,8 @@ function AdminCustomerProfileDetailPage() {
                               <span className="text-muted-foreground text-[11px]">-</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
+                          <td className="py-4 px-5 text-center">
+                            <div className="flex items-center justify-center gap-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1401,10 +1774,18 @@ function AdminCustomerProfileDetailPage() {
                                   setViewingInvoice(inv);
                                   setIsViewInvoiceOpen(true);
                                 }}
-                                className="text-primary hover:bg-primary/10 text-[11px] h-7 px-2 gap-1 font-medium"
+                                className="text-primary hover:bg-primary/10 text-xs h-7.5 px-2.5 gap-1.5 font-medium cursor-pointer"
                               >
                                 <Eye className="h-3.5 w-3.5" />
                                 مشاهده
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenEditInvoice(inv)}
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:bg-blue-500/10 text-xs h-7.5 px-2.5 font-medium cursor-pointer"
+                              >
+                                ویرایش
                               </Button>
                               {inv.status === "UNPAID" && (
                                 <Button
@@ -1412,9 +1793,20 @@ function AdminCustomerProfileDetailPage() {
                                   size="sm"
                                   onClick={() => cancelInvoiceMutation.mutate(inv.id)}
                                   disabled={cancelInvoiceMutation.isPending}
-                                  className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-[11px] h-7 px-2"
+                                  className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-xs h-7.5 px-2.5 cursor-pointer"
                                 >
                                   لغو فاکتور
+                                </Button>
+                              )}
+                              {inv.status === "CANCELLED" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => reactivateInvoiceMutation.mutate(inv.id)}
+                                  disabled={reactivateInvoiceMutation.isPending}
+                                  className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-500/10 text-xs h-7.5 px-2.5 font-medium cursor-pointer"
+                                >
+                                  فعال‌سازی
                                 </Button>
                               )}
                             </div>
@@ -1428,33 +1820,33 @@ function AdminCustomerProfileDetailPage() {
             </Card>
 
             {/* Payments Summary Section */}
-            <Card className="rounded-xl border bg-card shadow-xs">
-              <CardHeader className="pb-3 border-b">
+            <Card className="rounded-2xl border bg-card shadow-xs">
+              <CardHeader className="p-5 pb-3 border-b">
                 <CardTitle className="text-sm font-semibold">تراکنش‌ها و رسیدهای آنلاین</CardTitle>
                 <CardDescription className="text-xs">
                   رسیدهای موفق درگاه پرداخت اختصاص داده شده به مشتری
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-4">
+              <CardContent className="p-5 sm:p-6">
                 {invoicesList.filter((inv: any) => inv.payment).length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-4">
+                  <p className="text-xs text-muted-foreground text-center py-6">
                     هنوز پرداخت موفقی برای این مشتری ثبت نشده است
                   </p>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {invoicesList
                       .filter((inv: any) => inv.payment)
                       .map((inv: any) => (
                         <div
                           key={inv.payment.id}
-                          className="p-3.5 rounded-xl border bg-muted/30 flex items-center justify-between text-xs"
+                          className="p-4 rounded-xl border bg-muted/30 flex items-center justify-between text-xs"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600">
                               <CreditCard className="h-4 w-4" />
                             </div>
                             <div>
-                              <span className="font-bold block">
+                              <span className="font-bold block font-mono">
                                 {(inv.payment.amountToman || inv.totalToman).toLocaleString("fa-IR")} تومان
                               </span>
                               <span className="text-[10px] text-muted-foreground font-mono">
@@ -1477,25 +1869,25 @@ function AdminCustomerProfileDetailPage() {
         {/* TAB 4: NOTIFICATIONS & AUDIT LOGS */}
         {activeTab === "notifications" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 rounded-xl border bg-card shadow-xs">
-              <CardHeader>
+            <Card className="lg:col-span-2 rounded-2xl border bg-card shadow-xs">
+              <CardHeader className="p-6 pb-4">
                 <CardTitle className="text-base font-semibold">تاریخچه اعلانات و رخدادها</CardTitle>
                 <CardDescription className="text-xs">
                   سوابق پیامک‌ها، ایمیل‌ها و تغییرات سیستمی مرتبط با این مشتری
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6 pt-0">
                 {auditLogsData?.items && auditLogsData.items.length > 0 ? (
                   <div className="divide-y divide-border text-xs">
                     {auditLogsData.items.map((log: any) => (
-                      <div key={log.id} className="py-3 flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-2.5">
-                          <div className="p-1.5 rounded bg-primary/10 text-primary mt-0.5">
-                            <Bell className="h-3.5 w-3.5" />
+                      <div key={log.id} className="py-3.5 flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
+                            <Bell className="h-4 w-4" />
                           </div>
                           <div>
                             <span className="font-semibold block text-foreground">{log.action}</span>
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-[11px] text-muted-foreground mt-0.5 block">
                               توسط: {log.actorDisplayNameSnapshot || "سیستم"} • موجودیت: {log.entityType}
                             </span>
                           </div>
@@ -1507,9 +1899,9 @@ function AdminCustomerProfileDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <div className="p-3 rounded-lg border bg-muted/20 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
+                  <div className="space-y-3.5">
+                    <div className="p-4 rounded-xl border bg-muted/20 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2.5">
                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                         <span>ارسال پیامک خوش‌آمدگویی و فعال‌سازی حساب کاربری</span>
                       </div>
@@ -1518,8 +1910,8 @@ function AdminCustomerProfileDetailPage() {
                       </span>
                     </div>
 
-                    <div className="p-3 rounded-lg border bg-muted/20 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
+                    <div className="p-4 rounded-xl border bg-muted/20 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2.5">
                         <Bell className="h-4 w-4 text-blue-500" />
                         <span>ارسال اطلاعیه صدور صورت‌حساب دوره‌ای</span>
                       </div>
@@ -1532,18 +1924,18 @@ function AdminCustomerProfileDetailPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-xl border bg-card shadow-xs">
-              <CardHeader>
+            <Card className="rounded-2xl border bg-card shadow-xs">
+              <CardHeader className="p-6 pb-4">
                 <CardTitle className="text-base font-semibold">ارسال اعلان سریع به مشتری</CardTitle>
                 <CardDescription className="text-xs">
                   ارسال پیامک اطلاع‌رسانی یا ایمیل از طریق صف BullMQ
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSendNotificationSubmit} className="flex flex-col gap-4">
-                  <div className="space-y-1.5">
+              <CardContent className="p-6 pt-0">
+                <form onSubmit={handleSendNotificationSubmit} className="flex flex-col gap-5">
+                  <div className="space-y-2">
                     <Label className="text-xs font-semibold">نوع ارسال</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2.5">
                       <button
                         type="button"
                         onClick={() => setNotificationType("SMS")}
@@ -1569,12 +1961,12 @@ function AdminCustomerProfileDetailPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <Label className="text-xs font-semibold">قالب پیام</Label>
                     <select
                       value={notificationTemplate}
                       onChange={(e) => setNotificationTemplate(e.target.value)}
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1.5 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium"
                     >
                       <option value="renewal_reminder">یادآوری تمدید سرویس</option>
                       <option value="invoice_created">اطلاع‌رسانی صدور فاکتور جدید</option>
@@ -1583,23 +1975,23 @@ function AdminCustomerProfileDetailPage() {
                     </select>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <Label className="text-xs font-semibold">متن / یادداشت همراه پیام</Label>
                     <textarea
                       value={notificationMessage}
                       onChange={(e) => setNotificationMessage(e.target.value)}
                       rows={3}
                       placeholder="متن دلخواه خود را در صورت تمایل بنویسید..."
-                      className="w-full rounded-md border border-input bg-background p-2.5 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                      className="w-full rounded-xl border border-input bg-background p-3 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                     />
                   </div>
 
                   <Button
                     type="submit"
                     disabled={sendNotificationMutation.isPending}
-                    className="w-full gap-1.5 mt-2"
+                    className="w-full gap-2 h-10 mt-2 font-semibold"
                   >
-                    <Send className="h-3.5 w-3.5" />
+                    <Send className="h-4 w-4" />
                     {sendNotificationMutation.isPending ? "در حال قرار دادن در صف..." : "ارسال پیام"}
                   </Button>
                 </form>
@@ -1811,12 +2203,7 @@ function AdminCustomerProfileDetailPage() {
                             type="number"
                             min={1}
                             value={serviceDurationDays}
-                            onChange={(e) => {
-                              const days = Math.max(1, Number(e.target.value) || 1);
-                              setServiceDurationDays(days);
-                              const targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-                              setNewServiceRenewalDate(targetDate.toISOString());
-                            }}
+                            onChange={(e) => handleAssignDurationChange(Number(e.target.value))}
                             placeholder="مثال: 30"
                             className="pl-12 font-mono"
                             required
@@ -1891,12 +2278,7 @@ function AdminCustomerProfileDetailPage() {
                             type="number"
                             min={1}
                             value={serviceDurationDays}
-                            onChange={(e) => {
-                              const days = Math.max(1, Number(e.target.value) || 1);
-                              setServiceDurationDays(days);
-                              const targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-                              setNewServiceRenewalDate(targetDate.toISOString());
-                            }}
+                            onChange={(e) => handleAssignDurationChange(Number(e.target.value))}
                             placeholder="مثال: 30"
                             className="pl-12 font-mono"
                             required
@@ -1923,29 +2305,56 @@ function AdminCustomerProfileDetailPage() {
 
                   {/* 5. Dates (Only for TIME and HYBRID) */}
                   {serviceTrackingType !== "QUANTITY" && (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <JalaliDatePicker
-                            label="تاریخ ساخت و ایجاد سرویس (شمسی)"
+                            label="تاریخ شروع / خرید (شمسی) *"
                             value={servicePurchaseDate}
-                            onChange={(val) => setServicePurchaseDate(val)}
+                            onChange={handleAssignPurchaseDateChange}
                           />
                         </div>
                         <div className="space-y-1.5">
                           <JalaliDatePicker
-                            label="تاریخ شروع / خرید (شمسی)"
-                            value={servicePurchaseDate}
-                            onChange={(val) => setServicePurchaseDate(val)}
+                            label="تاریخ سررسید تمدید (شمسی) *"
+                            value={newServiceRenewalDate}
+                            onChange={handleAssignRenewalDateChange}
                           />
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <JalaliDatePicker
-                          label="تاریخ سررسید تمدید"
-                          value={newServiceRenewalDate}
-                          onChange={(val) => setNewServiceRenewalDate(val)}
-                        />
+
+                      {/* Live Span & Alarm indicator */}
+                      <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col gap-2 mt-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">بازه زمانی کلی سررسید (از تاریخ شروع تا سررسید):</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {assignSpanDays.toLocaleString("fa-IR")} روز
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">دوره تعیین‌شده برای سرویس:</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {serviceDurationDays.toLocaleString("fa-IR")} روز
+                          </span>
+                        </div>
+
+                        {isAssignAlarmExceeded && (
+                          <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-pulse mt-1">
+                            <div className="flex items-center gap-1.5">
+                              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                              <span>
+                                هشدار: دوره تعیین‌شده ({serviceDurationDays} روز) از بازه زمانی سررسید ({assignSpanDays} روز) بزرگ‌تر است!
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setServiceDurationDays(assignSpanDays)}
+                              className="text-[11px] font-bold underline hover:no-underline cursor-pointer text-amber-800 dark:text-amber-200"
+                            >
+                              تطبیق دوره با بازه
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2091,9 +2500,11 @@ function AdminCustomerProfileDetailPage() {
                       onChange={(e) => {
                         const newStatus = e.target.value;
                         if (newStatus === "INACTIVE" || newStatus === "SUSPENDED") {
-                          if (!confirm(`آیا از غیرفعال‌سازی سرویس «${selectedService?.name}» متعلق به مشتری «${activeCustomer.name}» اطمینان دارید؟`)) {
-                            return;
-                          }
+                          setConfirmDeactivateModal({
+                            isOpen: true,
+                            nextStatus: newStatus,
+                          });
+                          return;
                         }
                         setEditServiceStatus(newStatus);
                       }}
@@ -2116,13 +2527,7 @@ function AdminCustomerProfileDetailPage() {
                           type="number"
                           min={1}
                           value={editServiceDurationDays}
-                          onChange={(e) => {
-                            const days = Math.max(1, Number(e.target.value) || 1);
-                            setEditServiceDurationDays(days);
-                            const base = selectedService?.startDate ? new Date(selectedService.startDate) : new Date();
-                            const targetDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
-                            setEditServiceRenewalDate(targetDate.toISOString());
-                          }}
+                          onChange={(e) => handleEditServiceDurationChange(Number(e.target.value))}
                           placeholder="مثال: 30"
                           className="pl-12 font-mono h-10 text-xs"
                           required
@@ -2137,7 +2542,7 @@ function AdminCustomerProfileDetailPage() {
                       <JalaliDatePicker
                         label="تاریخ سررسید تمدید"
                         value={editServiceRenewalDate}
-                        onChange={(val) => setEditServiceRenewalDate(val)}
+                        onChange={handleEditServiceRenewalDateChange}
                       />
                     </div>
                   </div>
@@ -2184,13 +2589,7 @@ function AdminCustomerProfileDetailPage() {
                             type="number"
                             min={1}
                             value={editServiceDurationDays}
-                            onChange={(e) => {
-                              const days = Math.max(1, Number(e.target.value) || 1);
-                              setEditServiceDurationDays(days);
-                              const base = selectedService?.startDate ? new Date(selectedService.startDate) : new Date();
-                              const targetDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
-                              setEditServiceRenewalDate(targetDate.toISOString());
-                            }}
+                            onChange={(e) => handleEditServiceDurationChange(Number(e.target.value))}
                             placeholder="مثال: 30"
                             className="pl-12 font-mono h-10 text-xs"
                             required
@@ -2205,7 +2604,7 @@ function AdminCustomerProfileDetailPage() {
                         <JalaliDatePicker
                           label="تاریخ سررسید تمدید"
                           value={editServiceRenewalDate}
-                          onChange={(val) => setEditServiceRenewalDate(val)}
+                          onChange={handleEditServiceRenewalDateChange}
                         />
                       </div>
                     </div>
@@ -2371,8 +2770,123 @@ function AdminCustomerProfileDetailPage() {
             setIsViewInvoiceOpen(false);
             setViewingInvoice(null);
           }}
+          onEdit={(inv) => handleOpenEditInvoice(inv)}
           onCancel={(invId) => cancelInvoiceMutation.mutate(invId)}
+          onReactivate={(invId) => reactivateInvoiceMutation.mutate(invId)}
         />
+
+        {/* MODAL 4.5: EDIT INVOICE MODAL */}
+        {isEditInvoiceOpen && editingInvoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-4 border-b">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base">ویرایش فاکتور {editingInvoice.invoiceNumber || editingInvoice.id}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      مشتری: {customer?.name || "نامشخص"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditInvoiceOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <form onSubmit={handleEditInvoiceSubmit} className="flex flex-col gap-4 mt-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cust_etitle" className="text-xs font-semibold">
+                    شرح خدمت یا عنوان ردیف فاکتور *
+                  </Label>
+                  <Input
+                    id="cust_etitle"
+                    value={editInvoiceTitle}
+                    onChange={(e) => setEditInvoiceTitle(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cust_eamount" className="text-xs font-semibold">
+                      مبلغ کل (تومان) *
+                    </Label>
+                    <Input
+                      id="cust_eamount"
+                      type="number"
+                      value={editInvoiceAmount}
+                      onChange={(e) => setEditInvoiceAmount(Number(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cust_edays" className="text-xs font-semibold">
+                      مهلت پرداخت از امروز (روز)
+                    </Label>
+                    <Input
+                      id="cust_edays"
+                      type="number"
+                      value={editInvoiceDueDays}
+                      onChange={(e) => setEditInvoiceDueDays(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="cust_enotes" className="text-xs font-semibold">
+                    یادداشت و توضیحات فاکتور
+                  </Label>
+                  <Input
+                    id="cust_enotes"
+                    value={editInvoiceNotes}
+                    onChange={(e) => setEditInvoiceNotes(e.target.value)}
+                    placeholder="توضیحات اختیاری درباره فاکتور"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="cust_estatus" className="text-xs font-semibold">
+                    وضعیت فاکتور
+                  </Label>
+                  <select
+                    id="cust_estatus"
+                    value={editInvoiceStatus}
+                    onChange={(e) => setEditInvoiceStatus(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring font-medium"
+                  >
+                    <option value="UNPAID">در انتظار پرداخت</option>
+                    <option value="PAID">تسویه‌شده (پرداخت شده)</option>
+                    <option value="CANCELLED">لغو شده</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsEditInvoiceOpen(false)}
+                  >
+                    انصراف
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updateInvoiceMutation.isPending}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                  >
+                    {updateInvoiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* MODAL 5: DELETE CUSTOMER MODAL */}
         {isDeleteCustomerOpen && (
@@ -2420,6 +2934,31 @@ function AdminCustomerProfileDetailPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Confirm Modal for Deactivating / Suspending Customer Service */}
+        {confirmDeactivateModal && (
+          <ConfirmModal
+            isOpen={confirmDeactivateModal.isOpen}
+            onClose={() => setConfirmDeactivateModal(null)}
+            onConfirm={() => {
+              setEditServiceStatus(confirmDeactivateModal.nextStatus);
+              setConfirmDeactivateModal(null);
+            }}
+            title="تأیید غیرفعال‌سازی / تعلیق سرویس"
+            description={
+              <div className="space-y-2 text-xs">
+                <p>
+                  آیا از غیرفعال‌سازی سرویس <strong className="text-foreground font-semibold">«{selectedService?.name}»</strong> متعلق به مشتری <strong className="text-foreground font-semibold">«{activeCustomer.name}»</strong> اطمینان دارید؟
+                </p>
+                <p className="text-amber-600 dark:text-amber-400 font-medium">
+                  توجه: با تغییر وضعیت به {confirmDeactivateModal.nextStatus === "SUSPENDED" ? "معلق" : "غیرفعال"}، دسترسی مشتری به امکانات این سرویس موقتاً مسدود می‌گردد.
+                </p>
+              </div>
+            }
+            confirmText="بله، تغییر وضعیت اعمال شود"
+            variant="warning"
+          />
         )}
       </div>
     </AppShell>

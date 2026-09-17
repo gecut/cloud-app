@@ -235,6 +235,7 @@ function AdminAuditLogsListPage() {
                         "invoice.create": { label: "صدور فاکتور", color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
                         "invoice.update": { label: "ویرایش فاکتور", color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" },
                         "invoice.cancel": { label: "لغو فاکتور", color: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
+                        "invoice.reactivate": { label: "فعال‌سازی مجدد فاکتور", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
                         "payment.record": { label: "پرداخت آنلاین", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
                         "service.create": { label: "تعریف/تخصیص سرویس", color: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
                         "service.assign": { label: "تخصیص بسته", color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400" },

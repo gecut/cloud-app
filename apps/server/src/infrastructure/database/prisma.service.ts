@@ -32,13 +32,7 @@ export class PrismaService
   public memSuppliers: Map<string, any> = new Map();
   public memSupplierServices: Map<string, any> = new Map();
 
-  public memServiceTypes: Array<any> = [
-    { id: "st_domain", name: "ثبت و مدیریت دامنه", slug: "domain", description: "دامنه‌های ملی و بین‌المللی" },
-    { id: "st_server", name: "سرور ابری و اختصاصی", slug: "server", description: "سرورهای مجازی و اختصاصی" },
-    { id: "st_hosting", name: "هاست و میزبانی وب", slug: "hosting", description: "هاست ابری پرسرعت NVMe و اشتراکی" },
-    { id: "st_api", name: "وب‌سرویس و API", slug: "api", description: "سرویس‌های ابری و رابط‌های برنامه‌نویسی" },
-    { id: "st_package", name: "بسته تعدادی / پکیج", slug: "package", description: "بسته‌ها و پکیج‌های حجمی یا تعدادی" },
-  ];
+  public memServiceTypes: Array<any> = [];
 
   constructor() {
     const adapter = new PrismaPg({
@@ -88,6 +82,7 @@ export class PrismaService
           suppliers: Array.from(this.memSuppliers.entries()),
           supplierServices: Array.from(this.memSupplierServices.entries()),
           invoiceSequences: Array.from(this.memInvoiceSequences.entries()),
+          serviceTypes: this.memServiceTypes,
         };
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
       } catch (err) {
@@ -135,6 +130,7 @@ export class PrismaService
       if (data.suppliers && Array.isArray(data.suppliers)) this.memSuppliers = new Map(reviveDates(data.suppliers));
       if (data.supplierServices && Array.isArray(data.supplierServices)) this.memSupplierServices = new Map(reviveDates(data.supplierServices));
       if (data.invoiceSequences && Array.isArray(data.invoiceSequences)) this.memInvoiceSequences = new Map(data.invoiceSequences);
+      if (data.serviceTypes && Array.isArray(data.serviceTypes)) this.memServiceTypes = reviveDates(data.serviceTypes);
 
       this.logger.log(`💾 [PrismaService] Loaded persistent database store from ${filePath} (${this.memCustomers.size} customers, ${this.memServices.size} services, ${this.memInvoices.size} invoices).`);
       return true;
@@ -156,6 +152,35 @@ export class PrismaService
         phone: "09120000001",
         email: "admin@gecut.local",
         passwordHash: "Admin@123456",
+        role: "ADMIN",
+        tokenVersion: 0,
+        customerId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      this.saveToDisk();
+    }
+
+    // Ensure Requested Primary Admin user exists and has role ADMIN
+    const primaryAdminPhone = "09363528608";
+    const primaryAdmin = Array.from(this.memUsers.values()).find(
+      (u) => u.phone === primaryAdminPhone,
+    );
+    if (primaryAdmin) {
+      primaryAdmin.role = "ADMIN";
+      primaryAdmin.passwordHash = "admin@Gecut-cloud";
+      if (!primaryAdmin.name || primaryAdmin.name === "علی طباطبایی") {
+        primaryAdmin.name = "مدیر ارشد (علی طباطبایی)";
+      }
+      this.saveToDisk();
+    } else {
+      const pAdminId = "user_admin_primary";
+      this.memUsers.set(pAdminId, {
+        id: pAdminId,
+        name: "مدیر ارشد سامانه",
+        phone: primaryAdminPhone,
+        email: "admin@gecut-cloud.ir",
+        passwordHash: "admin@Gecut-cloud",
         role: "ADMIN",
         tokenVersion: 0,
         customerId: null,
@@ -350,6 +375,7 @@ export class PrismaService
           updatedAt: new Date(),
         };
         this.memUsers.set(id, newUser);
+        this.saveToDisk();
         return newUser;
       },
       update: async (args: any) => {
@@ -365,12 +391,19 @@ export class PrismaService
                 u.customerId = cust.id;
               }
             }
+            this.saveToDisk();
             return { ...u, customer: cust };
           }
         }
         return null;
       },
-      findMany: async () => Array.from(this.memUsers.values()),
+      findMany: async (args?: any) => {
+        let items = Array.from(this.memUsers.values());
+        if (args?.where?.role) {
+          items = items.filter((u) => u.role === args.where.role);
+        }
+        return items;
+      },
       count: async () => this.memUsers.size,
     });
 
@@ -529,20 +562,120 @@ export class PrismaService
 
     // ServiceType model
     wrapModel("serviceType", {
+      findUnique: async (args: any) => {
+        const where = args?.where || {};
+        const targetId = where.id;
+        const targetSlug = where.slug;
+        const item = this.memServiceTypes.find(
+          (t) =>
+            (targetId && (t.id === targetId || t.slug === targetId)) ||
+            (targetSlug && (t.slug === targetSlug || t.id === targetSlug)),
+        );
+        if (!item) return null;
+        const count = Array.from(this.memServices.values()).filter(
+          (s: any) =>
+            s.serviceTypeId === item.id ||
+            s.serviceType?.id === item.id ||
+            (item.slug && (s.serviceTypeSlug === item.slug || s.serviceType?.slug === item.slug)),
+        ).length;
+        return {
+          ...item,
+          _count: { services: count },
+        };
+      },
       findFirst: async (args: any) => {
         const where = args?.where || {};
-        if (where.slug) {
-          return this.memServiceTypes.find((t) => t.slug === where.slug) || null;
+        let filtered = [...this.memServiceTypes];
+        if (where.slug && where.id && where.id.not) {
+          filtered = filtered.filter((t) => t.slug === where.slug && t.id !== where.id.not);
+        } else if (where.slug) {
+          filtered = filtered.filter((t) => t.slug === where.slug);
+        } else if (where.id) {
+          filtered = filtered.filter((t) => t.id === where.id || t.slug === where.id);
         }
-        return this.memServiceTypes[0] || null;
+        const item = filtered[0] || null;
+        if (!item) return null;
+        const count = Array.from(this.memServices.values()).filter(
+          (s: any) =>
+            s.serviceTypeId === item.id ||
+            s.serviceType?.id === item.id ||
+            (item.slug && (s.serviceTypeSlug === item.slug || s.serviceType?.slug === item.slug)),
+        ).length;
+        return {
+          ...item,
+          _count: { services: count },
+        };
       },
-      findMany: async () => this.memServiceTypes,
+      findMany: async (args: any) => {
+        let items = [...this.memServiceTypes];
+        const where = args?.where || {};
+        if (where.isActive !== undefined) {
+          items = items.filter((t) => t.isActive === where.isActive);
+        }
+        return items.map((item) => {
+          const count = Array.from(this.memServices.values()).filter(
+            (s: any) =>
+              s.serviceTypeId === item.id ||
+              s.serviceType?.id === item.id ||
+              (item.slug && (s.serviceTypeSlug === item.slug || s.serviceType?.slug === item.slug)),
+          ).length;
+          return {
+            ...item,
+            _count: { services: count },
+          };
+        });
+      },
       create: async (args: any) => {
         const d = args?.data || {};
         const id = `st_${Date.now()}`;
-        const newType = { id, ...d };
-        this.memServiceTypes.push(newType);
+        const newType = {
+          id,
+          name: d.name,
+          slug: d.slug,
+          description: d.description || null,
+          isActive: d.isActive ?? true,
+          sortOrder: d.sortOrder || null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        this.memServiceTypes.unshift(newType);
+        this.saveToDisk();
         return newType;
+      },
+      update: async (args: any) => {
+        const where = args?.where || {};
+        const d = args?.data || {};
+        const targetId = where.id;
+        const targetSlug = where.slug;
+        const idx = this.memServiceTypes.findIndex(
+          (t) =>
+            (targetId && (t.id === targetId || t.slug === targetId)) ||
+            (targetSlug && (t.slug === targetSlug || t.id === targetSlug)),
+        );
+        if (idx === -1) return null;
+        this.memServiceTypes[idx] = {
+          ...this.memServiceTypes[idx],
+          ...d,
+          updatedAt: new Date(),
+        };
+        this.saveToDisk();
+        return this.memServiceTypes[idx];
+      },
+      delete: async (args: any) => {
+        const where = args?.where || {};
+        const targetId = where.id;
+        const targetSlug = where.slug;
+        const idx = this.memServiceTypes.findIndex(
+          (t) =>
+            (targetId && (t.id === targetId || t.slug === targetId)) ||
+            (targetSlug && (t.slug === targetSlug || t.id === targetSlug)),
+        );
+        if (idx !== -1) {
+          const deleted = this.memServiceTypes.splice(idx, 1)[0];
+          this.saveToDisk();
+          return deleted;
+        }
+        return null;
       },
     });
 
@@ -939,10 +1072,20 @@ export class PrismaService
             this.memCustomers.get(inv.customerId) ||
             Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
             null,
-          items:
+          items: (
             inv.items && inv.items.length > 0
               ? inv.items
-              : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id),
+              : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id)
+          ).map((it: any) => {
+            const svc = it.serviceId ? this.memServices.get(it.serviceId) : null;
+            const sType = svc?.serviceTypeId
+              ? this.memServiceTypes.find((t) => t.id === svc.serviceTypeId)
+              : null;
+            return {
+              ...it,
+              service: svc ? { ...svc, serviceType: sType } : it.service || null,
+            };
+          }),
           payment: Array.from(this.memPayments.values()).find((p) => p.invoiceId === inv.id) || null,
         }));
       },
@@ -975,10 +1118,20 @@ export class PrismaService
             this.memCustomers.get(inv.customerId) ||
             Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
             null,
-          items:
+          items: (
             inv.items && inv.items.length > 0
               ? inv.items
-              : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id),
+              : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id)
+          ).map((it: any) => {
+            const svc = it.serviceId ? this.memServices.get(it.serviceId) : null;
+            const sType = svc?.serviceTypeId
+              ? this.memServiceTypes.find((t) => t.id === svc.serviceTypeId)
+              : null;
+            return {
+              ...it,
+              service: svc ? { ...svc, serviceType: sType } : it.service || null,
+            };
+          }),
           payment: Array.from(this.memPayments.values()).find((p) => p.invoiceId === inv.id) || null,
         };
       },

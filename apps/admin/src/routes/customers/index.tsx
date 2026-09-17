@@ -29,9 +29,14 @@ import {
   AlertTriangle,
   Ban,
   Trash2,
+  Calendar,
+  Send,
+  MapPin,
+  FileText,
 } from "lucide-react";
 
-import { normalizePhoneNumber } from "@/utils/phone";
+import { normalizePhoneNumber, getTelegramChatUrl } from "@/utils/phone";
+import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
 
 export const Route = createFileRoute("/customers/")({
   component: AdminCustomersListPage,
@@ -47,6 +52,11 @@ function AdminCustomersListPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
+  const [birthDate, setBirthDate] = useState<string | null>(null);
+  const [cooperationStartDate, setCooperationStartDate] = useState<string | null>(null);
+  const [telegramChatId, setTelegramChatId] = useState("");
+  const [address, setAddress] = useState("");
+  const [description, setDescription] = useState("");
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin", "customers", searchTerm],
@@ -57,7 +67,17 @@ function AdminCustomersListPage() {
   });
 
   const createCustomerMutation = useMutation({
-    mutationFn: (newCustomer: { name: string; email?: string; phone?: string; company?: string }) =>
+    mutationFn: (newCustomer: {
+      name: string;
+      email?: string;
+      phone?: string;
+      company?: string;
+      birthDate?: string;
+      cooperationStartDate?: string;
+      telegramChatId?: string;
+      address?: string;
+      description?: string;
+    }) =>
       apiClient("/customers", {
         method: "POST",
         body: JSON.stringify(newCustomer),
@@ -70,6 +90,11 @@ function AdminCustomersListPage() {
       setEmail("");
       setPhone("");
       setCompany("");
+      setBirthDate(null);
+      setCooperationStartDate(null);
+      setTelegramChatId("");
+      setAddress("");
+      setDescription("");
     },
     onError: (err: any) => {
       toast.error(err.message || "خطا در ایجاد مشتری");
@@ -124,6 +149,11 @@ function AdminCustomersListPage() {
       email: email || undefined,
       phone: cleanPhone,
       company: company || undefined,
+      birthDate: birthDate || undefined,
+      cooperationStartDate: cooperationStartDate || undefined,
+      telegramChatId: telegramChatId ? telegramChatId.trim() : undefined,
+      address: address ? address.trim() : undefined,
+      description: description ? description.trim() : undefined,
     });
   };
 
@@ -180,23 +210,23 @@ function AdminCustomersListPage() {
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-6 animate-entrance">
+      <div className="flex flex-col gap-8 animate-entrance">
         {/* Page Title & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/30">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border/30">
           <div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
               مدیریت مشتریان و سازمان‌ها
             </h1>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
               مشاهده پرونده، سرویس‌های زیرساخت و دسترسی مشترکین حقیقی و حقوقی
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               بروزرسانی
@@ -204,7 +234,7 @@ function AdminCustomersListPage() {
             <Button
               size="sm"
               onClick={() => setIsCreateOpen(true)}
-              className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
+              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               مشتری جدید
@@ -215,7 +245,7 @@ function AdminCustomersListPage() {
         {/* Modal / Create Customer (Portal to Body for 100% viewport centering) */}
         {isCreateOpen && typeof document !== "undefined" && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-lg rounded-2xl border border-border/60 bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-border/40">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -233,8 +263,8 @@ function AdminCustomersListPage() {
                 </Button>
               </div>
 
-              <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4 mt-4 text-xs">
-                <div className="space-y-1.5">
+              <form onSubmit={handleCreateSubmit} className="flex flex-col gap-5 mt-5 text-xs">
+                <div className="space-y-2">
                   <Label htmlFor="cname" className="text-xs font-semibold text-foreground/80">
                     نام و نام خانوادگی / مسئول *
                   </Label>
@@ -243,12 +273,12 @@ function AdminCustomersListPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="مثال: علیرضا پارسا"
-                    className="rounded-xl border-border/60 bg-background/50 h-9 text-xs"
+                    className="rounded-xl border-border/60 bg-background/50 h-10 text-xs"
                     required
                   />
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <Label htmlFor="ccomp" className="text-xs font-semibold text-foreground/80">
                     نام شرکت / سازمان یا برند
                   </Label>
@@ -257,12 +287,12 @@ function AdminCustomersListPage() {
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
                     placeholder="مثال: شرکت نوآوران داده گستر"
-                    className="rounded-xl border-border/60 bg-background/50 h-9 text-xs"
+                    className="rounded-xl border-border/60 bg-background/50 h-10 text-xs"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <Label htmlFor="cphone" className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                       شماره موبایل (جهت ورود مشترک با OTP) *
                     </Label>
@@ -272,11 +302,11 @@ function AdminCustomersListPage() {
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="09121112233"
                       dir="ltr"
-                      className="font-mono rounded-xl border-border/60 bg-background/50 h-9 text-xs text-center"
+                      className="font-mono rounded-xl border-border/60 bg-background/50 h-10 text-xs text-center"
                       required
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <Label htmlFor="cemail" className="text-xs font-semibold text-foreground/80">
                       پست الکترونیک (ایمیل)
                     </Label>
@@ -287,17 +317,87 @@ function AdminCustomersListPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="info@company.com"
                       dir="ltr"
-                      className="font-mono rounded-xl border-border/60 bg-background/50 h-9 text-xs"
+                      className="font-mono rounded-xl border-border/60 bg-background/50 h-10 text-xs"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-4 border-t border-border/40 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-foreground/80">
+                      تاریخ تولد
+                    </Label>
+                    <JalaliDatePicker
+                      value={birthDate}
+                      onChange={(val) => setBirthDate(val)}
+                      placeholder="انتخاب تاریخ تولد..."
+                      minYear={1300}
+                      className="h-10 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-foreground/80">
+                      تاریخ شروع همکاری
+                    </Label>
+                    <JalaliDatePicker
+                      value={cooperationStartDate}
+                      onChange={(val) => setCooperationStartDate(val)}
+                      placeholder="انتخاب تاریخ شروع همکاری..."
+                      className="h-10 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ctelegram" className="text-xs font-semibold text-foreground/80">
+                    شناسه / آیدی تلگرام (Chat ID یا Username)
+                  </Label>
+                  <div className="relative">
+                    <Send className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
+                    <Input
+                      id="ctelegram"
+                      value={telegramChatId}
+                      onChange={(e) => setTelegramChatId(e.target.value)}
+                      placeholder="@username یا 123456789"
+                      dir="ltr"
+                      className="font-mono pl-9 rounded-xl border-border/60 bg-background/50 h-10 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="caddress" className="text-xs font-semibold text-foreground/80">
+                    نشانی / آدرس پستی
+                  </Label>
+                  <Input
+                    id="caddress"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="مثال: تهران، خیابان ولیعصر، پلاک ..."
+                    className="rounded-xl border-border/60 bg-background/50 h-10 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cdesc" className="text-xs font-semibold text-foreground/80">
+                    توضیحات و یادداشت مشتری
+                  </Label>
+                  <textarea
+                    id="cdesc"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="توضیحات تکمیلی، شرایط خاص قرارداد یا یادداشت‌های داخلی..."
+                    rows={2}
+                    className="w-full rounded-xl border border-border/60 bg-background/50 p-3 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/40 mt-2">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="rounded-xl text-xs"
+                    className="rounded-xl text-xs h-9 px-4"
                     onClick={() => setIsCreateOpen(false)}
                   >
                     انصراف
@@ -306,7 +406,7 @@ function AdminCustomersListPage() {
                     type="submit"
                     size="sm"
                     disabled={createCustomerMutation.isPending}
-                    className="rounded-xl text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-xs"
+                    className="rounded-xl text-xs h-9 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-xs"
                   >
                     {createCustomerMutation.isPending ? "در حال ثبت..." : "ثبت مشتری"}
                   </Button>
@@ -364,7 +464,7 @@ function AdminCustomersListPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {paginatedList.map((customer: any) => {
               const nearestService = getNearestExpiringService(customer.services);
               const servicesCount = customer.services?.length ?? customer._count?.services ?? 0;
@@ -373,7 +473,7 @@ function AdminCustomersListPage() {
               return (
                 <div
                   key={customer.id}
-                  className={`relative rounded-2xl border p-5 shadow-xs transition-all flex flex-col justify-between group overflow-hidden ${
+                  className={`relative rounded-2xl border p-6 shadow-xs transition-all flex flex-col justify-between group overflow-hidden ${
                     customer.status === "INACTIVE"
                       ? "border-rose-500/30 bg-rose-500/[0.02]"
                       : "border-border/50 bg-card/40 backdrop-blur-xs hover:border-emerald-500/30 hover:shadow-md"
@@ -387,20 +487,20 @@ function AdminCustomersListPage() {
                     }
                   >
                     {/* Header: Name & Status */}
-                    <div className="flex items-start justify-between gap-3 pb-3 border-b border-border/30">
+                    <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-border/30">
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-foreground group-hover:text-emerald-500 transition-colors">
                           {customer.name}
                         </span>
                         {(customer.displayName || customer.company) && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Building className="h-3 w-3 opacity-60 shrink-0" />
+                          <span className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
+                            <Building className="h-3.5 w-3.5 opacity-60 shrink-0" />
                             {customer.displayName || customer.company}
                           </span>
                         )}
                       </div>
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-bold border shrink-0 ${
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-bold border shrink-0 ${
                           customer.status === "ACTIVE"
                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                             : customer.status === "INACTIVE"
@@ -409,9 +509,9 @@ function AdminCustomersListPage() {
                         }`}
                       >
                         {customer.status === "ACTIVE" ? (
-                          <CheckCircle className="h-3 w-3" />
+                          <CheckCircle className="h-3.5 w-3.5" />
                         ) : (
-                          <Ban className="h-3 w-3" />
+                          <Ban className="h-3.5 w-3.5" />
                         )}
                         {customer.status === "ACTIVE"
                           ? "فعال"
@@ -422,7 +522,7 @@ function AdminCustomersListPage() {
                     </div>
 
                     {/* Contact details */}
-                    <div className="flex flex-col gap-1.5 py-3 text-xs text-muted-foreground">
+                    <div className="flex flex-col gap-2 py-3.5 text-xs text-muted-foreground">
                       {customer.phone && (
                         <div className="flex items-center justify-between">
                           <span className="text-[11px]">شماره تماس:</span>
@@ -431,11 +531,28 @@ function AdminCustomersListPage() {
                           </span>
                         </div>
                       )}
+                      {customer.telegramChatId && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px]">تلگرام:</span>
+                          <span className="font-mono text-[11px] text-sky-600 dark:text-sky-400 dir-ltr flex items-center gap-1.5">
+                            <Send className="h-3 w-3" />
+                            {customer.telegramChatId}
+                          </span>
+                        </div>
+                      )}
                       {customer.email && (
                         <div className="flex items-center justify-between">
                           <span className="text-[11px]">ایمیل:</span>
                           <span className="font-mono text-[11px] text-foreground dir-ltr">
                             {customer.email}
+                          </span>
+                        </div>
+                      )}
+                      {customer.cooperationStartDate && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px]">شروع همکاری:</span>
+                          <span className="text-[11px] text-foreground font-mono">
+                            {formatJalaliDate(customer.cooperationStartDate)}
                           </span>
                         </div>
                       )}
@@ -448,7 +565,7 @@ function AdminCustomersListPage() {
                     </div>
 
                     {/* Status Summary Counts */}
-                    <div className="grid grid-cols-2 gap-2 my-2 py-2 px-3 rounded-xl bg-muted/20 border border-border/20 text-center">
+                    <div className="grid grid-cols-2 gap-3 my-3 py-2.5 px-4 rounded-xl bg-muted/20 border border-border/20 text-center">
                       <div>
                         <div className="text-[10px] text-muted-foreground">سرویس‌های فعال</div>
                         <div className="text-sm font-bold text-foreground font-mono mt-0.5">
@@ -464,20 +581,20 @@ function AdminCustomersListPage() {
                     </div>
 
                     {/* Nearest Expiring Service Section */}
-                    <div className="mt-3 p-3 rounded-xl bg-card/60 border border-border/40 text-xs">
-                      <div className="flex items-center justify-between text-[11px] mb-1.5">
-                        <span className="text-muted-foreground flex items-center gap-1 font-medium">
+                    <div className="mt-3.5 p-3.5 rounded-xl bg-card/60 border border-border/40 text-xs">
+                      <div className="flex items-center justify-between text-[11px] mb-2">
+                        <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
                           <Clock className="h-3.5 w-3.5 text-amber-500" />
                           نزدیک‌ترین سرویس به انقضا:
                         </span>
                       </div>
                       {nearestService ? (
-                        <div className="flex items-center justify-between gap-2 mt-1">
+                        <div className="flex items-center justify-between gap-2.5 mt-1">
                           <span className="font-semibold text-xs text-foreground truncate">
                             {nearestService.name}
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 border ${
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold shrink-0 border ${
                               nearestService.daysLeft <= 7
                                 ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
                                 : nearestService.daysLeft <= 15
@@ -509,7 +626,7 @@ function AdminCustomersListPage() {
                   )}
 
                   {/* Action Buttons: Profile + Deactivate/Activate */}
-                  <div className="relative z-30 mt-4 pt-3 border-t border-border/30 flex items-center gap-2">
+                  <div className="relative z-30 mt-4 pt-3.5 border-t border-border/30 flex items-center gap-2.5">
                     <Link
                       to="/customers/$id"
                       params={{ id: customer.id }}
@@ -517,7 +634,7 @@ function AdminCustomersListPage() {
                     >
                       <Button
                         variant="outline"
-                        className="w-full h-9 rounded-xl text-xs font-semibold gap-1.5 border-border/60 hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all cursor-pointer"
+                        className="w-full h-9 rounded-xl text-xs font-semibold gap-2 border-border/60 hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all cursor-pointer"
                       >
                         <User className="h-3.5 w-3.5" />
                         پروفایل

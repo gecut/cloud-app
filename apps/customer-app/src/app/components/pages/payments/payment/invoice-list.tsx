@@ -5,9 +5,21 @@ export interface InvoiceListProps {
   data: Payments[];
   onPay?: (invoice: Payments) => void;
   payingId?: string | null;
+  onCancel?: (invoice: Payments) => void;
+  cancellingId?: string | null;
+  onReactivate?: (invoice: Payments) => void;
+  reactivatingId?: string | null;
 }
 
-export function InvoiceList({ data, onPay, payingId }: InvoiceListProps) {
+export function InvoiceList({
+  data,
+  onPay,
+  payingId,
+  onCancel,
+  cancellingId,
+  onReactivate,
+  reactivatingId,
+}: InvoiceListProps) {
   if (!data || data.length === 0) {
     return (
       <div className="w-full flex flex-col items-center justify-center p-12 rounded-[24px] bg-surface/50 border border-dashed border-border/40 text-center gap-3">
@@ -35,6 +47,10 @@ export function InvoiceList({ data, onPay, payingId }: InvoiceListProps) {
             key={payment.id || `${payment.title}-${payment.factorNumber}`}
             onPay={onPay}
             isPaying={payingId === payment.id}
+            onCancel={onCancel}
+            isCancelling={cancellingId === payment.id}
+            onReactivate={onReactivate}
+            isReactivating={reactivatingId === payment.id}
           />
         );
       })}

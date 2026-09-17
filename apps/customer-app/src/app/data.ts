@@ -31,6 +31,12 @@ export type Subscription = {
   remainedVolume: number;
   buyData: Date;
   price: number;
+  startDate?: Date;
+  purchaseDate?: Date;
+  renewalDate?: Date;
+  createdAt?: Date;
+  trackingType?: "HYBRID" | "TIME" | "QUANTITY";
+  billingCycle?: string;
 };
 export type Payments = {
   id?: string;
