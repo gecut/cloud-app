@@ -10,6 +10,8 @@ RUN apk add --no-cache libc6-compat openssl
 FROM base AS builder
 WORKDIR /app
 
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gecut_cloud"
+
 # Copy monorepo configuration
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json tsconfig.json ./
 COPY packages ./packages
