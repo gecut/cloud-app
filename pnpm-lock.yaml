@@ -245,9 +245,6 @@ importers:
       '@gecut-cloud/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@gecut-cloud/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@gecut-cloud/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -344,28 +341,6 @@ importers:
 
   packages/contracts:
     dependencies:
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.6
-    devDependencies:
-      '@gecut-cloud/config':
-        specifier: workspace:*
-        version: link:../config
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-
-  packages/core:
-    dependencies:
-      '@gecut-cloud/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@gecut-cloud/db':
-        specifier: workspace:*
-        version: link:../db
-      '@gecut-cloud/env':
-        specifier: workspace:*
-        version: link:../env
       zod:
         specifier: 'catalog:'
         version: 4.3.6
