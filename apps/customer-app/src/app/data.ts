@@ -1,4 +1,4 @@
-export type ServiceType = "SERVER" | "DOMAIN" | "SERVICE" | "PACKAGE";
+export type ServiceType = "SERVER" | "DOMAIN" | "SERVICE" | "PACKAGE" | "OTHER" | string;
 
 export type Service = {
   id: string;
@@ -17,6 +17,7 @@ export type Service = {
   remainedQuantity?: number;
   billingCycle?: string;
   autoRenew?: boolean;
+  paymentStatus?: "PAID" | "UNPAID";
   serviceType: {
     id: string;
     name: string;

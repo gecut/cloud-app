@@ -28,6 +28,8 @@ import {
   Cpu,
   Package,
   AlertTriangle,
+  Lock,
+  Building2,
 } from "lucide-react";
 import { formatInvoiceNumber } from "@/utils/format";
 import { InvoiceDetailModal } from "@/components/invoices/invoice-detail-modal";
@@ -36,36 +38,36 @@ export const Route = createFileRoute("/invoices/")({
   component: AdminInvoicesListPage,
 });
 
-function getCategoryBadge(slug?: string) {
-  const s = slug?.toLowerCase() || "";
+function getCategoryBadge(slug?: string, name?: string) {
+  const s = `${slug || ""} ${name || ""}`.toLowerCase();
   if (s.includes("domain") || s.includes("دامنه")) {
     return {
       icon: Globe,
       className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
     };
   }
-  if (s.includes("server") || s.includes("سرور") || s.includes("vps")) {
+  if (s.includes("server") || s.includes("سرور") || s.includes("vps") || s.includes("اختصاصی")) {
     return {
       icon: Server,
       className: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
     };
   }
-  if (s.includes("host") || s.includes("هاست")) {
+  if (s.includes("package") || s.includes("بسته") || s.includes("پکیج") || s.includes("تعدادی")) {
     return {
-      icon: HardDrive,
-      className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+      icon: Package,
+      className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
     };
   }
-  if (s.includes("api") || s.includes("وب") || s.includes("هوش")) {
+  if (s.includes("api") || s.includes("وب‌سرویس") || s.includes("وب سرویس") || s.includes("هوش")) {
     return {
       icon: Cpu,
       className: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
     };
   }
-  if (s.includes("package") || s.includes("بسته") || s.includes("پکیج")) {
+  if (s.includes("host") || s.includes("هاست") || s.includes("میزبانی") || s.includes("cloud")) {
     return {
-      icon: Package,
-      className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      icon: HardDrive,
+      className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     };
   }
   return {
@@ -74,26 +76,54 @@ function getCategoryBadge(slug?: string) {
   };
 }
 
-function getInvoiceCategoryInfo(inv: any, categories: any[] = []): { id: string; name: string; slug: string } {
-  const item = inv.items?.[0];
-  const service = item?.service;
-  const serviceType = service?.serviceType;
+function getInvoiceCategoryInfo(
+  inv: any,
+  rawCategories: any = [],
+  rawServices: any = [],
+): { id: string; name: string; slug: string } {
+  const categories: any[] = Array.isArray(rawCategories)
+    ? rawCategories
+    : Array.isArray(rawCategories?.items)
+    ? rawCategories.items
+    : [];
+  const services: any[] = Array.isArray(rawServices)
+    ? rawServices
+    : Array.isArray(rawServices?.items)
+    ? rawServices.items
+    : [];
 
-  // 1. Direct relation from service
+  const item = inv?.items?.[0];
+  const serviceId = item?.serviceId || item?.service?.id;
+
+  // 1. Direct relation from item.service or match by serviceId
+  let service = item?.service || (serviceId ? services.find((s) => s.id === serviceId) : null);
+
+  // 1b. If no direct service by ID, search among services matching text
+  if (!service && services.length > 0) {
+    const text = `${item?.title || ""} ${inv?.notes || ""} ${item?.description || ""} ${item?.serviceNameSnapshot || ""}`.toLowerCase();
+    const custServices = services.filter((s) => s.customerId === inv?.customerId);
+    const candidateServices = custServices.length > 0 ? custServices : services;
+    for (const s of candidateServices) {
+      if (s.name && s.name.trim().length > 1 && text.includes(s.name.toLowerCase())) {
+        service = s;
+        break;
+      }
+    }
+  }
+
+  // 2. Resolve serviceType from service
+  const serviceType =
+    service?.serviceType ||
+    (service?.serviceTypeId
+      ? categories.find((c) => c.id === service.serviceTypeId)
+      : null);
+
   if (serviceType?.id) {
     return {
       id: serviceType.id,
-      name: serviceType.name || "سرویس ابری",
+      name: serviceType.name || service?.name || "سرویس",
       slug: serviceType.slug || "hosting",
     };
-  }
-
-  // 2. Check serviceTypeId on service
-  if (service?.serviceTypeId) {
-    const matched = categories.find((c) => c.id === service.serviceTypeId);
-    if (matched) {
-      return { id: matched.id, name: matched.name, slug: matched.slug };
-    }
   }
 
   // 3. Check serviceTypeSnapshot on item
@@ -101,51 +131,88 @@ function getInvoiceCategoryInfo(inv: any, categories: any[] = []): { id: string;
   if (snapshot) {
     const matched = categories.find(
       (c) =>
-        c.name.toLowerCase() === snapshot.toLowerCase() ||
-        c.slug.toLowerCase() === snapshot.toLowerCase(),
+        c.name?.toLowerCase() === snapshot.toLowerCase() ||
+        c.slug?.toLowerCase() === snapshot.toLowerCase() ||
+        c.id === snapshot,
     );
     if (matched) {
       return { id: matched.id, name: matched.name, slug: matched.slug };
     }
+    const snapUpper = snapshot.toUpperCase();
+    if (snapUpper.includes("SERVER") || snapUpper.includes("DEDICATED") || snapUpper.includes("VPS")) {
+      const serverCat = categories.find((c) => c.slug?.includes("server") || c.name?.includes("سرور"));
+      return serverCat
+        ? { id: serverCat.id, name: serverCat.name, slug: serverCat.slug }
+        : { id: "server", name: "سرور اختصاصی و VPS", slug: "server" };
+    }
+    if (snapUpper.includes("HOSTING") || snapUpper.includes("CLOUD")) {
+      const hostCat = categories.find((c) => c.slug?.includes("host") || c.name?.includes("هاست"));
+      return hostCat
+        ? { id: hostCat.id, name: hostCat.name, slug: hostCat.slug }
+        : { id: "hosting", name: "هاست و فضای ابری", slug: "hosting" };
+    }
+    if (snapUpper.includes("DOMAIN")) {
+      const domCat = categories.find((c) => c.slug?.includes("domain") || c.name?.includes("دامنه"));
+      return domCat
+        ? { id: domCat.id, name: domCat.name, slug: domCat.slug }
+        : { id: "domain", name: "ثبت و تمدید دامنه", slug: "domain" };
+    }
+    if (snapUpper.includes("API")) {
+      const apiCat = categories.find((c) => c.slug?.includes("api") || c.name?.includes("وب"));
+      return apiCat
+        ? { id: apiCat.id, name: apiCat.name, slug: apiCat.slug }
+        : { id: "api", name: "وب‌سرویس و API", slug: "api" };
+    }
+    if (snapUpper.includes("PACKAGE")) {
+      const pkgCat = categories.find((c) => c.slug?.includes("package") || c.name?.includes("بسته"));
+      return pkgCat
+        ? { id: pkgCat.id, name: pkgCat.name, slug: pkgCat.slug }
+        : { id: "package", name: "بسته‌ها و پکیج‌ها", slug: "package" };
+    }
+    return {
+      id: snapshot,
+      name: snapshot,
+      slug: snapshot.toLowerCase().replace(/\s+/g, "-"),
+    };
   }
 
   // 4. Text-based matching against all categories
-  const text = `${item?.title || ""} ${inv.notes || ""} ${item?.description || ""} ${item?.serviceNameSnapshot || ""} ${snapshot}`.toLowerCase();
+  const fullText = `${item?.title || ""} ${inv?.notes || ""} ${item?.description || ""} ${item?.serviceNameSnapshot || ""}`.toLowerCase();
 
   for (const cat of categories) {
     const cName = (cat.name || "").toLowerCase();
     const cSlug = (cat.slug || "").toLowerCase();
-    if (cName && text.includes(cName)) {
+    if (cName && fullText.includes(cName)) {
       return { id: cat.id, name: cat.name, slug: cat.slug };
     }
-    if (cSlug && text.includes(cSlug)) {
+    if (cSlug && !cSlug.startsWith("cat-") && fullText.includes(cSlug)) {
       return { id: cat.id, name: cat.name, slug: cat.slug };
     }
   }
 
   // 5. Keyword heuristics
-  if (text.includes("دامنه") || text.includes("domain") || /\.(ir|com|org|net|co|site|online|io|xyz|info)\b/i.test(text)) {
+  if (fullText.includes("دامنه") || fullText.includes("domain") || /\.(ir|com|org|net|co|site|online|io|xyz|info)\b/i.test(fullText)) {
     const domainCat = categories.find((c) => c.slug?.includes("domain") || c.name?.includes("دامنه"));
     return domainCat
       ? { id: domainCat.id, name: domainCat.name, slug: domainCat.slug }
       : { id: "domain", name: "دامنه", slug: "domain" };
   }
 
-  if (text.includes("سرور") || text.includes("server") || text.includes("vps") || text.includes("اختصاصی") || text.includes("مجازی")) {
+  if (fullText.includes("سرور") || fullText.includes("server") || fullText.includes("vps") || fullText.includes("اختصاصی") || fullText.includes("مجازی")) {
     const serverCat = categories.find((c) => c.slug?.includes("server") || c.name?.includes("سرور") || c.slug?.includes("vps"));
     return serverCat
       ? { id: serverCat.id, name: serverCat.name, slug: serverCat.slug }
       : { id: "server", name: "سرور", slug: "server" };
   }
 
-  if (text.includes("بسته") || text.includes("پکیج") || text.includes("package") || (item?.quantity && item.quantity > 1)) {
-    const pkgCat = categories.find((c) => c.slug?.includes("package") || c.name?.includes("بسته") || c.name?.includes("پکیج"));
+  if (fullText.includes("بسته") || fullText.includes("پکیج") || fullText.includes("package") || fullText.includes("تعدادی") || (item?.quantity && item.quantity > 1)) {
+    const pkgCat = categories.find((c) => c.slug?.includes("package") || c.name?.includes("بسته") || c.name?.includes("پکیج") || c.name?.includes("تعدادی"));
     return pkgCat
       ? { id: pkgCat.id, name: pkgCat.name, slug: pkgCat.slug }
       : { id: "package", name: "بسته‌ها و پکیج‌ها", slug: "package" };
   }
 
-  if (text.includes("api") || text.includes("وب‌سرویس") || text.includes("وب سرویس")) {
+  if (fullText.includes("api") || fullText.includes("وب‌سرویس") || fullText.includes("وب سرویس")) {
     const apiCat = categories.find((c) => c.slug?.includes("api") || c.name?.includes("وب"));
     return apiCat
       ? { id: apiCat.id, name: apiCat.name, slug: apiCat.slug }
@@ -164,13 +231,20 @@ function AdminInvoicesListPage() {
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [counterpartyFilter, setCounterpartyFilter] = useState<"ALL" | "CUSTOMER" | "SUPPLIER">("ALL");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "category" | "amount-desc" | "amount-asc" | "due-asc">("newest");
   const [page, setPage] = useState<number>(1);
   const PAGE_LIMIT = 30;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   // Form states
+  const [counterpartyType, setCounterpartyType] = useState<"CUSTOMER" | "SUPPLIER">("CUSTOMER");
   const [customerId, setCustomerId] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [selectedSupplierServiceId, setSelectedSupplierServiceId] = useState<string>("");
+  const [isCreatingNewSupplierService, setIsCreatingNewSupplierService] = useState<boolean>(false);
+  const [newSupplierServiceName, setNewSupplierServiceName] = useState<string>("");
+  const [newSupplierServiceType, setNewSupplierServiceType] = useState<string>("SERVER");
   const [itemTitle, setItemTitle] = useState("");
   const [amountToman, setAmountToman] = useState<number>(2500000);
   const [dueDays, setDueDays] = useState<number>(7);
@@ -198,10 +272,59 @@ function AdminInvoicesListPage() {
     queryFn: () => apiClient<{ items: any[] }>("/customers?limit=100"),
   });
 
-  const { data: categories = [] } = useQuery<any[]>({
-    queryKey: ["admin", "service-categories"],
-    queryFn: () => apiClient("/services/categories"),
+  const { data: suppliersData } = useQuery({
+    queryKey: ["admin", "suppliers"],
+    queryFn: () => apiClient<{ items: any[]; total: number }>("/suppliers?limit=100"),
   });
+
+  const suppliers = useMemo(() => {
+    if (Array.isArray(suppliersData)) return suppliersData;
+    return suppliersData?.items || [];
+  }, [suppliersData]);
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ["admin", "service-categories"],
+    queryFn: () => apiClient<{ items: any[]; total: number }>("/categories"),
+  });
+
+  const categories = useMemo(() => {
+    if (Array.isArray(categoriesData)) return categoriesData;
+    return categoriesData?.items || [];
+  }, [categoriesData]);
+
+  useEffect(() => {
+    if (categories.length > 0) {
+      if (
+        !newSupplierServiceType ||
+        newSupplierServiceType === "SERVER" ||
+        !categories.some(
+          (c: any) => c.slug === newSupplierServiceType || c.id === newSupplierServiceType,
+        )
+      ) {
+        setNewSupplierServiceType(categories[0].slug || categories[0].id);
+      }
+    }
+  }, [categories, newSupplierServiceType]);
+
+  const { data: servicesData } = useQuery({
+    queryKey: ["admin", "services"],
+    queryFn: () => apiClient<{ items: any[]; total: number }>("/services?limit=200"),
+  });
+
+  const services = useMemo(() => {
+    if (Array.isArray(servicesData)) return servicesData;
+    return servicesData?.items || [];
+  }, [servicesData]);
+
+  const { data: supplierServicesData } = useQuery({
+    queryKey: ["admin", "suppliers", "services"],
+    queryFn: () => apiClient<{ items: any[]; total: number }>("/suppliers/services?limit=200"),
+  });
+
+  const supplierServices = useMemo(() => {
+    if (Array.isArray(supplierServicesData)) return supplierServicesData;
+    return supplierServicesData?.items || [];
+  }, [supplierServicesData]);
 
   const customerOptions = customersData?.items || [];
 
@@ -210,6 +333,12 @@ function AdminInvoicesListPage() {
       setCustomerId(customerOptions[0].id);
     }
   }, [customerOptions, customerId]);
+
+  useEffect(() => {
+    if (suppliers.length > 0 && (!supplierId || !suppliers.some((s: any) => s.id === supplierId))) {
+      setSupplierId(suppliers[0].id);
+    }
+  }, [suppliers, supplierId]);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin", "invoices"],
@@ -228,6 +357,7 @@ function AdminInvoicesListPage() {
     onSuccess: () => {
       toast.success("فاکتور جدید با موفقیت صادر شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
       setIsCreateOpen(false);
       setItemTitle("");
@@ -287,7 +417,7 @@ function AdminInvoicesListPage() {
     },
   });
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!itemTitle.trim()) {
       toast.error("عنوان ردیف فاکتور الزامی است");
@@ -296,17 +426,57 @@ function AdminInvoicesListPage() {
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + Number(dueDays));
 
-    createInvoiceMutation.mutate({
-      customerId,
+    let effectiveServiceId = selectedSupplierServiceId;
+    const effectiveSupplierId = supplierId || suppliers[0]?.id;
+
+    if (counterpartyType === "SUPPLIER") {
+      if (!effectiveSupplierId) {
+        toast.error("تامین‌کننده‌ای یافت نشد. لطفاً ابتدا در بخش تامین‌کنندگان یک تامین‌کننده تعریف نمایید");
+        return;
+      }
+      if (isCreatingNewSupplierService && newSupplierServiceName.trim()) {
+        try {
+          const newSvc = await apiClient<{ id: string }>("/suppliers/services", {
+            method: "POST",
+            body: JSON.stringify({
+              supplierId: effectiveSupplierId,
+              name: newSupplierServiceName.trim(),
+              type: newSupplierServiceType,
+              priceToman: Number(amountToman),
+              monthlyExpenseToman: Number(amountToman),
+            }),
+          });
+          effectiveServiceId = newSvc.id;
+          queryClient.invalidateQueries({ queryKey: ["admin", "suppliers", "services"] });
+          queryClient.invalidateQueries({ queryKey: ["admin", "suppliers"] });
+        } catch (err: any) {
+          toast.error("خطا در ایجاد سرویس جدید تامین‌کننده");
+          return;
+        }
+      }
+    } else {
+      if (!customerId) {
+        toast.error("لطفاً مشتری را انتخاب نمایید");
+        return;
+      }
+    }
+
+    const payload: any = {
       dueDate: dueDate.toISOString(),
+      counterpartyType,
+      supplierId: counterpartyType === "SUPPLIER" ? effectiveSupplierId : undefined,
+      customerId: counterpartyType === "CUSTOMER" ? customerId : undefined,
       items: [
         {
           title: itemTitle,
           unitPriceToman: Number(amountToman),
           quantity: 1,
+          serviceId: effectiveServiceId && effectiveServiceId !== "custom" && effectiveServiceId !== "new" ? effectiveServiceId : undefined,
         },
       ],
-    });
+    };
+
+    createInvoiceMutation.mutate(payload);
   };
 
   const handleOpenEdit = (inv: any) => {
@@ -344,6 +514,7 @@ function AdminInvoicesListPage() {
             title: editTitle,
             unitPriceToman: Number(editAmount),
             quantity: 1,
+            ...(editingInvoice.items?.[0]?.serviceId ? { serviceId: editingInvoice.items[0].serviceId } : {}),
           },
         ],
       },
@@ -380,16 +551,17 @@ function AdminInvoicesListPage() {
     const list: Array<{ id: string; label: string; icon: any; count: number }> = [
       { id: "ALL", label: "همه موضوعات", icon: Layers, count: nonCancelledInvoices.length },
     ];
-    if (categories && categories.length > 0) {
-      for (const c of categories) {
+    const catList = Array.isArray(categories) ? categories : [];
+    if (catList.length > 0) {
+      for (const c of catList) {
         const cCount = nonCancelledInvoices.filter((inv: any) => {
-          const info = getInvoiceCategoryInfo(inv, categories);
+          const info = getInvoiceCategoryInfo(inv, catList, services);
           return info.id === c.id || info.slug === c.slug;
         }).length;
         list.push({
           id: c.id,
           label: c.name,
-          icon: getCategoryBadge(c.slug).icon,
+          icon: getCategoryBadge(c.slug, c.name).icon,
           count: cCount,
         });
       }
@@ -402,21 +574,27 @@ function AdminInvoicesListPage() {
         { id: "package", label: "بسته‌ها و پکیج‌ها", slug: "package" },
       ]) {
         const cCount = nonCancelledInvoices.filter((inv: any) => {
-          const info = getInvoiceCategoryInfo(inv, categories);
+          const info = getInvoiceCategoryInfo(inv, categories, services);
           return info.slug === fallback.slug || info.id === fallback.id;
         }).length;
         list.push({
           id: fallback.id,
           label: fallback.label,
-          icon: getCategoryBadge(fallback.slug).icon,
+          icon: getCategoryBadge(fallback.slug, fallback.label).icon,
           count: cCount,
         });
       }
     }
     return list;
-  }, [categories, nonCancelledInvoices]);
+  }, [categories, services, nonCancelledInvoices]);
 
   const filteredList = invoicesList.filter((inv: any) => {
+    if (counterpartyFilter === "CUSTOMER") {
+      if (inv.supplierId || inv.counterpartyType === "SUPPLIER") return false;
+    } else if (counterpartyFilter === "SUPPLIER") {
+      if (!inv.supplierId && inv.counterpartyType !== "SUPPLIER") return false;
+    }
+
     if (selectedStatus === "OVERDUE") {
       if (inv.status !== "UNPAID" || !inv.dueDate || new Date(inv.dueDate).getTime() >= Date.now()) return false;
     } else if (selectedStatus === "CANCELLED") {
@@ -428,7 +606,7 @@ function AdminInvoicesListPage() {
     if (selectedCategory !== "ALL") {
       // In category views, cancelled invoices are NEVER shown (they go to "لغو شده")
       if (inv.status === "CANCELLED") return false;
-      const catInfo = getInvoiceCategoryInfo(inv, categories);
+      const catInfo = getInvoiceCategoryInfo(inv, categories, services);
       if (catInfo.id !== selectedCategory && catInfo.slug !== selectedCategory) return false;
     } else {
       // In ALL categories, if selectedStatus is "ALL", exclude CANCELLED invoices so they strictly go to "لغو شده"
@@ -444,8 +622,8 @@ function AdminInvoicesListPage() {
       return new Date(a.issuedAt || a.createdAt || 0).getTime() - new Date(b.issuedAt || b.createdAt || 0).getTime();
     }
     if (sortBy === "category") {
-      const catA = getInvoiceCategoryInfo(a, categories).name;
-      const catB = getInvoiceCategoryInfo(b, categories).name;
+      const catA = getInvoiceCategoryInfo(a, categories, services).name;
+      const catB = getInvoiceCategoryInfo(b, categories, services).name;
       const cmp = catA.localeCompare(catB, "fa");
       if (cmp !== 0) return cmp;
       return new Date(b.issuedAt || b.createdAt || 0).getTime() - new Date(a.issuedAt || a.createdAt || 0).getTime();
@@ -488,8 +666,16 @@ function AdminInvoicesListPage() {
             </Button>
             <Button
               size="sm"
-              onClick={() => setIsCreateOpen(true)}
-              className="gap-2 px-4 h-9"
+              onClick={() => {
+                if (!supplierId && suppliers.length > 0) {
+                  setSupplierId(suppliers[0].id);
+                }
+                if (!customerId && customerOptions.length > 0) {
+                  setCustomerId(customerOptions[0].id);
+                }
+                setIsCreateOpen(true);
+              }}
+              className="gap-2 px-4 h-9 cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               صدور فاکتور جدید
@@ -643,23 +829,186 @@ function AdminInvoicesListPage() {
               </div>
 
               <form onSubmit={handleCreateSubmit} className="flex flex-col gap-5 mt-5">
+                {/* Counterparty Type Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="icust" className="text-xs font-semibold">
-                    مشتری صورت‌حساب *
-                  </Label>
-                  <select
-                    id="icust"
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1.5 text-xs shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring"
-                  >
-                    {customerOptions.map((c: any) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.id})
-                      </option>
-                    ))}
-                  </select>
+                  <Label className="text-xs font-semibold">نوع طرف‌حساب فاکتور *</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={counterpartyType === "CUSTOMER" ? "default" : "outline"}
+                      onClick={() => setCounterpartyType("CUSTOMER")}
+                      className={`text-xs h-9 cursor-pointer rounded-xl ${
+                        counterpartyType === "CUSTOMER" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                      }`}
+                    >
+                      <User className="h-3.5 w-3.5 ml-1.5" />
+                      مشتری (فاکتور فروش)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={counterpartyType === "SUPPLIER" ? "default" : "outline"}
+                      onClick={() => {
+                        setCounterpartyType("SUPPLIER");
+                        if (!supplierId && suppliers.length > 0) {
+                          setSupplierId(suppliers[0].id);
+                        }
+                      }}
+                      className={`text-xs h-9 cursor-pointer rounded-xl ${
+                        counterpartyType === "SUPPLIER" ? "bg-purple-600 hover:bg-purple-500 text-white" : ""
+                      }`}
+                    >
+                      <Building2 className="h-3.5 w-3.5 ml-1.5" />
+                      تامین‌کننده (فاکتور خرید)
+                    </Button>
+                  </div>
                 </div>
+
+                {counterpartyType === "CUSTOMER" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="icust" className="text-xs font-semibold">
+                      مشتری صورت‌حساب *
+                    </Label>
+                    <select
+                      id="icust"
+                      value={customerId}
+                      onChange={(e) => setCustomerId(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1.5 text-xs shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring"
+                    >
+                      {customerOptions.length === 0 ? (
+                        <option value="">هیچ مشتری‌ای ثبت نشده است</option>
+                      ) : (
+                        customerOptions.map((c: any) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.id})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="isupplier" className="text-xs font-semibold">
+                        تامین‌کننده بستانکار (طرف حساب) *
+                      </Label>
+                      <select
+                        id="isupplier"
+                        value={supplierId || suppliers[0]?.id || ""}
+                        onChange={(e) => {
+                          setSupplierId(e.target.value);
+                          setSelectedSupplierServiceId("");
+                          setIsCreatingNewSupplierService(false);
+                        }}
+                        className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1.5 text-xs shadow-xs"
+                      >
+                        {suppliers.length === 0 ? (
+                          <option value="">هیچ تامین‌کننده‌ای ثبت نشده است</option>
+                        ) : (
+                          suppliers.map((s: any) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({s.contactName || s.email || s.id})
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Supplier Service Selector */}
+                    <div className="space-y-2 p-3 rounded-xl border border-purple-500/30 bg-purple-500/5">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="isupsvc" className="text-xs font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
+                          <Server className="h-3.5 w-3.5" />
+                          <span>انتخاب یا ثبت سرویس تامین‌کننده</span>
+                        </Label>
+                        <span className="text-[11px] text-muted-foreground">
+                          {supplierServices.filter((s: any) => s.supplierId === supplierId).length.toLocaleString("fa-IR")} سرویس ثبت‌شده
+                        </span>
+                      </div>
+
+                      <select
+                        id="isupsvc"
+                        value={isCreatingNewSupplierService ? "new" : selectedSupplierServiceId || "custom"}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "new") {
+                            setIsCreatingNewSupplierService(true);
+                            setSelectedSupplierServiceId("");
+                            setItemTitle(newSupplierServiceName);
+                          } else if (val === "custom") {
+                            setIsCreatingNewSupplierService(false);
+                            setSelectedSupplierServiceId("");
+                          } else {
+                            setIsCreatingNewSupplierService(false);
+                            setSelectedSupplierServiceId(val);
+                            const svc = supplierServices.find((s: any) => s.id === val);
+                            if (svc) {
+                              setItemTitle(svc.name);
+                              const p = svc.priceToman || svc.monthlyExpenseToman || 0;
+                              if (p > 0) setAmountToman(p);
+                            }
+                          }
+                        }}
+                        className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1.5 text-xs shadow-xs"
+                      >
+                        <option value="custom">-- ورود دستی شرح خدمت و هزینه --</option>
+                        {supplierServices.filter((s: any) => s.supplierId === supplierId).map((s: any) => (
+                          <option key={s.id} value={s.id}>
+                            سرویس: {s.name} ({(s.priceToman || s.monthlyExpenseToman || 0).toLocaleString("fa-IR")} تومان) - {s.type || "سرور"}
+                          </option>
+                        ))}
+                        <option value="new">+ تعریف و ثبت مستقیم سرویس جدید برای این تامین‌کننده</option>
+                      </select>
+
+                      {isCreatingNewSupplierService && (
+                        <div className="flex flex-col gap-2.5 pt-2 border-t border-purple-500/20 animate-in fade-in duration-150">
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">
+                              نام سرویس جدید تامین‌کننده *
+                            </Label>
+                            <Input
+                              value={newSupplierServiceName}
+                              onChange={(e) => {
+                                setNewSupplierServiceName(e.target.value);
+                                setItemTitle(e.target.value);
+                              }}
+                              placeholder="مثال: سرور اختصاصی آلمان AX52، هاست ابری، لایسنس cPanel..."
+                              className="h-9 text-xs"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">
+                              نوع خدمت زیرساخت
+                            </Label>
+                            <select
+                              value={newSupplierServiceType}
+                              onChange={(e) => setNewSupplierServiceType(e.target.value)}
+                              className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs"
+                            >
+                              {categories.length > 0 ? (
+                                categories.map((c: any) => (
+                                  <option key={c.id} value={c.slug || c.id}>
+                                    {c.name}
+                                  </option>
+                                ))
+                              ) : (
+                                <>
+                                  <option value="SERVER">سرور ابری / اختصاصی</option>
+                                  <option value="HOSTING">هاستینگ و میزبانی وب</option>
+                                  <option value="DOMAIN">دامنه و DNS</option>
+                                  <option value="API">وب‌سرویس و API</option>
+                                  <option value="PACKAGE">بسته مصرفی / ترافیک</option>
+                                </>
+                              )}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="ititle" className="text-xs font-semibold">
@@ -735,7 +1084,7 @@ function AdminInvoicesListPage() {
                     <FileText className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-base">ویرایش فاکتور {editingInvoice.invoiceNumber}</h3>
+                    <h3 className="font-bold text-base">ویرایش فاکتور #{formatInvoiceNumber(editingInvoice.invoiceNumber || editingInvoice.id)}</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       مشتری: {editingInvoice.customer?.name || "نامشخص"}
                     </p>
@@ -751,6 +1100,24 @@ function AdminInvoicesListPage() {
               </div>
 
               <form onSubmit={handleEditSubmit} className="flex flex-col gap-5 mt-5">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-muted-foreground">
+                      شناسه فاکتور (یکتا و ثابت)
+                    </Label>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50">
+                      <Lock className="h-3 w-3 text-amber-500" />
+                      غیرقابل تغییر
+                    </span>
+                  </div>
+                  <Input
+                    value={formatInvoiceNumber(editingInvoice.invoiceNumber || editingInvoice.id)}
+                    readOnly
+                    disabled
+                    className="h-10 text-xs font-mono font-bold bg-muted/40 text-muted-foreground cursor-not-allowed border-dashed"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="etitle" className="text-xs font-semibold">
                     شرح خدمت یا عنوان ردیف فاکتور *
@@ -766,9 +1133,16 @@ function AdminInvoicesListPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="eamount" className="text-xs font-semibold">
-                      مبلغ کل (تومان) *
-                    </Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="eamount" className="text-xs font-semibold">
+                        مبلغ کل (تومان) *
+                      </Label>
+                      {Number(editAmount) > 0 && (
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {Number(editAmount).toLocaleString("fa-IR")} تومان
+                        </span>
+                      )}
+                    </div>
                     <Input
                       id="eamount"
                       type="number"
@@ -879,8 +1253,56 @@ function AdminInvoicesListPage() {
             })}
           </div>
 
+          {/* Counterparty Filter Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/30">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <span className="text-xs text-muted-foreground font-medium ml-1">نوع طرف‌حساب:</span>
+              <Button
+                variant={counterpartyFilter === "ALL" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setCounterpartyFilter("ALL");
+                  setPage(1);
+                }}
+                className={`text-xs rounded-xl h-8 px-3 cursor-pointer ${
+                  counterpartyFilter === "ALL" ? "bg-emerald-600 text-white shadow-xs" : ""
+                }`}
+              >
+                همه فاکتورها
+              </Button>
+              <Button
+                variant={counterpartyFilter === "CUSTOMER" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setCounterpartyFilter("CUSTOMER");
+                  setPage(1);
+                }}
+                className={`text-xs rounded-xl h-8 px-3 cursor-pointer gap-1.5 ${
+                  counterpartyFilter === "CUSTOMER" ? "bg-emerald-600 text-white shadow-xs" : ""
+                }`}
+              >
+                <User className="h-3.5 w-3.5" />
+                فاکتورهای مشتریان (فروش)
+              </Button>
+              <Button
+                variant={counterpartyFilter === "SUPPLIER" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setCounterpartyFilter("SUPPLIER");
+                  setPage(1);
+                }}
+                className={`text-xs rounded-xl h-8 px-3 cursor-pointer gap-1.5 ${
+                  counterpartyFilter === "SUPPLIER" ? "bg-purple-600 text-white shadow-xs" : ""
+                }`}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                فاکتورهای تامین‌کنندگان (خرید)
+              </Button>
+            </div>
+          </div>
+
           {/* Status Sub-filter & Sorting Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-border/30">
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
               <span className="text-xs text-muted-foreground font-medium ml-1">وضعیت پرداخت:</span>
               {[
@@ -950,7 +1372,7 @@ function AdminInvoicesListPage() {
                 <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
                   <tr>
                     <th className="py-4 px-5 whitespace-nowrap">شماره فاکتور</th>
-                    <th className="py-4 px-5 whitespace-nowrap">مشتری</th>
+                    <th className="py-4 px-5 whitespace-nowrap">طرف‌حساب</th>
                     <th className="py-4 px-5 whitespace-nowrap">دسته‌بندی</th>
                     <th className="py-4 px-5 whitespace-nowrap">شرح خدمات</th>
                     <th className="py-4 px-5 whitespace-nowrap">مبلغ نهایی (تومان)</th>
@@ -961,9 +1383,10 @@ function AdminInvoicesListPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {paginatedList.map((inv: any) => {
-                    const catInfo = getInvoiceCategoryInfo(inv, categories);
-                    const catBadge = getCategoryBadge(catInfo.slug);
+                    const catInfo = getInvoiceCategoryInfo(inv, categories, services);
+                    const catBadge = getCategoryBadge(catInfo.slug, catInfo.name);
                     const CatIcon = catBadge.icon;
+                    const isSupplier = Boolean(inv.supplierId) || inv.counterpartyType === "SUPPLIER";
                     return (
                     <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
                       <td className="py-4 px-5 font-medium font-mono text-foreground whitespace-nowrap">
@@ -977,10 +1400,25 @@ function AdminInvoicesListPage() {
                         </button>
                       </td>
                       <td className="py-4 px-5 font-medium whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <span className="whitespace-nowrap">{inv.customer?.name || inv.customerId || "مشتری"}</span>
-                        </div>
+                        {isSupplier ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 whitespace-nowrap">
+                              <Building2 className="h-3 w-3 shrink-0" />
+                              تامین‌کننده
+                            </span>
+                            <span className="font-semibold text-foreground whitespace-nowrap">
+                              {inv.supplier?.name || inv.supplierName || "تامین‌کننده زیرساخت"}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
+                              <User className="h-3 w-3 shrink-0" />
+                              مشتری
+                            </span>
+                            <span className="whitespace-nowrap">{inv.customer?.name || inv.customerId || "مشتری"}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-4 px-5 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap ${catBadge.className}`}>
@@ -988,11 +1426,25 @@ function AdminInvoicesListPage() {
                           {catInfo.name}
                         </span>
                       </td>
-                      <td className="py-4 px-5 text-muted-foreground max-w-xs truncate whitespace-nowrap">
-                        {inv.items?.[0]?.title || inv.notes || "صورت‌حساب سرویس ابری"}
+                      <td className="py-4 px-5 text-muted-foreground max-w-xs whitespace-nowrap">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-foreground font-medium truncate">
+                            {inv.items?.[0]?.title || inv.notes || "صورت‌حساب خدمات"}
+                          </span>
+                          {(inv.items?.[0]?.serviceNameSnapshot || inv.items?.[0]?.service?.name) && (
+                            <span className="inline-flex items-center gap-1 text-[10.5px] font-medium text-purple-600 dark:text-purple-400">
+                              <Server className="h-3 w-3 shrink-0" />
+                              <span>سرویس: {inv.items[0].serviceNameSnapshot || inv.items[0].service?.name}</span>
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-4 px-5 font-semibold text-foreground whitespace-nowrap">
-                        {(inv.totalToman || 0).toLocaleString("fa-IR")} تومان
+                        {(inv.totalToman || 0) === 0 ? (
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">رایگان</span>
+                        ) : (
+                          `${(inv.totalToman || 0).toLocaleString("fa-IR")} تومان`
+                        )}
                       </td>
                       <td className="py-4 px-5 whitespace-nowrap">
                         {inv.status === "PAID" ? (
@@ -1008,7 +1460,7 @@ function AdminInvoicesListPage() {
                         ) : inv.dueDate && new Date(inv.dueDate).getTime() < Date.now() ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 animate-pulse whitespace-nowrap">
                             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                            معوقه (سررسید گذشته)
+                            منقضی شده ({Math.max(1, Math.floor((Date.now() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24))).toLocaleString("fa-IR")} روز معوقه)
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 whitespace-nowrap">
@@ -1023,7 +1475,7 @@ function AdminInvoicesListPage() {
                             {formatJalaliDate(inv.dueDate)}
                             {inv.status === "UNPAID" && new Date(inv.dueDate).getTime() < Date.now() && (
                               <span className="mr-1.5 text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 whitespace-nowrap">
-                                منقضی
+                                {Math.max(1, Math.floor((Date.now() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24))).toLocaleString("fa-IR")} روز معوقه
                               </span>
                             )}
                           </span>

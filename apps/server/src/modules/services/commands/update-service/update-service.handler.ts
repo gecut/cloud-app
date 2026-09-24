@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
 import { UpdateServiceCommand } from "./update-service.command";
 
@@ -14,6 +14,10 @@ export class UpdateServiceHandler
 
     const existing = await this.prisma.service.findUnique({
       where: { id },
+      include: {
+        customer: true,
+        server: true,
+      },
     });
 
     if (!existing) {
@@ -43,16 +47,22 @@ export class UpdateServiceHandler
       updateData.customerId = finalCustomerId;
     }
     if (dto.serviceTypeId !== undefined) {
-      updateData.serviceTypeId = dto.serviceTypeId;
+      const matched = await this.prisma.serviceType.findFirst({
+        where: {
+          OR: [{ id: dto.serviceTypeId }, { slug: dto.serviceTypeId }],
+        },
+      });
+      updateData.serviceTypeId = matched ? matched.id : dto.serviceTypeId;
     } else if (dto.serviceTypeSlug !== undefined) {
       let matched = await this.prisma.serviceType.findFirst({
-        where: { slug: dto.serviceTypeSlug },
+        where: {
+          OR: [
+            { slug: dto.serviceTypeSlug },
+            { id: dto.serviceTypeSlug },
+            { name: dto.serviceTypeSlug },
+          ],
+        },
       });
-      if (!matched) {
-        matched = await this.prisma.serviceType.findFirst({
-          where: { name: dto.serviceTypeSlug },
-        });
-      }
       if (matched) {
         updateData.serviceTypeId = matched.id;
       }
@@ -63,6 +73,19 @@ export class UpdateServiceHandler
     if (dto.quantity !== undefined) updateData.quantity = Math.max(1, Number(dto.quantity) || 1);
     if (dto.usedQuantity !== undefined) updateData.usedQuantity = Math.max(0, Number(dto.usedQuantity) || 0);
     if (dto.serverVisibilityLevel !== undefined) updateData.serverVisibilityLevel = dto.serverVisibilityLevel;
+
+    const effectiveTrackingType = updateData.trackingType !== undefined ? updateData.trackingType : existing.trackingType;
+    const effectivePurchaseDate = updateData.purchaseDate !== undefined ? updateData.purchaseDate : (existing.purchaseDate || existing.startDate);
+    const effectiveRenewalDate = updateData.renewalDate !== undefined ? updateData.renewalDate : existing.renewalDate;
+
+    if (
+      effectiveTrackingType !== "QUANTITY" &&
+      effectiveRenewalDate &&
+      effectivePurchaseDate &&
+      new Date(effectiveRenewalDate).getTime() < new Date(effectivePurchaseDate).getTime()
+    ) {
+      throw new BadRequestException("تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
+    }
 
     const updated = await this.prisma.service.update({
       where: { id },
@@ -80,132 +103,162 @@ export class UpdateServiceHandler
       },
     });
 
-    // Synchronize price, name, or quantity changes with open UNPAID customer invoices
-    if (
-      dto.priceToman !== undefined ||
-      dto.name !== undefined ||
-      dto.quantity !== undefined
-    ) {
-      try {
-        const targetCustomerId = updated.customerId;
-        const newPrice = Number(updated.priceToman || 0);
-        const newName = updated.name;
-        const newQty = updated.quantity || 1;
+    // Synchronize all invoices and payments for this service when service details are edited
+    try {
+      const matchedInvoices: any[] = [];
+      for (const inv of this.prisma.memInvoices.values()) {
+        const hasItem =
+          (inv.items && inv.items.some((it: any) => it.serviceId === updated.id)) ||
+          Array.from(this.prisma.memInvoiceItems.values()).some(
+            (it) => it.invoiceId === inv.id && it.serviceId === updated.id,
+          );
+        if (hasItem) {
+          matchedInvoices.push(inv);
+        }
+      }
 
-        // Find all invoice items referencing this service
-        const items = await this.prisma.invoiceItem.findMany({
-          where: { serviceId: id },
-        });
+      for (const inv of matchedInvoices) {
+        let newSubtotal = 0;
+        const allItems =
+          inv.items && inv.items.length > 0
+            ? inv.items
+            : Array.from(this.prisma.memInvoiceItems.values()).filter(
+                (it) => it.invoiceId === inv.id,
+              );
 
-        for (const it of items) {
-          const inv = await this.prisma.invoice.findUnique({
-            where: { id: it.invoiceId },
-            include: { items: true },
-          });
+        for (const it of allItems) {
+          if (it.serviceId === updated.id) {
+            const qty = it.quantity || 1;
+            const unitPrice = updated.priceToman !== undefined ? updated.priceToman : (it.unitPriceToman || 0);
+            const lineTotal = unitPrice * qty;
+            const isQtyMode = updated.trackingType === "QUANTITY";
+            const title = isQtyMode
+              ? `${updated.name} (تعداد: ${qty.toLocaleString("fa-IR")})`
+              : `صورت‌حساب سرویس ${updated.name}`;
 
-          // Only sync open UNPAID invoices (historical PAID/CANCELLED invoices remain locked per financial rules)
-          if (inv && inv.status === "UNPAID") {
-            const updatedItems = (inv.items || []).map((currItem: any) => {
-              if (currItem.serviceId === id || currItem.id === it.id) {
-                const itemQty = dto.quantity !== undefined ? newQty : (currItem.quantity || 1);
-                const itemTitle =
-                  itemQty > 1
-                    ? `${newName} (تعداد: ${itemQty.toLocaleString("fa-IR")})`
-                    : `صورت‌حساب سرویس ${newName}`;
-                return {
-                  ...currItem,
-                  title: itemTitle,
-                  unitPriceToman: newPrice,
-                  totalToman: newPrice,
-                  quantity: itemQty,
-                  serviceNameSnapshot: newName,
-                  servicePriceSnapshotToman: newPrice,
-                };
-              }
-              return currItem;
-            });
+            it.title = title;
+            it.unitPriceToman = unitPrice;
+            it.totalToman = lineTotal;
+            it.serviceNameSnapshot = updated.name;
+            it.servicePriceSnapshotToman = unitPrice;
+            if (updated.renewalDate) {
+              it.serviceRenewalDateSnapshot = updated.renewalDate;
+            }
 
-            const newTotalToman = updatedItems.reduce(
-              (sum: number, x: any) => sum + (Number(x.totalToman) || 0),
-              0,
-            );
-
-            await this.prisma.invoice.update({
-              where: { id: inv.id },
-              data: {
-                subtotalToman: newTotalToman,
-                totalToman: newTotalToman,
-                notes: `صورت‌حساب سرویس ${newName}`,
-                items: updatedItems,
-              } as any,
-            });
-
-            await this.prisma.auditLog
-              .create({
-                data: {
-                  actorType: "USER",
-                  actorRole: "ADMIN",
-                  actorDisplayNameSnapshot: "مدیر مالی سیستم",
-                  action: "invoice.update",
-                  entityType: "Invoice",
-                  entityId: inv.id,
-                  reason: `به‌روزرسانی خودکار مبلغ فاکتور ${inv.invoiceNumber} به ${newTotalToman.toLocaleString("fa-IR")} تومان بر اثر تغییر تعرفه سرویس ${newName}`,
-                  before: { totalToman: inv.totalToman },
-                  after: { totalToman: newTotalToman, servicePriceToman: newPrice },
-                },
-              })
-              .catch(() => {});
+            if (this.prisma.memInvoiceItems.has(it.id)) {
+              const memIt = this.prisma.memInvoiceItems.get(it.id);
+              Object.assign(memIt, {
+                title,
+                unitPriceToman: unitPrice,
+                totalToman: lineTotal,
+                serviceNameSnapshot: updated.name,
+                servicePriceSnapshotToman: unitPrice,
+                serviceRenewalDateSnapshot: updated.renewalDate || memIt.serviceRenewalDateSnapshot,
+                updatedAt: new Date(),
+              });
+            }
+            newSubtotal += lineTotal;
+          } else {
+            newSubtotal += Number(it.totalToman) || 0;
           }
         }
 
-        // If service was allocated to a customer, has price > 0, but has NO invoice yet, create one
-        if (targetCustomerId && newPrice > 0 && items.length === 0) {
-          const year = new Date().getFullYear();
-          let invoiceNumber = (30001 + Math.floor(Math.random() * 89999)).toString();
-          try {
-            const seq = await this.prisma.invoiceSequence.upsert({
-              where: { year },
-              create: { year, lastNumber: 1 },
-              update: { lastNumber: { increment: 1 } },
-            });
-            invoiceNumber = (30000 + seq.lastNumber).toString();
-          } catch {}
-
-          const itemTitle =
-            newQty > 1
-              ? `${newName} (تعداد: ${newQty.toLocaleString("fa-IR")})`
-              : `صورت‌حساب سرویس ${newName}`;
-
-          await this.prisma.invoice.create({
-            data: {
-              customerId: targetCustomerId,
-              invoiceNumber,
-              status: "UNPAID",
-              subtotalToman: newPrice,
-              totalToman: newPrice,
-              dueDate: updated.renewalDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-              notes: `صورت‌حساب سرویس ${newName}`,
-              items: {
-                create: [
-                  {
-                    serviceId: updated.id,
-                    title: itemTitle,
-                    description: updated.description || `سرویس فعال ${newName}`,
-                    quantity: newQty,
-                    unitPriceToman: newPrice,
-                    totalToman: newPrice,
-                    serviceNameSnapshot: newName,
-                    servicePriceSnapshotToman: newPrice,
-                  },
-                ],
-              },
-            },
-          });
+        inv.subtotalToman = newSubtotal;
+        inv.totalToman = newSubtotal;
+        if (updated.renewalDate) {
+          inv.dueDate = updated.renewalDate;
         }
-      } catch (err) {
-        // ignore sync error
+
+        const isNowFree = newSubtotal === 0;
+        const existingPayment = Array.from(this.prisma.memPayments.values()).find(
+          (p) => p.invoiceId === inv.id,
+        );
+
+        if (isNowFree) {
+          inv.status = "PAID";
+          inv.paidAt = inv.paidAt || new Date();
+          inv.notes = `صورت‌حساب سرویس رایگان ${updated.name} (تایید خودکار پس از ویرایش)`;
+
+          if (existingPayment) {
+            existingPayment.amountToman = 0;
+            existingPayment.provider = "FREE_PLAN";
+            existingPayment.gatewayRef = existingPayment.gatewayRef || `FREE_${inv.id}_${Date.now()}`;
+            existingPayment.paidAt = existingPayment.paidAt || new Date();
+            existingPayment.updatedAt = new Date();
+          } else {
+            const payId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            this.prisma.memPayments.set(payId, {
+              id: payId,
+              invoiceId: inv.id,
+              amountToman: 0,
+              provider: "FREE_PLAN",
+              gatewayRef: `FREE_${inv.id}_${Date.now()}`,
+              paidAt: new Date(),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
+        } else {
+          if (existingPayment) {
+            if (existingPayment.provider === "FREE_PLAN") {
+              this.prisma.memPayments.delete(existingPayment.id);
+              inv.status = "UNPAID";
+              inv.paidAt = null;
+            } else {
+              existingPayment.amountToman = newSubtotal;
+              existingPayment.updatedAt = new Date();
+            }
+          }
+        }
       }
+      this.prisma.saveToDisk();
+    } catch (err: any) {
+      console.error("Error synchronizing invoices for service:", err);
     }
+
+    const isCustomerService = Boolean(updated.customerId);
+    const targetLabel = isCustomerService
+      ? `مشتری: ${updated.customer?.displayName || updated.customer?.name || updated.customerId}`
+      : `تامین‌کننده / زیرساخت تامین${updated.server ? ` (سرور ${updated.server.name} - ${updated.server.provider})` : ""}`;
+
+    await this.prisma.auditLog
+      .create({
+        data: {
+          actorType: "USER",
+          actorRole: "ADMIN",
+          actorDisplayNameSnapshot: "مدیر فنی سیستم",
+          action: "service.update",
+          entityType: "Service",
+          entityId: updated.id,
+          reason: `ویرایش مشخصات سرویس «${updated.name}» (${targetLabel})`,
+          metadata: {
+            customerId: updated.customerId || null,
+            isSupplier: !isCustomerService,
+          },
+          before: {
+            name: existing.name,
+            priceToman: existing.priceToman,
+            status: existing.status,
+            renewalDate: existing.renewalDate,
+            customerId: existing.customerId,
+            customerName: (existing as any).customer?.displayName || (existing as any).customer?.name || null,
+            serverName: (existing as any).server?.name || null,
+            quantity: existing.quantity,
+          },
+          after: {
+            name: updated.name,
+            priceToman: updated.priceToman,
+            status: updated.status,
+            renewalDate: updated.renewalDate,
+            customerId: updated.customerId,
+            customerName: updated.customer?.displayName || updated.customer?.name || null,
+            serverName: updated.server?.name || null,
+            quantity: updated.quantity,
+            isSupplier: !isCustomerService,
+          },
+        },
+      })
+      .catch(() => {});
 
     return updated;
   }

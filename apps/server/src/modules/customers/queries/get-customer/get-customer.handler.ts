@@ -17,6 +17,11 @@ export class GetCustomerHandler implements IQueryHandler<GetCustomerQuery> {
         services: {
           include: {
             serviceType: true,
+            parentService: {
+              include: {
+                serviceType: true,
+              },
+            },
             server: true,
             endpoints: true,
           },
@@ -29,7 +34,15 @@ export class GetCustomerHandler implements IQueryHandler<GetCustomerQuery> {
           include: {
             payment: true,
             paymentAttempts: true,
-            items: true,
+            items: {
+              include: {
+                service: {
+                  include: {
+                    serviceType: true,
+                  },
+                },
+              },
+            },
           },
           orderBy: {
             createdAt: "desc",

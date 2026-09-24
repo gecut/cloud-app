@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
@@ -98,7 +98,10 @@ export const SERVICE_TYPE_BADGES: Record<string, { label: string; bg: string; te
 export function getSupplierServiceBadge(type: string, dynamicCats: any[] = []) {
   const norm = (type || "").toLowerCase().trim();
   const matched = dynamicCats.find(
-    (c) => (c.slug || "").toLowerCase() === norm || (c.id || "").toLowerCase() === norm,
+    (c) =>
+      (c.slug || "").toLowerCase() === norm ||
+      (c.id || "").toLowerCase() === norm ||
+      (c.name || "").toLowerCase() === norm,
   );
   if (matched) {
     return {
@@ -152,7 +155,7 @@ export function getSupplierServiceBadge(type: string, dynamicCats: any[] = []) {
     };
   }
   return {
-    label: type || "سرویس ابری",
+    label: type || "سایر خدمات",
     bg: "bg-slate-500/10",
     text: "text-slate-600 dark:text-slate-400",
     border: "border-slate-500/20",
@@ -254,6 +257,7 @@ function AdminSuppliersPage() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name" | "payable-desc" | "services-desc">("newest");
   const [servicesSortBy, setServicesSortBy] = useState<"due-asc" | "newest-purchase" | "price-desc" | "price-asc" | "name">("newest-purchase");
   const [page, setPage] = useState(1);
+  const [selectedPeriodMonth, setSelectedPeriodMonth] = useState<number | "ALL">(0);
   const PAGE_LIMIT = 12;
 
   // Modals state
@@ -309,6 +313,18 @@ function AdminSuppliersPage() {
   });
 
   const dynamicCategories = categoriesData?.items || [];
+
+  useEffect(() => {
+    if (dynamicCategories.length > 0) {
+      if (
+        !serviceType ||
+        serviceType === "DEDICATED_SERVER" ||
+        !dynamicCategories.some((c: any) => c.slug === serviceType || c.id === serviceType)
+      ) {
+        setServiceType(dynamicCategories[0].slug || dynamicCategories[0].id);
+      }
+    }
+  }, [dynamicCategories, serviceType]);
 
   // Create Supplier Mutation
   const createSupplierMutation = useMutation({
@@ -371,6 +387,10 @@ function AdminSuppliersPage() {
     onSuccess: () => {
       toast.success("سرویس خریداری‌شده با موفقیت به خدمات تامین‌کننده اضافه شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "accounting"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "payments"] });
       setIsAddServiceOpen(false);
       setServiceName("");
     },
@@ -389,6 +409,8 @@ function AdminSuppliersPage() {
     onSuccess: () => {
       toast.success("سرویس تامین‌کننده با موفقیت به‌روزرسانی شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "accounting"] });
       setIsEditServiceOpen(false);
       setEditingService(null);
     },
@@ -406,6 +428,8 @@ function AdminSuppliersPage() {
     onSuccess: () => {
       toast.success("سرویس تامین‌کننده با موفقیت حذف شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "accounting"] });
     },
     onError: (err: any) => {
       toast.error(err.message || "خطا در حذف سرویس");
@@ -537,25 +561,36 @@ function AdminSuppliersPage() {
     return list;
   }, [suppliersList]);
 
-  // Nearest upcoming payment across all suppliers
+  // Expired / overdue services across all suppliers
+  const expiredSupplierServices = useMemo(() => {
+    const now = Date.now();
+    return allSupplierServices.filter((s) => {
+      if (!s.renewalDate) return false;
+      return new Date(s.renewalDate).getTime() < now;
+    });
+  }, [allSupplierServices]);
+
+  // Nearest upcoming payment across all suppliers (prioritizing overdue if any)
   const nearestPayment = useMemo(() => {
     const now = Date.now();
     const sorted = [...allSupplierServices]
       .filter((s) => s.renewalDate)
       .sort((a, b) => new Date(a.renewalDate).getTime() - new Date(b.renewalDate).getTime());
 
-    const upcoming = sorted.find((s) => new Date(s.renewalDate).getTime() >= now - 24 * 60 * 60 * 1000) || sorted[0];
-    if (!upcoming) return null;
+    const overdue = sorted.filter((s) => new Date(s.renewalDate).getTime() < now);
+    const upcoming = sorted.find((s) => new Date(s.renewalDate).getTime() >= now);
 
-    const diffDays = Math.ceil((new Date(upcoming.renewalDate).getTime() - now) / (1000 * 60 * 60 * 24));
+    const target = overdue.length > 0 ? overdue[0] : (upcoming || sorted[0]);
+    if (!target) return null;
+
+    const diffDays = Math.ceil((new Date(target.renewalDate).getTime() - now) / (1000 * 60 * 60 * 24));
     return {
-      service: upcoming,
+      service: target,
       diffDays,
-      amount: Number(upcoming.priceToman ?? upcoming.monthlyExpenseToman ?? 0),
+      isExpired: new Date(target.renewalDate).getTime() < now,
+      amount: Number(target.priceToman ?? target.monthlyExpenseToman ?? 0),
     };
   }, [allSupplierServices]);
-
-  const [selectedPeriodMonth, setSelectedPeriodMonth] = useState<number | "ALL">(0);
 
   // Generate 12 past Jalali months options
   const monthOptions = useMemo(() => {
@@ -633,20 +668,29 @@ function AdminSuppliersPage() {
       tabs.push(
         { id: "domain", label: "ثبت و مدیریت دامنه", icon: Tag },
         { id: "server", label: "سرور ابری و اختصاصی", icon: Server },
-        { id: "hosting", label: "میزبانی وب و هاست", icon: Globe },
+        { id: "hosting", label: "هاست و میزبانی", icon: Globe },
         { id: "license", label: "لایسنس و نرم‌افزار", icon: Cpu },
         { id: "api", label: "وب‌سرویس و API", icon: Cpu },
       );
     }
 
+    if (expiredSupplierServices.length > 0) {
+      tabs.push({ id: "EXPIRED", label: "دارای سرور منقضی شده", icon: AlertCircle });
+    }
     tabs.push({ id: "DEBT", label: "دارای بدهکاری فعال", icon: AlertCircle });
 
     return tabs;
-  }, [dynamicCategories]);
+  }, [dynamicCategories, expiredSupplierServices.length]);
 
   const getSupplierCategoryCount = (catId: string) => {
     if (catId === "ALL") return suppliersList.length;
     if (catId === "DEBT") return suppliersList.filter((s: any) => Number(s.totalPayableToman) > 0).length;
+    if (catId === "EXPIRED") {
+      const now = Date.now();
+      return suppliersList.filter((s: any) =>
+        (s.services || []).some((svc: any) => svc.renewalDate && new Date(svc.renewalDate).getTime() < now)
+      ).length;
+    }
     return suppliersList.filter((s: any) => {
       const cats = getSupplierCategories(s, dynamicCategories);
       return (
@@ -661,12 +705,22 @@ function AdminSuppliersPage() {
   const filteredSuppliers = useMemo(() => {
     return suppliersList.filter((s: any) => {
       if (selectedCategory !== "ALL") {
-        const cats = getSupplierCategories(s, dynamicCategories);
-        const matches =
-          cats.includes(selectedCategory) ||
-          cats.includes(selectedCategory.toLowerCase()) ||
-          cats.includes(selectedCategory.toUpperCase());
-        if (!matches) return false;
+        if (selectedCategory === "DEBT") {
+          if (!(Number(s.totalPayableToman) > 0)) return false;
+        } else if (selectedCategory === "EXPIRED") {
+          const now = Date.now();
+          const hasExpired = (s.services || []).some(
+            (svc: any) => svc.renewalDate && new Date(svc.renewalDate).getTime() < now
+          );
+          if (!hasExpired) return false;
+        } else {
+          const cats = getSupplierCategories(s, dynamicCategories);
+          const matches =
+            cats.includes(selectedCategory) ||
+            cats.includes(selectedCategory.toLowerCase()) ||
+            cats.includes(selectedCategory.toUpperCase());
+          if (!matches) return false;
+        }
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -776,8 +830,37 @@ function AdminSuppliersPage() {
           </div>
         </div>
 
+        {/* Overdue/Expired Servers High-Priority Alert Banner */}
+        {expiredSupplierServices.length > 0 && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-rose-500/10 border-2 border-rose-500/30 text-rose-950 dark:text-rose-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                  <span>هشدار فوری: تاریخ سررسید {expiredSupplierServices.length.toLocaleString("fa-IR")} سرور به پایان رسیده است!</span>
+                </h3>
+                <p className="text-xs text-rose-600/90 dark:text-rose-400/90">
+                  مهلت تمدید این سرورها منقضی شده است. جهت جلوگیری از مسدودسازی و قطع خدمات توسط تامین‌کننده، سریعاً اقدام به بررسی و تمدید نمایید.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectedCategory("EXPIRED")}
+                className="h-8.5 text-xs font-bold px-3.5 rounded-xl border-rose-500/40 bg-rose-500/15 text-rose-700 dark:text-rose-300 hover:bg-rose-500/25 cursor-pointer shadow-xs"
+              >
+                مشاهده سرورهای منقضی شده ({expiredSupplierServices.length.toLocaleString("fa-IR")})
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Monthly Expense & Nearest Due Highlight Banner */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
           {/* Monthly Commitment Summary with Month Selector */}
           <div className="rounded-2xl border border-border/50 bg-card/60 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between gap-4">
             <div className="flex items-center justify-between gap-2">
@@ -812,24 +895,40 @@ function AdminSuppliersPage() {
 
           {/* Nearest Upcoming Payment Highlight */}
           <div className={`md:col-span-2 rounded-2xl border p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-            nearestPayment && nearestPayment.diffDays <= 7
+            nearestPayment && nearestPayment.diffDays <= 0
+              ? "bg-rose-500/10 border-rose-500/40 text-rose-950 dark:text-rose-100"
+              : nearestPayment && nearestPayment.diffDays <= 7
               ? "bg-amber-500/5 border-amber-500/30 text-amber-950 dark:text-amber-100"
               : "bg-card/60 border-border/50 text-foreground"
           }`}>
             <div className="flex items-start sm:items-center gap-3.5">
-              <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-500 shrink-0">
-                <Clock className="h-5 w-5" />
+              <div className={`p-3 rounded-2xl shrink-0 ${
+                nearestPayment && nearestPayment.diffDays <= 0
+                  ? "bg-rose-500/20 text-rose-600 dark:text-rose-400"
+                  : "bg-amber-500/10 text-amber-500"
+              }`}>
+                {nearestPayment && nearestPayment.diffDays <= 0 ? (
+                  <AlertCircle className="h-5 w-5" />
+                ) : (
+                  <Clock className="h-5 w-5" />
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold">نزدیک‌ترین موعد پرداخت آتی:</span>
+                  <span className="text-xs font-bold">
+                    {nearestPayment && nearestPayment.diffDays <= 0 ? "سررسید منقضی شده سرور:" : "نزدیک‌ترین موعد پرداخت آتی:"}
+                  </span>
                   {nearestPayment && (
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                      nearestPayment.diffDays <= 3
+                      nearestPayment.diffDays <= 0
+                        ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/40 font-mono font-bold"
+                        : nearestPayment.diffDays <= 3
                         ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-mono"
                         : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-mono"
                     }`}>
-                      {nearestPayment.diffDays <= 0 ? "سررسید فرا رسیده" : `${nearestPayment.diffDays.toLocaleString("fa-IR")} روز باقی‌مانده`}
+                      {nearestPayment.diffDays <= 0
+                        ? `سررسید منقضی شده (${Math.max(1, Math.abs(nearestPayment.diffDays)).toLocaleString("fa-IR")} روز گذشته)`
+                        : `${nearestPayment.diffDays.toLocaleString("fa-IR")} روز باقی‌مانده`}
                     </span>
                   )}
                 </div>
@@ -957,10 +1056,17 @@ function AdminSuppliersPage() {
           <div className="flex flex-col gap-4">
             {paginatedSuppliers.map((supplier: any) => {
               const sortedServices = sortSupplierServices(supplier.services || []);
+              const supplierExpiredCount = (supplier.services || []).filter(
+                (s: any) => s.renewalDate && new Date(s.renewalDate).getTime() < Date.now()
+              ).length;
               return (
                 <div
                   key={supplier.id}
-                  className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col gap-4 hover:border-purple-500/30 transition-all"
+                  className={`rounded-2xl border p-5 shadow-xs backdrop-blur-xs flex flex-col gap-4 transition-all ${
+                    supplierExpiredCount > 0
+                      ? "border-rose-500/40 bg-card/60 shadow-rose-500/5 hover:border-rose-500/60"
+                      : "border-border/50 bg-card/40 hover:border-purple-500/30"
+                  }`}
                 >
                   {/* Supplier Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/30">
@@ -980,6 +1086,12 @@ function AdminSuppliersPage() {
                           >
                             {supplier.status === "ACTIVE" ? "همکاری فعال" : "غیرفعال"}
                           </span>
+                          {supplierExpiredCount > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1 font-mono">
+                              <AlertCircle className="h-3 w-3" />
+                              {supplierExpiredCount.toLocaleString("fa-IR")} سرور منقضی شده
+                            </span>
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
                           {supplier.contactPerson && (
@@ -1064,6 +1176,10 @@ function AdminSuppliersPage() {
                         {sortedServices.map((svc: any) => {
                           const badge = getSupplierServiceBadge(svc.type, dynamicCategories);
                           const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
+                          const isExpired = svc.renewalDate && new Date(svc.renewalDate).getTime() < Date.now();
+                          const overdueDays = isExpired
+                            ? Math.max(1, Math.ceil((Date.now() - new Date(svc.renewalDate).getTime()) / (1000 * 60 * 60 * 24)))
+                            : 0;
                           const daysLeft = svc.renewalDate
                             ? Math.ceil((new Date(svc.renewalDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
                             : null;
@@ -1071,7 +1187,11 @@ function AdminSuppliersPage() {
                           return (
                             <div
                               key={svc.id}
-                              className="p-4 rounded-xl bg-card/70 border border-border/50 flex flex-col justify-between text-xs hover:border-purple-500/40 hover:shadow-sm transition-all group"
+                              className={`p-4 rounded-xl flex flex-col justify-between text-xs transition-all group ${
+                                isExpired
+                                  ? "bg-rose-500/5 border-2 border-rose-500/40 shadow-xs shadow-rose-500/10 hover:border-rose-500/60"
+                                  : "bg-card/70 border border-border/50 hover:border-purple-500/40 hover:shadow-xs"
+                              }`}
                             >
                               <div className="space-y-3">
                                 <div className="flex items-start justify-between gap-3">
@@ -1102,12 +1222,25 @@ function AdminSuppliersPage() {
                                   </span>
                                   {daysLeft !== null && (
                                     <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
-                                      daysLeft <= 3 ? "bg-rose-500/10 text-rose-600 font-bold" : "bg-muted text-muted-foreground"
+                                      isExpired
+                                        ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold"
+                                        : daysLeft <= 3
+                                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold"
+                                        : "bg-muted text-muted-foreground"
                                     }`}>
-                                      {daysLeft <= 0 ? "سررسید رسیده" : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
+                                      {isExpired
+                                        ? `۰ روز باقی‌مانده (منقضی شده - ${overdueDays.toLocaleString("fa-IR")} روز گذشته)`
+                                        : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
                                     </span>
                                   )}
                                 </div>
+
+                                {isExpired && (
+                                  <div className="flex items-center gap-1.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-semibold">
+                                    <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                                    <span>هشدار: مهلت سرور به پایان رسیده است ({overdueDays.toLocaleString("fa-IR")} روز گذشته از سررسید)!</span>
+                                  </div>
+                                )}
 
                                 <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border/30">
                                   <span>مبلغ دوره:</span>
@@ -1124,8 +1257,8 @@ function AdminSuppliersPage() {
                                     </div>
                                   )}
                                   {svc.renewalDate && (
-                                    <div className="flex items-center gap-1.5 justify-end">
-                                      <Clock className="h-3 w-3 text-amber-500 shrink-0" />
+                                    <div className={`flex items-center gap-1.5 justify-end font-mono ${isExpired ? "text-rose-600 dark:text-rose-400 font-bold" : ""}`}>
+                                      <Clock className={`h-3 w-3 shrink-0 ${isExpired ? "text-rose-500" : "text-amber-500"}`} />
                                       <span className="truncate">سررسید: {formatJalaliDate(svc.renewalDate)}</span>
                                     </div>
                                   )}
@@ -1294,7 +1427,7 @@ function AdminSuppliersPage() {
                       {dynamicCategories.length > 0 ? (
                         dynamicCategories.map((c: any) => (
                           <option key={c.id} value={c.slug || c.id}>
-                            {c.name} ({c.slug})
+                            {c.name}
                           </option>
                         ))
                       ) : (
@@ -1387,7 +1520,7 @@ function AdminSuppliersPage() {
                       {dynamicCategories.length > 0 ? (
                         dynamicCategories.map((c: any) => (
                           <option key={c.id} value={c.slug || c.id}>
-                            {c.name} ({c.slug})
+                            {c.name}
                           </option>
                         ))
                       ) : (
@@ -1529,6 +1662,10 @@ function AdminSuppliersPage() {
                   sortSupplierServices(selectedSupplier.services).map((svc: any) => {
                     const badge = getSupplierServiceBadge(svc.type, dynamicCategories);
                     const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
+                    const isExpired = svc.renewalDate && new Date(svc.renewalDate).getTime() < Date.now();
+                    const overdueDays = isExpired
+                      ? Math.max(1, Math.ceil((Date.now() - new Date(svc.renewalDate).getTime()) / (1000 * 60 * 60 * 24)))
+                      : 0;
                     const daysLeft = svc.renewalDate
                       ? Math.ceil((new Date(svc.renewalDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
                       : null;
@@ -1536,7 +1673,11 @@ function AdminSuppliersPage() {
                     return (
                       <div
                         key={svc.id}
-                        className="p-4.5 rounded-2xl border border-border/50 bg-card/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs hover:border-purple-500/40 hover:shadow-sm transition-all"
+                        className={`p-4.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs transition-all ${
+                          isExpired
+                            ? "bg-rose-500/5 border-rose-500/40 shadow-xs shadow-rose-500/10 hover:border-rose-500/60"
+                            : "border-border/50 bg-card/80 hover:border-purple-500/40 hover:shadow-xs"
+                        }`}
                       >
                         <div className="space-y-2 flex-1">
                           <div className="flex flex-wrap items-center gap-2.5">
@@ -1546,15 +1687,31 @@ function AdminSuppliersPage() {
                             </span>
                             {daysLeft !== null && (
                               <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
-                                daysLeft <= 3 ? "bg-rose-500/10 text-rose-600 font-bold" : "bg-muted text-muted-foreground"
+                                isExpired
+                                  ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold"
+                                  : daysLeft <= 3
+                                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold"
+                                  : "bg-muted text-muted-foreground"
                               }`}>
-                                {daysLeft <= 0 ? "سررسید رسیده" : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
+                                {isExpired
+                                  ? `۰ روز باقی‌مانده (منقضی شده - ${overdueDays.toLocaleString("fa-IR")} روز گذشته)`
+                                  : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
                               </span>
                             )}
                           </div>
+                          {isExpired && (
+                            <div className="flex items-center gap-1.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-semibold">
+                              <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                              <span>هشدار: مهلت این سرور به پایان رسیده است ({overdueDays.toLocaleString("fa-IR")} روز گذشته از سررسید)!</span>
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                             {svc.purchaseDate && <span>تاریخ خرید: {formatJalaliDate(svc.purchaseDate)}</span>}
-                            {svc.renewalDate && <span className="text-amber-600 dark:text-amber-400 font-medium">سررسید بعدی: {formatJalaliDate(svc.renewalDate)}</span>}
+                            {svc.renewalDate && (
+                              <span className={`font-medium ${isExpired ? "text-rose-600 dark:text-rose-400 font-bold" : "text-amber-600 dark:text-amber-400"}`}>
+                                سررسید بعدی: {formatJalaliDate(svc.renewalDate)}
+                              </span>
+                            )}
                             {svc.notes && <span className="italic">یادداشت: {svc.notes}</span>}
                           </div>
                         </div>

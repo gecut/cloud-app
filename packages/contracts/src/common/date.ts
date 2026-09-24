@@ -1,5 +1,12 @@
 export function parseToDate(dateInput: Date | string | number | null | undefined): Date | null {
   if (!dateInput) return null;
+  if (typeof dateInput === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    const parts = dateInput.split("-").map(Number);
+    const y = parts[0] ?? 2026;
+    const m = parts[1] ?? 1;
+    const d = parts[2] ?? 1;
+    return new Date(y, m - 1, d, 12, 0, 0);
+  }
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   if (Number.isNaN(date.getTime())) return null;
   return date;
@@ -107,7 +114,7 @@ export function gregorianToJalali(dateInput: Date | string | number): {
   jm: number;
   jd: number;
 } {
-  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  const date = parseToDate(dateInput) || new Date();
   let gy = date.getFullYear();
   let gm = date.getMonth() + 1;
   let gd = date.getDate();
@@ -204,4 +211,195 @@ export function jalaliToGregorian(jy: number, jm: number, jd: number): Date {
   let gm = 0;
   for (gm = 0; gm < 13 && gd > (sal_a[gm] ?? 0); gm++) gd -= (sal_a[gm] ?? 0);
   return new Date(gy, gm - 1, gd, 12, 0, 0);
+}
+
+export interface DateRangeAnalysis {
+  isValid: boolean;
+  isNegativeRange: boolean;
+  errorMessage?: string;
+  startDate: Date;
+  endDate: Date;
+  totalSpanDays: number;
+  totalDays: number;
+  daysPassed: number;
+  daysLeft: number;
+  remainingPercent: number;
+  isExpired: boolean;
+  isOverdue: boolean;
+  overdueDays: number;
+  isFuture: boolean;
+  urgency: "expired" | "critical" | "warning" | "normal";
+  statusText: string;
+  isAlarmExceeded?: boolean;
+  alarmMessage?: string;
+}
+
+/**
+ * Complete analysis of a date range (start to renewal/end date).
+ * Ensures that if the date passes, remaining days is strictly 0,
+ * progress is 0%, and an explicit error/warning is triggered.
+ */
+export function analyzeDateRange(params: {
+  startDate: Date | string | number | null | undefined;
+  endDate: Date | string | number | null | undefined;
+  configuredCycleDays?: number | null;
+  nowDate?: Date;
+}): DateRangeAnalysis {
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+  const now = params.nowDate || new Date();
+
+  const start = parseToDate(params.startDate) || now;
+  const end = parseToDate(params.endDate) || new Date(start.getTime() + 30 * MS_PER_DAY);
+
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+  const nowMs = now.getTime();
+
+  // 1. Validation: End before Start (Negative Range Error)
+  if (endMs < startMs) {
+    const negativeDays = Math.ceil((startMs - endMs) / MS_PER_DAY);
+    return {
+      isValid: false,
+      isNegativeRange: true,
+      errorMessage: "تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد",
+      startDate: start,
+      endDate: end,
+      totalSpanDays: 0,
+      totalDays: 0,
+      daysPassed: 0,
+      daysLeft: 0,
+      remainingPercent: 0,
+      isExpired: true,
+      isOverdue: true,
+      overdueDays: negativeDays,
+      isFuture: false,
+      urgency: "expired",
+      statusText: "بازه نامعتبر (سررسید قبل از خرید)",
+    };
+  }
+
+  const rawSpanDays = Math.round((endMs - startMs) / MS_PER_DAY);
+  const totalSpanDays = Math.max(1, rawSpanDays);
+
+  const configuredCycleDays =
+    params.configuredCycleDays && params.configuredCycleDays > 0
+      ? Number(params.configuredCycleDays)
+      : null;
+
+  const effectiveSpanDays = configuredCycleDays || totalSpanDays;
+
+  // 2. Alarm: Configured cycle exceeds calendar span
+  const isAlarmExceeded =
+    configuredCycleDays !== null && totalSpanDays > 0 && configuredCycleDays > totalSpanDays;
+  const alarmMessage = isAlarmExceeded
+    ? `دوره تعیین‌شده (${configuredCycleDays.toLocaleString("fa-IR")} روز) بیشتر از بازه زمانی سررسید (${totalSpanDays.toLocaleString("fa-IR")} روز) است`
+    : undefined;
+
+  // 3. Case A: Future (now < start)
+  if (nowMs < startMs) {
+    return {
+      isValid: true,
+      isNegativeRange: false,
+      startDate: start,
+      endDate: end,
+      totalSpanDays: effectiveSpanDays,
+      totalDays: effectiveSpanDays,
+      daysPassed: 0,
+      daysLeft: effectiveSpanDays,
+      remainingPercent: 100,
+      isExpired: false,
+      isOverdue: false,
+      overdueDays: 0,
+      isFuture: true,
+      urgency: "normal",
+      statusText: "آینده (هنوز آغاز نشده)",
+      isAlarmExceeded,
+      alarmMessage,
+    };
+  }
+
+  // 4. Case B: Expired / Overdue (now >= end)
+  if (nowMs >= endMs) {
+    const overdueDays = Math.max(1, Math.floor((nowMs - endMs) / MS_PER_DAY));
+    return {
+      isValid: true,
+      isNegativeRange: false,
+      errorMessage: `مهلت این سرویس/سررسید به پایان رسیده است (${overdueDays.toLocaleString("fa-IR")} روز گذشته از سررسید)`,
+      startDate: start,
+      endDate: end,
+      totalSpanDays: effectiveSpanDays,
+      totalDays: effectiveSpanDays,
+      daysPassed: effectiveSpanDays,
+      daysLeft: 0,
+      remainingPercent: 0,
+      isExpired: true,
+      isOverdue: true,
+      overdueDays,
+      isFuture: false,
+      urgency: "expired",
+      statusText: `منقضی شده (${overdueDays.toLocaleString("fa-IR")} روز گذشته)`,
+      isAlarmExceeded,
+      alarmMessage,
+    };
+  }
+
+  // 5. Case C: Active (start <= now < end)
+  const msRemaining = endMs - nowMs;
+  const daysLeft = Math.max(0, Math.ceil(msRemaining / MS_PER_DAY));
+  const daysPassed = Math.max(0, effectiveSpanDays - daysLeft);
+  const remainingPercent = Math.min(100, Math.max(0, (daysLeft / effectiveSpanDays) * 100));
+
+  if (daysLeft <= 0) {
+    const overdueDays = Math.max(1, Math.floor((nowMs - endMs) / MS_PER_DAY));
+    return {
+      isValid: true,
+      isNegativeRange: false,
+      errorMessage: `مهلت این سرویس/سررسید به پایان رسیده است (${overdueDays.toLocaleString("fa-IR")} روز گذشته از سررسید)`,
+      startDate: start,
+      endDate: end,
+      totalSpanDays: effectiveSpanDays,
+      totalDays: effectiveSpanDays,
+      daysPassed: effectiveSpanDays,
+      daysLeft: 0,
+      remainingPercent: 0,
+      isExpired: true,
+      isOverdue: true,
+      overdueDays,
+      isFuture: false,
+      urgency: "expired",
+      statusText: `منقضی شده (${overdueDays.toLocaleString("fa-IR")} روز گذشته)`,
+      isAlarmExceeded,
+      alarmMessage,
+    };
+  }
+
+  let urgency: "expired" | "critical" | "warning" | "normal" = "normal";
+  let statusText = `${daysLeft.toLocaleString("fa-IR")} روز باقی‌مانده`;
+  if (daysLeft <= 3) {
+    urgency = "critical";
+    statusText = `بحرانی (تنها ${daysLeft.toLocaleString("fa-IR")} روز مانده)`;
+  } else if (daysLeft <= 7) {
+    urgency = "warning";
+    statusText = `نزدیک سررسید (${daysLeft.toLocaleString("fa-IR")} روز مانده)`;
+  }
+
+  return {
+    isValid: true,
+    isNegativeRange: false,
+    startDate: start,
+    endDate: end,
+    totalSpanDays: effectiveSpanDays,
+    totalDays: effectiveSpanDays,
+    daysPassed,
+    daysLeft,
+    remainingPercent,
+    isExpired: false,
+    isOverdue: false,
+    overdueDays: 0,
+    isFuture: false,
+    urgency,
+    statusText,
+    isAlarmExceeded,
+    alarmMessage,
+  };
 }

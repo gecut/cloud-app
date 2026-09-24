@@ -88,12 +88,12 @@ export function AppShell({ header, children }: AppShellProps) {
     <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-emerald-500/20 selection:text-emerald-400">
       {header}
       <div className="flex-1 flex relative">
-        {/* Sleek Minimalist Sidebar */}
-        <aside className="w-64 border-l border-border/40 bg-card/20 backdrop-blur-md p-5 hidden md:flex flex-col gap-1.5 shrink-0 select-none">
-          <div className="px-3.5 py-2 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+        {/* Sleek Minimalist Sidebar (Responsive for Tablet & Desktop) */}
+        <aside className="w-52 lg:w-64 border-l border-border/40 bg-card/20 backdrop-blur-md p-3.5 lg:p-5 hidden md:flex flex-col gap-1 lg:gap-1.5 shrink-0 select-none transition-all duration-200">
+          <div className="px-3 py-1.5 lg:px-3.5 lg:py-2 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
             مدیریت و نظارت
           </div>
-          <nav className="flex flex-col gap-1.5 mt-1.5">
+          <nav className="flex flex-col gap-1 lg:gap-1.5 mt-1.5">
             {navItems.map((item, idx) => {
               const Icon = item.icon;
               const isActive = item.exact
@@ -104,7 +104,7 @@ export function AppShell({ header, children }: AppShellProps) {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className={`group relative flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
+                  className={`group relative flex items-center gap-2.5 lg:gap-3 px-3 lg:px-4 py-2 lg:py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
                     isActive
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
@@ -119,14 +119,14 @@ export function AppShell({ header, children }: AppShellProps) {
                       isActive ? "text-emerald-500" : "opacity-70 group-hover:opacity-100"
                     }`}
                   />
-                  <span>{item.label}</span>
+                  <span className="truncate">{item.label}</span>
                 </Link>
               );
             })}
           </nav>
 
-          <div className="mt-auto pt-5 border-t border-border/30 flex flex-col gap-2.5">
-            <div className="p-3.5 rounded-xl bg-card/40 border border-border/40 text-xs flex flex-col gap-1.5 backdrop-blur-xs">
+          <div className="mt-auto pt-4 lg:pt-5 border-t border-border/30 flex flex-col gap-2 lg:gap-2.5">
+            <div className="p-2.5 lg:p-3.5 rounded-xl bg-card/40 border border-border/40 text-xs flex flex-col gap-1 lg:gap-1.5 backdrop-blur-xs">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-foreground text-[11px]">جیکات کلود v1.0</span>
                 <span className="flex h-2 w-2 relative">
@@ -150,8 +150,8 @@ export function AppShell({ header, children }: AppShellProps) {
           </div>
         </aside>
 
-        {/* Main Content Area with Entrance Animation */}
-        <main className="flex-1 p-6 md:p-8 lg:p-10 max-w-7xl mx-auto w-full overflow-y-auto animate-entrance">
+        {/* Main Content Area with Entrance Animation & min-w-0 for Table Responsiveness */}
+        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto animate-entrance min-w-0">
           {children}
         </main>
       </div>

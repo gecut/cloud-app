@@ -41,6 +41,7 @@ export class CreateCustomerHandler
         });
       } else {
         const userUpdateData: any = {};
+        if (dto.name) userUpdateData.name = dto.name;
         if (user.phone !== cleanPhone) userUpdateData.phone = cleanPhone;
         if (validBirthDate && !user.birthDate) userUpdateData.birthDate = validBirthDate;
         if (validCoopDate && !user.cooperationStartDate) userUpdateData.cooperationStartDate = validCoopDate;

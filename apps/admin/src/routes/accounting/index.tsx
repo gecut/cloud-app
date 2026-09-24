@@ -1,13 +1,15 @@
 import { useState, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
 import { AppShell } from "@/components/layout/app-shell";
 import { apiClient } from "@/utils/api-client";
 import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
+import { Label } from "@gecut-cloud/ui/components/label";
 import { formatJalaliDate } from "@gecut-cloud/contracts";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
+import { toast } from "sonner";
 import {
   Calculator,
   TrendingUp,
@@ -28,11 +30,16 @@ import {
   Globe,
   Cpu,
   Package,
+  MessageSquare,
+  Headphones,
+  Image,
+  Tag,
   Filter,
   Calendar,
   CalendarDays,
   X,
   RotateCcw,
+  Plus,
 } from "lucide-react";
 import { formatInvoiceNumber } from "@/utils/format";
 
@@ -40,18 +47,29 @@ export const Route = createFileRoute("/accounting/")({
   component: AdminAccountingPage,
 });
 
-const ACCOUNTING_CONTENT_CATEGORIES = [
-  { id: "ALL", label: "همه خدمات و اسناد", icon: Layers },
-  { id: "HOSTING", label: "هاست و فضای ابری", icon: HardDrive },
-  { id: "SERVER", label: "سرور اختصاصی و VPS", icon: Server },
-  { id: "DOMAIN", label: "ثبت و تمدید دامنه", icon: Globe },
-  { id: "API", label: "وب‌سرویس و API", icon: Cpu },
-  { id: "PACKAGE", label: "بسته‌های مصرفی", icon: Package },
-];
+function getCategoryIcon(slug: string, name?: string) {
+  const s = `${slug || ""} ${name || ""}`.toLowerCase();
+  if (s.includes("domain") || s.includes("دامنه")) return Globe;
+  if (s.includes("server") || s.includes("سرور") || s.includes("vps")) return Server;
+  if (s.includes("host") || s.includes("هاست") || s.includes("میزبانی")) return HardDrive;
+  if (s.includes("sms") || s.includes("پیامک") || s.includes("پیام")) return MessageSquare;
+  if (s.includes("support") || s.includes("پشتیبانی") || s.includes("تیکت")) return Headphones;
+  if (s.includes("image") || s.includes("تصویر") || s.includes("عکس")) return Image;
+  if (s.includes("api") || s.includes("ai") || s.includes("هوش")) return Cpu;
+  if (s.includes("package") || s.includes("بسته") || s.includes("پکیج")) return Package;
+  return Tag;
+}
 
-function getAccountingItemCategory(item: any): string {
+function getAccountingItemCategory(item: any, categories: any[]): string {
   const invItem = item.items?.[0];
-  const snapshotType = (invItem?.serviceTypeSnapshot || item.serviceType?.name || item.serviceType?.slug || "").toLowerCase();
+  const snapshotType = (
+    invItem?.serviceTypeSnapshot ||
+    invItem?.service?.serviceType?.slug ||
+    invItem?.service?.serviceType?.name ||
+    item.serviceType?.slug ||
+    item.serviceType?.name ||
+    ""
+  ).toLowerCase();
   const title = (invItem?.title || item.name || "").toLowerCase();
   const text = (
     title + " " +
@@ -60,64 +78,43 @@ function getAccountingItemCategory(item: any): string {
     (invItem?.serviceNameSnapshot || "")
   ).toLowerCase();
 
-  // 1. DOMAIN
-  if (
-    snapshotType.includes("domain") || snapshotType.includes("دامنه") ||
-    text.includes("دامنه") || text.includes("domain") ||
-    /\.(ir|com|org|net|co|site|online|io|xyz|info)\b/i.test(title)
-  ) {
-    return "DOMAIN";
+  for (const cat of categories) {
+    const slug = (cat.slug || "").toLowerCase();
+    const name = (cat.name || "").toLowerCase();
+    const combined = `${slug} ${name}`;
+    if (
+      snapshotType.includes(slug) ||
+      text.includes(slug) ||
+      text.includes(name) ||
+      combined.split(" ").some((kw) => kw.length > 2 && text.includes(kw))
+    ) {
+      return cat.slug;
+    }
   }
-
-  // 2. SERVER & VPS
-  if (
-    snapshotType.includes("server") || snapshotType.includes("سرور") || snapshotType.includes("vps") ||
-    text.includes("سرور") || text.includes("server") || text.includes("vps") || text.includes("اختصاصی") || text.includes("مجازی")
-  ) {
-    return "SERVER";
-  }
-
-  // 3. PACKAGE & CONSUMABLE
-  if (
-    snapshotType.includes("package") || snapshotType.includes("پکیج") || snapshotType.includes("بسته") ||
-    item.trackingType === "QUANTITY" ||
-    text.includes("بسته") || text.includes("پکیج") || text.includes("تعدادی") || (invItem?.quantity && invItem.quantity > 1)
-  ) {
-    return "PACKAGE";
-  }
-
-  // 4. API & WEB SERVICE (Do NOT match generic 'سرویس')
-  if (
-    snapshotType.includes("api") || snapshotType.includes("وب‌سرویس") ||
-    text.includes("api") || text.includes("وب‌سرویس") || text.includes("وب سرویس")
-  ) {
-    return "API";
-  }
-
-  // 5. HOSTING & CLOUD
-  if (
-    snapshotType.includes("host") || snapshotType.includes("هاست") || snapshotType.includes("ابری") || snapshotType.includes("cloud") ||
-    text.includes("هاست") || text.includes("host") || text.includes("ابری") || text.includes("cloud") || text.includes("میزبانی")
-  ) {
-    return "HOSTING";
-  }
-
-  return "HOSTING";
+  return "";
 }
 
-function getSupplierItemCategory(item: any): string {
-  const type = (item.type || "").toUpperCase();
+function getSupplierItemCategory(item: any, categories: any[]): string {
   const name = (item.name || "").toLowerCase();
   const notes = (item.notes || "").toLowerCase();
-  const text = `${name} ${notes}`;
+  const serviceTypeSlug = (item.serviceType?.slug || item.type || "").toLowerCase();
+  const text = `${name} ${notes} ${serviceTypeSlug}`;
 
-  if (type === "DOMAIN" || text.includes("دامنه") || text.includes("domain") || /\.(ir|com|org|net|co|site|online)\b/i.test(name)) return "DOMAIN";
-  if (type === "SERVER" || text.includes("سرور") || text.includes("server") || text.includes("vps") || text.includes("اختصاصی") || text.includes("مجازی")) return "SERVER";
-  if (type === "PACKAGE" || text.includes("بسته") || text.includes("پکیج") || text.includes("تعدادی")) return "PACKAGE";
-  if (type === "API" || text.includes("api") || text.includes("وب‌سرویس")) return "API";
-  if (type === "HOSTING" || text.includes("هاست") || text.includes("ابری") || text.includes("cloud") || text.includes("میزبانی")) return "HOSTING";
-  return "HOSTING";
+  for (const cat of categories) {
+    const slug = (cat.slug || "").toLowerCase();
+    const catName = (cat.name || "").toLowerCase();
+    const combined = `${slug} ${catName}`;
+    if (
+      text.includes(slug) ||
+      text.includes(catName) ||
+      combined.split(" ").some((kw) => kw.length > 2 && text.includes(kw))
+    ) {
+      return cat.slug;
+    }
+  }
+  return "";
 }
+
 
 function AdminAccountingPage() {
   const [activeTab, setActiveTab] = useState<"sales" | "procurement">("sales");
@@ -164,6 +161,59 @@ function AdminAccountingPage() {
     queryFn: () => apiClient<{ items: any[]; total: number }>("/customers?limit=100"),
   });
 
+  const { data: categoriesData } = useQuery({
+    queryKey: ["admin", "categories"],
+    queryFn: () => apiClient<{ items: any[]; total: number }>("/categories"),
+  });
+  const dynamicCategories = (categoriesData?.items || []).filter((c: any) => c.isActive);
+
+
+  const queryClient = useQueryClient();
+  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState("");
+  const [newSupplierContact, setNewSupplierContact] = useState("");
+  const [newSupplierPhone, setNewSupplierPhone] = useState("");
+  const [newSupplierEmail, setNewSupplierEmail] = useState("");
+  const [newSupplierNotes, setNewSupplierNotes] = useState("");
+
+  const createSupplierMutation = useMutation({
+    mutationFn: (body: any) =>
+      apiClient("/suppliers", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      toast.success("تامین‌کننده جدید با موفقیت ثبت شد");
+      queryClient.invalidateQueries({ queryKey: ["admin", "suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "suppliers", "accounting"] });
+      setIsAddSupplierOpen(false);
+      setNewSupplierName("");
+      setNewSupplierContact("");
+      setNewSupplierPhone("");
+      setNewSupplierEmail("");
+      setNewSupplierNotes("");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در ثبت تامین‌کننده");
+    },
+  });
+
+  const handleCreateSupplierSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSupplierName.trim()) {
+      toast.error("نام تامین‌کننده الزامی است");
+      return;
+    }
+    createSupplierMutation.mutate({
+      name: newSupplierName.trim(),
+      contactPerson: newSupplierContact.trim() || undefined,
+      phone: newSupplierPhone.trim() || undefined,
+      email: newSupplierEmail.trim() || undefined,
+      status: "ACTIVE",
+      notes: newSupplierNotes.trim() || undefined,
+    });
+  };
+
   const invoices = invoicesData?.items || [];
   const suppliers = suppliersData?.items || [];
   const customersList = customersData?.items || [];
@@ -182,7 +232,7 @@ function AdminAccountingPage() {
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv: any) => {
       // 1. Content category
-      if (selectedCategory !== "ALL" && getAccountingItemCategory(inv) !== selectedCategory) return false;
+      if (selectedCategory !== "ALL" && getAccountingItemCategory(inv, dynamicCategories) !== selectedCategory) return false;
 
       // 2. Customer
       if (filterCustomerId !== "ALL" && String(inv.customerId) !== String(filterCustomerId)) return false;
@@ -213,7 +263,8 @@ function AdminAccountingPage() {
 
       return true;
     });
-  }, [invoices, selectedCategory, filterCustomerId, filterStatus, minAmount, maxAmount, filterFromDate, filterToDate, filterDateType]);
+  }, [invoices, dynamicCategories, selectedCategory, filterCustomerId, filterStatus, minAmount, maxAmount, filterFromDate, filterToDate, filterDateType]);
+
 
   const hasActiveFilters = Boolean(
     filterCustomerId !== "ALL" ||
@@ -276,7 +327,7 @@ function AdminAccountingPage() {
   const filteredSupplierServices = useMemo(() => {
     return allSupplierServices.filter((svc: any) => {
       // 1. Content Category
-      if (selectedSupplierCategory !== "ALL" && getSupplierItemCategory(svc) !== selectedSupplierCategory) return false;
+      if (selectedSupplierCategory !== "ALL" && getSupplierItemCategory(svc, dynamicCategories) !== selectedSupplierCategory) return false;
 
       // 2. Specific Supplier
       if (filterSupplierId !== "ALL" && String(svc.supplierId) !== String(filterSupplierId)) return false;
@@ -307,7 +358,7 @@ function AdminAccountingPage() {
 
       return true;
     });
-  }, [allSupplierServices, selectedSupplierCategory, filterSupplierId, filterSupplierStatus, minSupplierAmount, maxSupplierAmount, filterSupplierFromDate, filterSupplierToDate, filterSupplierDateType]);
+  }, [allSupplierServices, dynamicCategories, selectedSupplierCategory, filterSupplierId, filterSupplierStatus, minSupplierAmount, maxSupplierAmount, filterSupplierFromDate, filterSupplierToDate, filterSupplierDateType]);
 
   const hasActiveSupplierFilters = Boolean(
     filterSupplierId !== "ALL" ||
@@ -354,13 +405,13 @@ function AdminAccountingPage() {
       if (filterSupplierStatus !== "ALL" && sup.status !== filterSupplierStatus) return false;
       if (selectedSupplierCategory !== "ALL") {
         const hasMatchingSvc = (sup.services || []).some(
-          (s: any) => getSupplierItemCategory(s) === selectedSupplierCategory
+          (s: any) => getSupplierItemCategory(s, dynamicCategories) === selectedSupplierCategory
         );
         if (!hasMatchingSvc) return false;
       }
       return true;
     });
-  }, [suppliers, filterSupplierId, filterSupplierStatus, selectedSupplierCategory]);
+  }, [suppliers, dynamicCategories, filterSupplierId, filterSupplierStatus, selectedSupplierCategory]);
 
   const handleRefresh = () => {
     refetchInvoices();
@@ -510,30 +561,46 @@ function AdminAccountingPage() {
             {/* Content-Based Category Tabs */}
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="text-xs text-muted-foreground font-semibold ml-1">دسته‌بندی موضوعی اسناد:</span>
-              {ACCOUNTING_CONTENT_CATEGORIES.map((cat) => {
-                const Icon = cat.icon;
+              <Button
+                key="ALL"
+                variant={selectedCategory === "ALL" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setSelectedCategory("ALL");
+                  setPage(1);
+                }}
+                className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
+                  selectedCategory === "ALL" ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
+                }`}
+              >
+                <Layers className="h-4 w-4" />
+                همه خدمات
+              </Button>
+              {dynamicCategories.map((cat: any) => {
+                const Icon = getCategoryIcon(cat.slug, cat.name);
                 return (
                   <Button
                     key={cat.id}
-                    variant={selectedCategory === cat.id ? "default" : "outline"}
+                    variant={selectedCategory === cat.slug ? "default" : "outline"}
                     size="sm"
                     onClick={() => {
-                      setSelectedCategory(cat.id);
+                      setSelectedCategory(cat.slug);
                       setPage(1);
                     }}
                     className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
-                      selectedCategory === cat.id ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
+                      selectedCategory === cat.slug ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
                     }`}
                   >
                     <Icon className="h-4 w-4" />
-                    {cat.label}
+                    {cat.name}
                   </Button>
                 );
               })}
             </div>
 
+
             {/* Comprehensive Multi-Filter Bar */}
-            <div className="rounded-2xl border border-border/60 bg-card/50 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
+            <div className="relative z-20 rounded-2xl border border-border/60 bg-card/50 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
               <div className="flex items-center justify-between pb-3 border-b border-border/30">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
@@ -631,7 +698,7 @@ function AdminAccountingPage() {
               </div>
 
               {/* Date Filters Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-border/30 text-xs">
+              <div className="relative z-20 grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-border/30 text-xs">
                 {/* Date Criteria Toggle */}
                 <div className="space-y-1.5">
                   <span className="text-xs font-semibold text-muted-foreground">مبنای تاریخ جستجو:</span>
@@ -706,7 +773,7 @@ function AdminAccountingPage() {
             </div>
 
             {/* Invoices Table Card */}
-            <div className="rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs">
+            <div className="relative z-10 rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
                   <thead className="bg-muted/30 text-muted-foreground font-semibold border-b border-border/30">
@@ -833,30 +900,46 @@ function AdminAccountingPage() {
             {/* Content-Based Category Tabs for Procurement */}
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="text-xs text-muted-foreground font-semibold ml-1">دسته‌بندی موضوعی اسناد تامین:</span>
-              {ACCOUNTING_CONTENT_CATEGORIES.map((cat) => {
-                const Icon = cat.icon;
+              <Button
+                key="ALL"
+                variant={selectedSupplierCategory === "ALL" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setSelectedSupplierCategory("ALL");
+                  setSupplierPage(1);
+                }}
+                className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
+                  selectedSupplierCategory === "ALL" ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
+                }`}
+              >
+                <Layers className="h-4 w-4" />
+                همه خدمات
+              </Button>
+              {dynamicCategories.map((cat: any) => {
+                const Icon = getCategoryIcon(cat.slug, cat.name);
                 return (
                   <Button
                     key={cat.id}
-                    variant={selectedSupplierCategory === cat.id ? "default" : "outline"}
+                    variant={selectedSupplierCategory === cat.slug ? "default" : "outline"}
                     size="sm"
                     onClick={() => {
-                      setSelectedSupplierCategory(cat.id);
+                      setSelectedSupplierCategory(cat.slug);
                       setSupplierPage(1);
                     }}
                     className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
-                      selectedSupplierCategory === cat.id ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
+                      selectedSupplierCategory === cat.slug ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
                     }`}
                   >
                     <Icon className="h-4 w-4" />
-                    {cat.label}
+                    {cat.name}
                   </Button>
                 );
               })}
             </div>
 
+
             {/* Comprehensive Multi-Filter Bar for Procurement */}
-            <div className="rounded-2xl border border-border/60 bg-card/50 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
+            <div className="relative z-20 rounded-2xl border border-border/60 bg-card/50 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
               <div className="flex items-center justify-between pb-3 border-b border-border/30">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
@@ -996,6 +1079,7 @@ function AdminAccountingPage() {
                         setFilterSupplierToDate(iso);
                         setSupplierPage(1);
                       }}
+                      align="left"
                     />
                   </div>
                 </div>
@@ -1003,7 +1087,7 @@ function AdminAccountingPage() {
             </div>
 
             {/* Procurement View Selector & Table Card */}
-            <div className="rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs">
+            <div className="relative z-10 rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs">
               <div className="p-4.5 px-6 border-b border-border/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-2.5">
                   <Building2 className="h-4 w-4 text-rose-500" />
@@ -1034,11 +1118,21 @@ function AdminAccountingPage() {
                     </Button>
                   </div>
 
-                  <Link to="/servers">
-                    <Button size="sm" variant="outline" className="h-8.5 px-3 rounded-xl text-xs font-medium">
-                      مدیریت تامین‌کنندگان
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setIsAddSupplierOpen(true)}
+                      className="h-8.5 px-3 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="h-4 w-4" />
+                      تعریف تامین‌کننده جدید
                     </Button>
-                  </Link>
+                    <Link to="/servers">
+                      <Button size="sm" variant="outline" className="h-8.5 px-3 rounded-xl text-xs font-medium cursor-pointer">
+                        مدیریت زیرساخت و سرورها
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               </div>
 
@@ -1072,9 +1166,10 @@ function AdminAccountingPage() {
                         </tr>
                       ) : (
                         paginatedSupplierServices.map((svc: any) => {
-                          const catSlug = getSupplierItemCategory(svc);
-                          const catMeta = ACCOUNTING_CONTENT_CATEGORIES.find((c) => c.id === catSlug) || ACCOUNTING_CONTENT_CATEGORIES[1];
-                          const CatIcon = catMeta.icon;
+                          const catSlug = getSupplierItemCategory(svc, dynamicCategories);
+                          const catData = dynamicCategories.find((c: any) => c.slug === catSlug);
+                          const CatIcon = catSlug ? getCategoryIcon(catSlug, catData?.name) : Tag;
+                          const catLabel = catData?.name || catSlug || "سایر";
 
                           return (
                             <tr key={svc.id} className="hover:bg-muted/20 transition-colors">
@@ -1090,7 +1185,7 @@ function AdminAccountingPage() {
                               <td className="py-4 px-5">
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-muted/60 text-muted-foreground border border-border/40">
                                   <CatIcon className="h-3.5 w-3.5" />
-                                  {catMeta.label}
+                                  {catLabel}
                                 </span>
                               </td>
                               <td className="py-4 px-5 font-bold text-rose-600 dark:text-rose-400 font-mono">
@@ -1223,6 +1318,109 @@ function AdminAccountingPage() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: ADD SUPPLIER */}
+        {isAddSupplierOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="relative w-full max-w-md rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-4 border-b">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                    <Building2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base">تعریف تامین‌کننده جدید</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      ثبت شرکت یا شخص تامین‌کننده زیرساخت
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsAddSupplierOpen(false)}
+                  className="cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <form onSubmit={handleCreateSupplierSubmit} className="flex flex-col gap-4 mt-4 text-xs">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">نام تامین‌کننده / دیتاسنتر *</Label>
+                  <Input
+                    value={newSupplierName}
+                    onChange={(e) => setNewSupplierName(e.target.value)}
+                    placeholder="مثال: پارس آنلاین، آسیاتک، Hetzner، پیامک اول..."
+                    className="rounded-xl h-9 text-xs"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">مسئول ارتباط</Label>
+                    <Input
+                      value={newSupplierContact}
+                      onChange={(e) => setNewSupplierContact(e.target.value)}
+                      placeholder="نام شخص رابط"
+                      className="rounded-xl h-9 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">تلفن تماس</Label>
+                    <Input
+                      value={newSupplierPhone}
+                      onChange={(e) => setNewSupplierPhone(e.target.value)}
+                      placeholder="۰۲۱..."
+                      dir="ltr"
+                      className="rounded-xl h-9 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">ایمیل ارتباطی</Label>
+                  <Input
+                    value={newSupplierEmail}
+                    onChange={(e) => setNewSupplierEmail(e.target.value)}
+                    placeholder="support@datacenter.com"
+                    dir="ltr"
+                    className="rounded-xl h-9 text-xs font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">توضیحات و یادداشت</Label>
+                  <Input
+                    value={newSupplierNotes}
+                    onChange={(e) => setNewSupplierNotes(e.target.value)}
+                    placeholder="توضیحات اختیاری..."
+                    className="rounded-xl h-9 text-xs"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-4 border-t mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsAddSupplierOpen(false)}
+                    className="cursor-pointer text-xs h-9 rounded-xl"
+                  >
+                    انصراف
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createSupplierMutation.isPending}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer text-xs h-9 rounded-xl px-5"
+                  >
+                    {createSupplierMutation.isPending ? "در حال ثبت..." : "ثبت تامین‌کننده"}
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
         )}

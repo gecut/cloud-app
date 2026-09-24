@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
-import { NotFoundException, ForbiddenException } from "@nestjs/common";
+import { ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
 import { normalizePhoneNumber } from "../../../../common/utils/phone.util";
 import { OtpService } from "../../services/otp.service";
@@ -22,69 +22,71 @@ export class VerifyOtpHandler implements ICommandHandler<VerifyOtpCommand, AuthR
     const cleanPhone = normalizePhoneNumber(phone);
 
     // Verify OTP
-    await this.otpService.verifyOtp(phone, code);
-
-    // Find pre-registered user
-    let user = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ phone: cleanPhone }, { phone: phone }],
-      },
-      include: { customer: true },
-    });
-
-    if (!user) {
-      // Fallback check on customer
-      const existingCustomer = await this.prisma.customer.findFirst({
-        where: {
-          OR: [{ phone: cleanPhone }, { phone: phone }],
-        },
-      });
-
-      if (existingCustomer?.userId) {
-        user = await this.prisma.user.findUnique({
-          where: { id: existingCustomer.userId },
-          include: { customer: true },
-        });
-
-        if (user && user.phone !== cleanPhone) {
-          await this.prisma.user
-            .update({
-              where: { id: user.id },
-              data: { phone: cleanPhone } as any,
-            })
-            .catch(() => {});
-        }
+    try {
+      await this.otpService.verifyOtp(cleanPhone, code);
+    } catch (e) {
+      if (phone && phone !== cleanPhone) {
+        await this.otpService.verifyOtp(phone, code);
+      } else {
+        throw e;
       }
     }
 
-    if (!user) {
-      throw new NotFoundException(
-        "کاربر با این شماره همراه یافت نشد. حساب کاربری باید ابتدا توسط مدیر سیستم تعریف شده باشد.",
+    // Customer MUST exist in the system (created by admin)
+    const existingCustomer = await this.prisma.customer.findFirst({
+      where: {
+        OR: [{ phone: cleanPhone }, { phone: phone }],
+      },
+    });
+
+    if (!existingCustomer) {
+      throw new ForbiddenException(
+        "شماره موبایل شما در سیستم ثبت نشده است. لطفاً با پشتیبانی تماس بگیرید.",
       );
     }
 
-    const targetCustomer =
-      user.customer ||
-      (await this.prisma.customer.findFirst({
-        where: {
-          OR: [
-            { userId: user.id },
-            { id: user.id },
-            { phone: cleanPhone },
-            { phone },
-          ],
-        },
-      }));
-
     if (
-      targetCustomer &&
-      (targetCustomer.status === "INACTIVE" ||
-        targetCustomer.status === "SUSPENDED")
+      existingCustomer.status === "INACTIVE" ||
+      existingCustomer.status === "SUSPENDED"
     ) {
       throw new ForbiddenException(
         "حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.",
       );
     }
+
+    // Find linked user for this specific customer
+    let user = existingCustomer.userId
+      ? await this.prisma.user.findUnique({
+          where: { id: existingCustomer.userId },
+          include: { customer: true },
+        })
+      : null;
+
+    if (!user || user.phone !== cleanPhone) {
+      user = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: cleanPhone },
+            ...(existingCustomer.phone ? [{ phone: existingCustomer.phone }] : []),
+          ],
+        },
+        include: { customer: true },
+      });
+    }
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          name: existingCustomer.name || "کاربر جیکات",
+          phone: cleanPhone,
+          role: "CUSTOMER",
+          customerId: existingCustomer.id,
+        },
+        include: { customer: true },
+      });
+    }
+
+    const targetCustomer = existingCustomer;
 
     // Update user login timestamp
     await this.prisma.user
@@ -112,27 +114,50 @@ export class VerifyOtpHandler implements ICommandHandler<VerifyOtpCommand, AuthR
 
     await this.sessionService.recordLogin(user.id);
 
-    let customerId = user.customer?.id || (user as any).customerId || null;
-    if (!customerId) {
-      const cust = await this.prisma.customer.findFirst({
-        where: { userId: user.id },
-      });
-      if (cust) {
-        customerId = cust.id;
+    const customerId = targetCustomer?.id || user.customer?.id || (user as any).customerId || null;
+    const resolvedName = targetCustomer?.displayName || targetCustomer?.name || user.name;
+
+    // Synchronize customer relation with user
+    if (targetCustomer) {
+      if (!targetCustomer.userId || targetCustomer.userId !== user.id) {
+        await this.prisma.customer
+          .update({
+            where: { id: targetCustomer.id },
+            data: { userId: user.id },
+          })
+          .catch(() => {});
+      }
+      if ((user as any).customerId !== targetCustomer.id || user.name !== (targetCustomer.name || resolvedName)) {
+        await this.prisma.user
+          .update({
+            where: { id: user.id },
+            data: {
+              customerId: targetCustomer.id,
+              name: targetCustomer.name || resolvedName,
+            },
+          })
+          .catch(() => {});
       }
     }
 
     const authUser: AuthenticatedUser = {
       id: user.id,
-      name: user.name,
+      name: resolvedName,
       phone: user.phone,
-      email: user.email,
+      email: targetCustomer?.email || user.email,
       role: user.role,
       customerId: customerId,
       tokenVersion: user.tokenVersion,
     };
 
-    const tokens = this.tokenService.generateAuthTokens(authUser);
+    // وقتی کاربر با OTP لاگین کرد، انقضای توکن دسترسی باید دقیقاً ۲ دقیقه (۱۲۰ ثانیه) باشد
+    const OTP_ACCESS_TOKEN_TTL_SECONDS = 120; // 2 minutes
+    const tokens = this.tokenService.generateAuthTokens(
+      authUser,
+      OTP_ACCESS_TOKEN_TTL_SECONDS,
+      undefined,
+      "otp",
+    );
     const refreshTokenExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
     await this.sessionService
       .createSession(user.id, tokens.refreshToken, refreshTokenExpiresAt)

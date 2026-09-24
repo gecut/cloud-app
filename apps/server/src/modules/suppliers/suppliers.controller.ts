@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -17,11 +19,14 @@ import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { CreateServerCommand } from "./commands/create-server/create-server.command";
 import { CreateServerDto } from "./commands/create-server/create-server.dto";
 import { ListServersQuery } from "./queries/list-servers/list-servers.query";
+import { getNextUniqueInvoiceNumber } from "../invoices/utils/invoice-number.util";
 
 @ApiTags("suppliers")
 @Controller("suppliers")
 @UseGuards(RolesGuard)
 export class SuppliersController {
+  private readonly logger = new Logger(SuppliersController.name);
+
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
@@ -100,6 +105,7 @@ export class SuppliersController {
       updatedAt: new Date(),
     };
     this.prisma.memSuppliers.set(id, newSup);
+    this.prisma.saveToDisk();
     return newSup;
   }
 
@@ -158,14 +164,107 @@ export class SuppliersController {
     };
     this.prisma.memSupplierServices.set(id, newService);
 
+    const isFree = amount === 0;
+
     // Update supplier payable
     const sup = this.prisma.memSuppliers.get(body.supplierId);
-    if (sup) {
+    if (sup && !isFree) {
       sup.totalPayableToman = (sup.totalPayableToman || 0) + amount;
     }
 
+    // Automatically issue purchase invoice for supplier
+    let invoice: any = null;
+    try {
+      const invoiceNumber = await getNextUniqueInvoiceNumber(this.prisma);
+
+      invoice = await this.prisma.invoice.create({
+        data: {
+          customerId: null,
+          supplierId: body.supplierId,
+          counterpartyType: "SUPPLIER",
+          invoiceNumber,
+          status: isFree ? "PAID" : "UNPAID",
+          subtotalToman: amount,
+          totalToman: amount,
+          paidAt: isFree ? now : null,
+          issuedAt: newService.purchaseDate || now,
+          dueDate: newService.renewalDate || new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+          notes: isFree
+            ? `فاکتور خرید رایگان سرویس «${newService.name}» (تایید خودکار سیستمی)`
+            : (body.notes || `فاکتور خرید دوره سرویس «${newService.name}» از تامین‌کننده ${sup?.name || ""}`),
+          items: {
+            create: [
+              {
+                serviceId: id,
+                title: newService.name,
+                quantity: 1,
+                unitPriceToman: amount,
+                totalToman: amount,
+                serviceNameSnapshot: newService.name,
+                serviceTypeSnapshot: newService.type,
+                servicePriceSnapshotToman: amount,
+                serviceRenewalDateSnapshot: newService.renewalDate,
+              },
+            ],
+          },
+        } as any,
+      });
+
+      if (isFree) {
+        await this.prisma.payment.create({
+          data: {
+            invoiceId: invoice.id,
+            amountToman: 0,
+            provider: "FREE_PLAN",
+            gatewayRef: `FREE_${invoice.id}_${Date.now()}`,
+            paidAt: now,
+          },
+        });
+      }
+
+      this.logger.log(`Issued supplier purchase invoice #${invoiceNumber} for service ${newService.name} (Supplier: ${sup?.name || body.supplierId}, Free: ${isFree})`);
+    } catch (invErr) {
+      this.logger.error("Failed to automatically generate supplier invoice", invErr);
+    }
+
     this.prisma.saveToDisk();
-    return newService;
+
+    await this.prisma.auditLog
+      .create({
+        data: {
+          actorType: "USER",
+          actorRole: "ADMIN",
+          actorDisplayNameSnapshot: "مدیر مالی و زیرساخت",
+          action: "service.create",
+          entityType: "Service",
+          entityId: newService.id,
+          reason: `ثبت و تعریف سرویس تامین‌کننده «${newService.name}» (تامین‌کننده: ${sup?.name || "نامشخص"})`,
+          metadata: {
+            supplierId: body.supplierId,
+            isSupplier: true,
+            invoiceId: invoice?.id || null,
+            invoiceNumber: invoice?.invoiceNumber || null,
+          },
+          after: {
+            name: newService.name,
+            supplierId: body.supplierId,
+            supplierName: sup?.name || null,
+            monthlyExpenseToman: amount,
+            priceToman: amount,
+            isSupplier: true,
+            status: newService.status,
+            renewalDate: newService.renewalDate,
+            invoiceId: invoice?.id || null,
+            invoiceNumber: invoice?.invoiceNumber || null,
+          },
+        },
+      })
+      .catch(() => {});
+
+    return {
+      ...newService,
+      invoice,
+    };
   }
 
   @Patch(":id")
@@ -208,6 +307,15 @@ export class SuppliersController {
   ) {
     const s = this.prisma.memSupplierServices.get(serviceId);
     if (s) {
+      const beforeSnapshot = {
+        name: s.name,
+        priceToman: s.priceToman,
+        monthlyExpenseToman: s.monthlyExpenseToman,
+        status: s.status,
+        renewalDate: s.renewalDate,
+        supplierId: s.supplierId,
+      };
+
       if (body.priceToman !== undefined || body.monthlyExpenseToman !== undefined) {
         const amt = Number(body.priceToman ?? body.monthlyExpenseToman) || 0;
         body.priceToman = amt;
@@ -216,16 +324,302 @@ export class SuppliersController {
       if (body.purchaseDate) body.purchaseDate = new Date(body.purchaseDate);
       if (body.renewalDate) body.renewalDate = new Date(body.renewalDate);
       Object.assign(s, body, { updatedAt: new Date() });
+
+      // Synchronize all invoices and payments for this supplier service
+      const openInvoices = Array.from(this.prisma.memInvoices.values()).filter(
+        (inv) =>
+          inv.supplierId === s.supplierId &&
+          ((inv.items && inv.items.some((it: any) => it.serviceId === s.id)) ||
+            Array.from(this.prisma.memInvoiceItems.values()).some(
+              (it) => it.invoiceId === inv.id && it.serviceId === s.id,
+            )),
+      );
+
+      for (const inv of openInvoices) {
+        let updatedSubtotal = 0;
+        const allItems =
+          inv.items && inv.items.length > 0
+            ? inv.items
+            : Array.from(this.prisma.memInvoiceItems.values()).filter(
+                (it) => it.invoiceId === inv.id,
+              );
+
+        for (const item of allItems) {
+          if (item.serviceId === s.id) {
+            item.title = `سرویس تامین‌کننده ${s.name}`;
+            item.serviceNameSnapshot = s.name;
+            if (s.priceToman !== undefined) {
+              item.unitPriceToman = s.priceToman;
+              item.totalToman = s.priceToman * (item.quantity || 1);
+              item.servicePriceSnapshotToman = s.priceToman;
+            }
+            if (s.renewalDate) {
+              item.serviceRenewalDateSnapshot = s.renewalDate;
+            }
+            if (this.prisma.memInvoiceItems.has(item.id)) {
+              const memIt = this.prisma.memInvoiceItems.get(item.id);
+              Object.assign(memIt, {
+                title: item.title,
+                unitPriceToman: item.unitPriceToman,
+                totalToman: item.totalToman,
+                serviceNameSnapshot: s.name,
+                servicePriceSnapshotToman: s.priceToman,
+                serviceRenewalDateSnapshot: s.renewalDate,
+                updatedAt: new Date(),
+              });
+            }
+          }
+          updatedSubtotal += Number(item.totalToman) || 0;
+        }
+
+        inv.subtotalToman = updatedSubtotal;
+        inv.totalToman = updatedSubtotal;
+        if (s.renewalDate) {
+          inv.dueDate = s.renewalDate;
+        }
+
+        const isFree = updatedSubtotal === 0;
+        const existingPayment = Array.from(this.prisma.memPayments.values()).find(
+          (p) => p.invoiceId === inv.id,
+        );
+
+        if (isFree) {
+          inv.status = "PAID";
+          inv.paidAt = inv.paidAt || new Date();
+          if (existingPayment) {
+            existingPayment.amountToman = 0;
+            existingPayment.provider = "FREE_PLAN";
+            existingPayment.gatewayRef = existingPayment.gatewayRef || `FREE_${inv.id}_${Date.now()}`;
+            existingPayment.paidAt = existingPayment.paidAt || new Date();
+            existingPayment.updatedAt = new Date();
+          } else {
+            const payId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            this.prisma.memPayments.set(payId, {
+              id: payId,
+              invoiceId: inv.id,
+              amountToman: 0,
+              provider: "FREE_PLAN",
+              gatewayRef: `FREE_${inv.id}_${Date.now()}`,
+              paidAt: new Date(),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
+        } else {
+          if (existingPayment) {
+            if (existingPayment.provider === "FREE_PLAN") {
+              this.prisma.memPayments.delete(existingPayment.id);
+              inv.status = "UNPAID";
+              inv.paidAt = null;
+            } else {
+              existingPayment.amountToman = updatedSubtotal;
+              existingPayment.updatedAt = new Date();
+            }
+          }
+        }
+      }
+
+      const sup = this.prisma.memSuppliers.get(s.supplierId);
+      if (sup) {
+        const supServices = Array.from(this.prisma.memSupplierServices.values()).filter(
+          (item) => item.supplierId === sup.id && item.status === "ACTIVE",
+        );
+        sup.totalPayableToman = supServices.reduce(
+          (sum, item) => sum + (Number(item.priceToman ?? item.monthlyExpenseToman) || 0),
+          0,
+        );
+      }
+
       this.prisma.saveToDisk();
+
+      await this.prisma.auditLog
+        .create({
+          data: {
+            actorType: "USER",
+            actorRole: "ADMIN",
+            actorDisplayNameSnapshot: "مدیر مالی و زیرساخت",
+            action: "service.update",
+            entityType: "Service",
+            entityId: s.id,
+            reason: `ویرایش مشخصات سرویس تامین‌کننده «${s.name}» (تامین‌کننده: ${sup?.name || "نامشخص"})`,
+            metadata: {
+              supplierId: s.supplierId,
+              isSupplier: true,
+            },
+            before: {
+              ...beforeSnapshot,
+              supplierName: sup?.name || null,
+            },
+            after: {
+              name: s.name,
+              priceToman: s.priceToman,
+              monthlyExpenseToman: s.monthlyExpenseToman,
+              status: s.status,
+              renewalDate: s.renewalDate,
+              supplierId: s.supplierId,
+              supplierName: sup?.name || null,
+              isSupplier: true,
+            },
+          },
+        })
+        .catch(() => {});
+
       return s;
     }
     return null;
+  }
+
+  @Post("services/:serviceId/renew")
+  @Roles("ADMIN")
+  @ApiOperation({ summary: "Renew a supplier purchased service and issue new invoice and payment" })
+  async renewSupplierService(
+    @Param("serviceId") serviceId: string,
+    @Body() body?: { cycleDays?: number },
+  ) {
+    const s = this.prisma.memSupplierServices.get(serviceId);
+    if (!s) {
+      throw new NotFoundException("سرویس تامین‌کننده یافت نشد");
+    }
+
+    const now = new Date();
+    const cycleDays = Number(body?.cycleDays) || s.billingCycleDays || 30;
+    const prevRenewal = s.renewalDate ? new Date(s.renewalDate) : now;
+    let nextRenewal = new Date(prevRenewal.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+    if (nextRenewal.getTime() <= now.getTime()) {
+      nextRenewal = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+    }
+
+    s.purchaseDate = prevRenewal;
+    s.renewalDate = nextRenewal;
+    s.status = "ACTIVE";
+    s.updatedAt = now;
+
+    const amount = Number(s.priceToman ?? s.monthlyExpenseToman) || 0;
+    const isFree = amount === 0;
+    const invoiceNumber = await getNextUniqueInvoiceNumber(this.prisma);
+    const sup = this.prisma.memSuppliers.get(s.supplierId);
+
+    const invoice = await this.prisma.invoice.create({
+      data: {
+        customerId: null,
+        supplierId: s.supplierId,
+        counterpartyType: "SUPPLIER",
+        invoiceNumber,
+        status: isFree ? "PAID" : "UNPAID",
+        subtotalToman: amount,
+        totalToman: amount,
+        paidAt: isFree ? now : null,
+        issuedAt: now,
+        dueDate: nextRenewal,
+        notes: isFree
+          ? `فاکتور تمدید رایگان سرویس «${s.name}» (تایید خودکار سیستمی)`
+          : `فاکتور تمدید دوره خرید سرویس «${s.name}» از تامین‌کننده ${sup?.name || ""}`,
+        items: {
+          create: [
+            {
+              serviceId: s.id,
+              title: `تمدید سرویس تامین‌کننده ${s.name}`,
+              quantity: 1,
+              unitPriceToman: amount,
+              totalToman: amount,
+              serviceNameSnapshot: s.name,
+              serviceTypeSnapshot: s.type,
+              servicePriceSnapshotToman: amount,
+              serviceRenewalDateSnapshot: nextRenewal,
+            },
+          ],
+        },
+      } as any,
+    });
+
+    let payment: any = null;
+    if (isFree) {
+      payment = await this.prisma.payment.create({
+        data: {
+          invoiceId: invoice.id,
+          amountToman: 0,
+          provider: "FREE_PLAN",
+          gatewayRef: `FREE_${invoice.id}_${Date.now()}`,
+          paidAt: now,
+        },
+      });
+    } else if (sup) {
+      sup.totalPayableToman = (sup.totalPayableToman || 0) + amount;
+    }
+
+    this.prisma.saveToDisk();
+
+    await this.prisma.auditLog
+      .create({
+        data: {
+          actorType: "USER",
+          actorRole: "ADMIN",
+          actorDisplayNameSnapshot: "مدیر مالی و زیرساخت",
+          action: "service.renewed_and_invoice_created",
+          entityType: "Service",
+          entityId: s.id,
+          reason: `تمدید سرویس تامین‌کننده «${s.name}» تا تاریخ ${nextRenewal.toISOString().slice(0, 10)} و صدور صورت‌حساب خرید #${invoiceNumber}`,
+          metadata: {
+            supplierId: s.supplierId,
+            isSupplier: true,
+            invoiceId: invoice.id,
+            invoiceNumber,
+            isFree,
+            paymentId: payment?.id || null,
+          },
+          after: {
+            name: s.name,
+            renewalDate: nextRenewal,
+            status: "ACTIVE",
+            invoiceId: invoice.id,
+            invoiceNumber,
+            amountToman: amount,
+            isFree,
+          },
+        },
+      })
+      .catch(() => {});
+
+    return {
+      success: true,
+      service: s,
+      invoice,
+      payment,
+    };
   }
 
   @Delete("services/:serviceId")
   @Roles("ADMIN")
   @ApiOperation({ summary: "Delete supplier service" })
   async deleteSupplierService(@Param("serviceId") serviceId: string) {
+    const s = this.prisma.memSupplierServices.get(serviceId);
+    if (s) {
+      const sup = this.prisma.memSuppliers.get(s.supplierId);
+      await this.prisma.auditLog
+        .create({
+          data: {
+            actorType: "USER",
+            actorRole: "ADMIN",
+            actorDisplayNameSnapshot: "مدیر مالی و زیرساخت",
+            action: "service.delete",
+            entityType: "Service",
+            entityId: s.id,
+            reason: `حذف سرویس تامین‌کننده «${s.name}» (تامین‌کننده: ${sup?.name || "نامشخص"})`,
+            metadata: {
+              supplierId: s.supplierId,
+              isSupplier: true,
+            },
+            before: {
+              name: s.name,
+              priceToman: s.priceToman,
+              supplierId: s.supplierId,
+              supplierName: sup?.name || null,
+            },
+          },
+        })
+        .catch(() => {});
+    }
+
     this.prisma.memSupplierServices.delete(serviceId);
     this.prisma.saveToDisk();
     return { success: true };

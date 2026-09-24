@@ -25,6 +25,9 @@ import {
   Hash,
   X,
   ExternalLink,
+  MessageSquare,
+  Headphones,
+  Image,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,11 +47,14 @@ interface CategoryItem {
   updatedAt: string;
 }
 
-function getCategoryIcon(slug: string) {
-  const s = slug?.toLowerCase() || "";
+function getCategoryIcon(slug: string, name?: string) {
+  const s = `${slug || ""} ${name || ""}`.toLowerCase();
   if (s.includes("domain") || s.includes("دامنه")) return Globe;
   if (s.includes("server") || s.includes("سرور") || s.includes("vps")) return Server;
-  if (s.includes("host") || s.includes("هاست")) return HardDrive;
+  if (s.includes("host") || s.includes("هاست") || s.includes("میزبانی")) return HardDrive;
+  if (s.includes("sms") || s.includes("پیامک") || s.includes("پیام")) return MessageSquare;
+  if (s.includes("support") || s.includes("پشتیبانی") || s.includes("تیکت")) return Headphones;
+  if (s.includes("image") || s.includes("تصویر") || s.includes("عکس")) return Image;
   if (s.includes("api") || s.includes("ai") || s.includes("هوش")) return Cpu;
   if (s.includes("package") || s.includes("بسته") || s.includes("پکیج")) return Package;
   return Tag;
@@ -160,12 +166,17 @@ export function AdminCategoriesPage() {
         method: "PATCH",
         body: JSON.stringify(updateData),
       }),
-    onSuccess: () => {
-      toast.success("دسته‌بندی با موفقیت ویرایش شد");
+    onSuccess: (_data, variables) => {
+      const isToggle = Object.keys(variables).filter((k) => k !== "id").length === 1 && "isActive" in variables;
+      if (isToggle) {
+        toast.success(variables.isActive ? "دسته‌بندی فعال شد" : "دسته‌بندی غیرفعال شد");
+      } else {
+        toast.success("دسته‌بندی با موفقیت ویرایش شد");
+        setIsEditOpen(false);
+        setEditingCategory(null);
+      }
       queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "services"] });
-      setIsEditOpen(false);
-      setEditingCategory(null);
     },
     onError: (err: any) => {
       toast.error(err.message || "خطا در ویرایش دسته‌بندی");
@@ -425,6 +436,29 @@ export function AdminCategoriesPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              onClick={() =>
+                                updateMutation.mutate({
+                                  id: cat.id,
+                                  isActive: !cat.isActive,
+                                })
+                              }
+                              disabled={updateMutation.isPending}
+                              className={`h-8 w-8 cursor-pointer rounded-lg ${
+                                cat.isActive
+                                  ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                                  : "text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                              }`}
+                              title={cat.isActive ? "غیرفعال کردن دسته‌بندی" : "فعال کردن دسته‌بندی"}
+                            >
+                              {cat.isActive ? (
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              ) : (
+                                <XCircle className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handleOpenEdit(cat)}
                               className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg"
                               title="ویرایش دسته‌بندی"
@@ -530,12 +564,17 @@ export function AdminCategoriesPage() {
               <div className="flex items-center gap-2 pt-2 border-t">
                 <Button
                   onClick={() => {
-                    if (!createName.trim()) {
+                    const clean = createName.trim();
+                    if (!clean) {
                       toast.error("لطفاً نام دسته‌بندی را وارد کنید");
                       return;
                     }
+                    if (categories.some((c) => c.name.trim().toLowerCase() === clean.toLowerCase())) {
+                      toast.error("دسته‌بندی با این نام قبلاً ایجاد شده است");
+                      return;
+                    }
                     createMutation.mutate({
-                      name: createName,
+                      name: clean,
                       slug: createSlug.trim() || undefined,
                       description: createDescription.trim() || undefined,
                       isActive: createIsActive,
@@ -632,13 +671,24 @@ export function AdminCategoriesPage() {
               <div className="flex items-center gap-2 pt-2 border-t">
                 <Button
                   onClick={() => {
-                    if (!editName.trim()) {
+                    const clean = editName.trim();
+                    if (!clean) {
                       toast.error("نام دسته‌بندی نمی‌تواند خالی باشد");
+                      return;
+                    }
+                    if (
+                      categories.some(
+                        (c) =>
+                          c.id !== editingCategory.id &&
+                          c.name.trim().toLowerCase() === clean.toLowerCase(),
+                      )
+                    ) {
+                      toast.error("دسته‌بندی دیگری با این نام قبلاً ایجاد شده است");
                       return;
                     }
                     updateMutation.mutate({
                       id: editingCategory.id,
-                      name: editName,
+                      name: clean,
                       slug: editSlug.trim() || undefined,
                       description: editDescription.trim() || undefined,
                       isActive: editIsActive,
@@ -676,8 +726,8 @@ export function AdminCategoriesPage() {
                 </p>
                 {deletingCategory.servicesCount > 0 && (
                   <div className="p-3 mt-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-400 text-right">
-                    <span className="font-bold">هشدار:</span> این دسته‌بندی در حال حاضر دارای{" "}
-                    <span className="font-bold">{deletingCategory.servicesCount}</span> سرویس متصل است و امکان حذف مستقیم آن به منظور حفظ یکپارچگی داده‌ها وجود ندارد. ابتدا باید سرویس‌ها را ویرایش یا به دسته دیگری منتقل کنید.
+                    <span className="font-bold">توجه:</span> این دسته‌بندی دارای{" "}
+                    <span className="font-bold">{deletingCategory.servicesCount}</span> سرویس متصل است. در صورت حذف، سرویس‌های متصل به صورت خودکار به دسته‌بندی پیش‌فرض منتقل خواهند شد.
                   </div>
                 )}
               </div>
@@ -685,8 +735,8 @@ export function AdminCategoriesPage() {
               <div className="flex items-center gap-2 pt-2">
                 <Button
                   onClick={() => deleteMutation.mutate(deletingCategory.id)}
-                  disabled={deleteMutation.isPending || deletingCategory.servicesCount > 0}
-                  className="flex-1 rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white cursor-pointer disabled:opacity-50"
+                  disabled={deleteMutation.isPending}
+                  className="flex-1 rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white cursor-pointer"
                 >
                   {deleteMutation.isPending ? "در حال حذف..." : "تایید و حذف"}
                 </Button>

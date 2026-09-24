@@ -1,11 +1,10 @@
+import { useState } from "react";
 import { Service } from "@/app/data";
-import { cn, toast } from "@heroui/react";
+import { cn, Button } from "@heroui/react";
 import { ServerSquareCloud } from "@solar-icons/react-perf/category/devices/LineDuotone";
 import { LayersMinimalistic } from "@solar-icons/react-perf/category/tools/BoldDuotone";
-import { Factor } from "./factor";
 import { Progress } from "../../common/progress";
-import { useNavigate } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { analyzeDateRange } from "@gecut-cloud/contracts";
 import { apiClient } from "@/lib/api-client";
 
 interface DashboardCardProps {
@@ -13,8 +12,24 @@ interface DashboardCardProps {
 }
 
 export function DashboardCard({ data }: DashboardCardProps) {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const [isRenewing, setIsRenewing] = useState(false);
+
+  const handleRenew = async () => {
+    try {
+      setIsRenewing(true);
+      const res = await apiClient<{ success: boolean; invoice: any; message: string }>(
+        `/services/${data.id}/renew`,
+        { method: "POST" },
+      );
+      if (res?.invoice) {
+        window.location.href = "/payments";
+      }
+    } catch (err: any) {
+      alert(err.message || "خطا در صدور فاکتور تمدید سرویس");
+    } finally {
+      setIsRenewing(false);
+    }
+  };
 
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -39,67 +54,38 @@ export function DashboardCard({ data }: DashboardCardProps) {
   const remainedQty = data.remainedQuantity ?? Math.max(0, totalQty - (data.usedQuantity || 0));
   const quantityPercent = Math.min(Math.max((remainedQty / totalQty) * 100, 0), 100);
 
-  // 1. بازه زمانی کلی یا دوره تعیین‌شده
+  // 1. تحلیل دقیق و استاندارد بازه زمانی
   const rawCycle = Number(data.billingCycle);
   const configuredCycleDays = !isNaN(rawCycle) && rawCycle > 0 ? rawCycle : null;
-  const rawTotalDays = Math.round((renewalDate.getTime() - startDate.getTime()) / MS_PER_DAY);
-  const totalDays = configuredCycleDays || Math.max(1, rawTotalDays);
 
-  // 2. روزشمار معطوف به روزهای سپری‌شده
-  const creationMs = data.createdAt ? new Date(data.createdAt).getTime() : startDate.getTime();
-  const daysPassed = Math.max(0, Math.floor((Date.now() - creationMs) / MS_PER_DAY));
-  const daysLeft = Math.max(0, totalDays - daysPassed);
-
-  const remainingDaysPercent = Math.min(
-    Math.max((daysLeft / totalDays) * 100, 0),
-    100,
-  );
-
-  // 3. آلارم در صورت مغایرت دوره تعیین‌شده با بازه زمانی
-  const isAlarmExceeded = trackingType !== "QUANTITY" && configuredCycleDays !== null && configuredCycleDays > totalDays;
-
-  const statusStyle: Record<Service["status"], string> = {
-    ACTIVE: "bg-green-400",
-    INACTIVE: "bg-red-400",
-    SUSPENDED: "bg-yellow-400",
-  };
-
-  const renewMutation = useMutation({
-    mutationFn: async () => {
-      return apiClient("/invoices", {
-        method: "POST",
-        body: JSON.stringify({
-          dueDate: new Date(Date.now() + 7 * 86400000).toISOString(),
-          items: [
-            {
-              serviceId: data.id,
-              title: isPackage
-                ? `تمدید بسته ${data.name} (${totalQty.toLocaleString("fa-IR")} عدد)`
-                : `تمدید دوره‌ای ${data.name}`,
-              quantity: totalQty,
-              unitPriceToman: data.priceToman,
-              totalToman: data.priceToman,
-            },
-          ],
-        }),
-      });
-    },
-    onSuccess: () => {
-      toast.success("صورت‌حساب تمدید با موفقیت صادر شد. در حال انتقال به درگاه پرداخت...");
-      queryClient.invalidateQueries({ queryKey: ["customer", "invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["customer", "payments"] });
-      setTimeout(() => {
-        navigate({ to: "/payments" });
-      }, 600);
-    },
-    onError: (err: any) => {
-      toast.danger(err.message || "خطا در صدور صورت‌حساب تمدید");
-    },
+  const dateAnalysis = analyzeDateRange({
+    startDate,
+    endDate: renewalDate,
+    configuredCycleDays,
   });
 
-  const handleRenewService = () => {
-    if (renewMutation.isPending) return;
-    renewMutation.mutate();
+  const totalDays = dateAnalysis.totalSpanDays;
+  const daysLeft = dateAnalysis.daysLeft; // به صورت تضمینی در صورت انقضا دقیقاً ۰ است
+  const remainingDaysPercent = dateAnalysis.remainingPercent; // در صورت انقضا ۰٪
+  const isExpired = trackingType === "QUANTITY" ? false : dateAnalysis.isExpired;
+  const isAlarmExceeded = Boolean(dateAnalysis.isAlarmExceeded);
+  const overdueDays = dateAnalysis.overdueDays;
+  const isTimeNearExpiry = showDays && !isExpired && daysLeft > 0 && daysLeft <= 3;
+
+  const isQuantityDepleted = showQty && (remainedQty <= 0 || (data.usedQuantity || 0) >= totalQty);
+  const isQuantityNearDepletion = showQty && !isQuantityDepleted && (quantityPercent <= 5 || remainedQty <= Math.max(1, Math.ceil(totalQty * 0.05)));
+
+  // اگر سرویسی هنوز بسته داره و تموم نشده و تاریخشم نگذشته، وضعیت قطعی آن فعال است
+  const isServiceActive = !isExpired && remainedQty > 0 ? true : data.status === "ACTIVE";
+  const displayStatus =
+    data.paymentStatus === "UNPAID" || data.status === "SUSPENDED" || data.status === "INACTIVE" || !isServiceActive
+      ? "SUSPENDED"
+      : "ACTIVE";
+
+  const statusStyle: Record<string, string> = {
+    ACTIVE: "bg-green-400",
+    INACTIVE: "bg-amber-400",
+    SUSPENDED: "bg-amber-400",
   };
 
   return (
@@ -113,10 +99,17 @@ export function DashboardCard({ data }: DashboardCardProps) {
               <ServerSquareCloud size={50} className="*:stroke-1 text-primary" />
             )}
 
-            <div className="flex flex-col justify-center gap-2">
-              <span className="leading-none font-semibold text-md">
-                {data.name || data.serviceType?.name || "سرویس ابری"}
-              </span>
+            <div className="flex flex-col justify-center gap-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="leading-none font-semibold text-md">
+                  {data.name}
+                </span>
+                {data.serviceType?.name && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+                    {data.serviceType.name}
+                  </span>
+                )}
+              </div>
 
               <span className="text-xs font-normal leading-none text-muted-foreground">
                 {data.description || (isPackage ? `بسته دارای ${totalQty.toLocaleString("fa-IR")} سهمیه فعال` : "سرویس فعال زیرساخت ابری")}
@@ -124,51 +117,129 @@ export function DashboardCard({ data }: DashboardCardProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <div
-              className={cn(
-                "w-1 h-2 rounded-full animate-wiggle delay-200",
-                statusStyle[data.status],
-              )}
-            />
+          <div className="flex items-center gap-2">
+            {displayStatus === "SUSPENDED" ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                معلق
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                فعال
+              </span>
+            )}
 
-            <div
-              className={cn(
-                "w-1 h-2 rounded-full animate-wiggle delay-400",
-                statusStyle[data.status],
-              )}
-            />
-
-            <div
-              className={cn(
-                "w-1 h-2 rounded-full animate-wiggle delay-700",
-                statusStyle[data.status],
-              )}
-            />
+            <div className="flex items-center gap-1">
+              <div
+                className={cn(
+                  "w-1 h-2 rounded-full animate-wiggle delay-200",
+                  statusStyle[displayStatus],
+                )}
+              />
+              <div
+                className={cn(
+                  "w-1 h-2 rounded-full animate-wiggle delay-400",
+                  statusStyle[displayStatus],
+                )}
+              />
+              <div
+                className={cn(
+                  "w-1 h-2 rounded-full animate-wiggle delay-700",
+                  statusStyle[displayStatus],
+                )}
+              />
+            </div>
           </div>
         </div>
 
         <div className="w-full flex flex-col gap-3">
           {/* Days Remaining Progress (TIME & HYBRID) */}
           {showDays && (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between text-xs">
-                <span>مدت زمان باقی‌مانده</span>
+                <span className="font-medium text-foreground">مدت زمان باقی‌مانده</span>
                 <div className="flex items-center gap-1 font-mono">
-                  <span className="font-semibold text-foreground">
-                    {daysLeft.toLocaleString("fa-IR")} روز مانده
-                  </span>
-                  <span className="text-muted-foreground text-[11px]">
-                    ({Math.round(remainingDaysPercent).toLocaleString("fa-IR")}٪ از بازه {totalDays.toLocaleString("fa-IR")} روزه)
-                  </span>
+                  {isExpired ? (
+                    <span className="font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                      <span>۰ روز مانده</span>
+                      <span className="text-[10px] bg-rose-500/10 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 rounded-md border border-rose-500/20">
+                        (منقضی شده)
+                      </span>
+                    </span>
+                  ) : (
+                    <>
+                      <span className={`font-semibold ${dateAnalysis.urgency === "critical" ? "text-rose-600 dark:text-rose-400" : dateAnalysis.urgency === "warning" ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
+                        {daysLeft.toLocaleString("fa-IR")} روز مانده
+                      </span>
+                      <span className="text-muted-foreground text-[11px]">
+                        ({Math.round(remainingDaysPercent).toLocaleString("fa-IR")}٪ از بازه {totalDays.toLocaleString("fa-IR")} روزه)
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
-              {isAlarmExceeded && (
-                <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium animate-pulse flex items-center gap-1">
+
+              {/* Explicit Error Banner when expired */}
+              {isExpired && (
+                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-rose-600 dark:text-rose-400 font-bold">⚠️ خطا:</span>
+                    <span>مهلت زمانی این سرویس به پایان رسیده است ({overdueDays.toLocaleString("fa-IR")} روز گذشته از موعد سررسید)</span>
+                  </div>
+                  <span className="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded font-bold shrink-0">
+                    نیاز به تمدید
+                  </span>
+                </div>
+              )}
+
+              {/* Critical Urgency Banner when near expiration (<= 3 days) */}
+              {!isExpired && isTimeNearExpiry && (
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center gap-1.5 animate-pulse">
+                  <svg className="h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <span>هشدار: تنها {daysLeft.toLocaleString("fa-IR")} روز تا سررسید و پایان مهلت سرویس باقی مانده است. لطفاً نسبت به تمدید اقدام فرمایید.</span>
+                </div>
+              )}
+
+              {/* Alarm for cycle mismatch */}
+              {isAlarmExceeded && !isExpired && (
+                <div className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/10 p-2 rounded-xl border border-amber-500/30 font-medium flex items-center gap-1">
                   <span>⚠️ هشدار: دوره تعیین‌شده ({configuredCycleDays?.toLocaleString("fa-IR")} روز) بیشتر از بازه زمانی سررسید ({totalDays.toLocaleString("fa-IR")} روز) است</span>
                 </div>
               )}
-              <Progress progress={remainingDaysPercent} />
+
+              <Progress
+                progress={remainingDaysPercent}
+                variant={isExpired ? "rose" : isTimeNearExpiry ? "rose" : dateAnalysis.urgency === "warning" ? "amber" : "auto"}
+              />
+            </div>
+          )}
+
+          {/* Quantity Depleted Alarm */}
+          {showQty && isQuantityDepleted && (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold">
+              <svg className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>خطا: سهمیه این سرویس به پایان رسیده است (۰ عدد باقی‌مانده). جهت شارژ مجدد تمدید فرمایید.</span>
+            </div>
+          )}
+
+          {/* Quantity Near Depletion Alarm (<=5%) */}
+          {showQty && isQuantityNearDepletion && (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold animate-pulse">
+              <svg className="h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <span>هشدار: کمتر از ۵٪ از سهمیه این سرویس باقی مانده است ({remainedQty.toLocaleString("fa-IR")} عدد باقی‌مانده).</span>
             </div>
           )}
 
@@ -186,7 +257,7 @@ export function DashboardCard({ data }: DashboardCardProps) {
                   </span>
                 </div>
               </div>
-              <Progress progress={quantityPercent} />
+              <Progress progress={quantityPercent} variant={isQuantityDepleted ? "rose" : isQuantityNearDepletion ? "amber" : "auto"} />
             </div>
           )}
 
@@ -195,19 +266,44 @@ export function DashboardCard({ data }: DashboardCardProps) {
               {trackingType === "QUANTITY" ? "مبلغ بسته" : "هزینه دوره سرویس"}
             </span>
             <span className="font-semibold text-foreground font-mono">
-              {Number(data.priceToman || 0).toLocaleString("fa-IR")}{" "}
-              <span className="text-[10px] text-muted-foreground font-normal">تومان</span>
+              {Number(data.priceToman || 0) === 0 ? (
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">رایگان</span>
+              ) : (
+                <>
+                  {Number(data.priceToman || 0).toLocaleString("fa-IR")}{" "}
+                  <span className="text-[10px] text-muted-foreground font-normal">تومان</span>
+                </>
+              )}
             </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-border/40">
+            <Button
+              variant={isExpired || isQuantityDepleted ? "danger" : "primary"}
+              size="sm"
+              className="w-full sm:flex-1 rounded-xl font-medium cursor-pointer text-xs py-2 px-3"
+              isDisabled={isRenewing}
+              onPress={handleRenew}
+            >
+              {isRenewing
+                ? "در حال صدور فاکتور..."
+                : isExpired || isQuantityDepleted
+                ? "تمدید سرویس (صدور فوری فاکتور)"
+                : "تمدید سرویس"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto rounded-xl font-medium cursor-pointer text-xs py-2 px-3 whitespace-nowrap"
+              onPress={() => {
+                window.location.href = "/payments";
+              }}
+            >
+              صورت‌حساب‌ها
+            </Button>
           </div>
         </div>
       </div>
-      <Factor
-        price={data.priceToman}
-        title={isPackage ? "هزینه تمدید یا خرید مجدد بسته" : "هزینه تمدید دوره"}
-        actionText={renewMutation.isPending ? "در حال صدور فاکتور..." : "تمدید سرویس"}
-        showAction={daysLeft <= 10 || isPackage}
-        onAction={handleRenewService}
-      />
     </div>
   );
 }

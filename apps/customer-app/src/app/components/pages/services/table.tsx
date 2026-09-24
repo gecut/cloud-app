@@ -50,8 +50,14 @@ export function Table({ data }: TableProps) {
       <div className="flex items-center justify-between py-3 px-4 sm:px-5">
         <span className="text-muted-foreground font-medium">مبلغ قرارداد</span>
         <span className="font-semibold text-foreground font-mono">
-          {(Number(data.price) || 0).toLocaleString("fa-IR")}{" "}
-          <span className="text-xs text-muted-foreground font-normal">تومان</span>
+          {(Number(data.price) || 0) === 0 ? (
+            <span className="text-emerald-600 dark:text-emerald-400 font-bold">رایگان</span>
+          ) : (
+            <>
+              {(Number(data.price) || 0).toLocaleString("fa-IR")}{" "}
+              <span className="text-xs text-muted-foreground font-normal">تومان</span>
+            </>
+          )}
         </span>
       </div>
     </div>

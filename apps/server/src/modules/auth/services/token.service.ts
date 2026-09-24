@@ -109,18 +109,33 @@ export class TokenService {
     return payload;
   }
 
-  public generateAuthTokens(user: AuthenticatedUser): AuthTokens {
+  public generateAuthTokens(
+    user: AuthenticatedUser,
+    customAccessTtlSeconds?: number,
+    customRefreshTtlSeconds?: number,
+    loginMethod?: "otp" | "password",
+  ): AuthTokens {
     const now = Math.floor(Date.now() / 1000);
+    const tokenVersion =
+      typeof user.tokenVersion === "number"
+        ? user.tokenVersion
+        : (typeof (user.tokenVersion as any)?.increment === "number"
+            ? (user.tokenVersion as any).increment
+            : 0);
+
+    const accessTtl = customAccessTtlSeconds ?? this.accessTokenTtlSeconds;
+    const refreshTtl = customRefreshTtlSeconds ?? this.refreshTokenTtlSeconds;
 
     const accessPayload: JwtPayload = {
       sub: user.id,
       phone: user.phone,
       role: user.role,
       customerId: user.customerId,
-      tokenVersion: user.tokenVersion,
+      tokenVersion,
       type: "access",
+      loginMethod,
       iat: now,
-      exp: now + this.accessTokenTtlSeconds,
+      exp: now + accessTtl,
     };
 
     const refreshPayload: JwtPayload = {
@@ -128,10 +143,11 @@ export class TokenService {
       phone: user.phone,
       role: user.role,
       customerId: user.customerId,
-      tokenVersion: user.tokenVersion,
+      tokenVersion,
       type: "refresh",
+      loginMethod,
       iat: now,
-      exp: now + this.refreshTokenTtlSeconds,
+      exp: now + refreshTtl,
     };
 
     const header = { alg: "HS256", typ: "JWT" };
@@ -142,7 +158,7 @@ export class TokenService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: this.accessTokenTtlSeconds,
+      expiresIn: accessTtl,
       tokenType: "Bearer",
     };
   }

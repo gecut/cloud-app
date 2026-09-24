@@ -12,17 +12,33 @@ export class ListServicesHandler implements IQueryHandler<ListServicesQuery> {
 
     const where: any = {};
     if (customerId) {
-      // Support finding by either customerId or userId
-      const matchedCustomer = await this.prisma.customer.findFirst({
-        where: {
-          OR: [{ id: customerId }, { userId: customerId }],
-        },
-      });
-
-      if (matchedCustomer) {
-        where.customerId = matchedCustomer.id;
+      if (customerId === "__NO_CUSTOMER_SERVICES__") {
+        where.customerId = "__NO_CUSTOMER_SERVICES__";
       } else {
-        where.customerId = customerId;
+        // Support finding by either customerId, userId, or matching phone
+        let matchedCustomer = await this.prisma.customer.findFirst({
+          where: {
+            OR: [{ id: customerId }, { userId: customerId }],
+          },
+        });
+
+        if (!matchedCustomer) {
+          const u = await this.prisma.user.findUnique({ where: { id: customerId } });
+          if (u?.phone) {
+            matchedCustomer = await this.prisma.customer.findFirst({
+              where: { phone: u.phone },
+            });
+          }
+        }
+
+        if (matchedCustomer) {
+          where.OR = [
+            { customerId: matchedCustomer.id },
+            ...(matchedCustomer.userId ? [{ customerId: matchedCustomer.userId }] : []),
+          ];
+        } else {
+          where.customerId = customerId;
+        }
       }
     }
     if (status) where.status = status;

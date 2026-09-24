@@ -191,6 +191,7 @@ model Service {
   purchaseDate          DateTime?
   startDate             DateTime
   renewalDate           DateTime
+  autoRenew             Boolean               @default(false)
   serverVisibilityLevel ServerVisibilityLevel @default(NONE)
   parentServiceId       String?
   customer              Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -236,7 +237,9 @@ model Endpoint {
 
 model Invoice {
   id              String        @id @default(cuid())
-  customerId      String
+  customerId      String?
+  supplierId      String?
+  counterpartyType String?      @default("CUSTOMER")
   invoiceNumber   String        @unique
   status          InvoiceStatus @default(UNPAID)
   subtotalToman   Int
@@ -246,7 +249,7 @@ model Invoice {
   paidAt          DateTime?
   cancelledAt     DateTime?
   notes           String?
-  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  customer        Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   items           InvoiceItem[]
   payment         Payment?
   paymentAttempts PaymentAttempt[]
@@ -254,6 +257,7 @@ model Invoice {
   updatedAt       DateTime      @updatedAt
 
   @@index([customerId, status])
+  @@index([supplierId])
   @@index([dueDate])
   @@index([createdAt])
 }

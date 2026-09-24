@@ -4,11 +4,13 @@ import { Chip } from "@heroui/react";
 import { Server2 } from "@solar-icons/react-perf/category/devices/LineDuotone";
 import { GalleryWide } from "@solar-icons/react-perf/category/video/LineDuotone";
 
-interface Transaction {
+interface TransactionProps {
   data: Payments[];
+  onPay?: (invoice: Payments) => void;
+  payingId?: string | null;
 }
 
-export function Transactions({ data }: Transaction) {
+export function Transactions({ data, onPay, payingId }: TransactionProps) {
   if (!data || data.length === 0) {
     return (
       <div className="w-full flex flex-col items-center justify-center p-12 rounded-[24px] bg-surface/50 border border-dashed border-border/40 text-center gap-3">
@@ -30,35 +32,74 @@ export function Transactions({ data }: Transaction) {
   return (
     <div className="w-full flex flex-col gap-2.5">
       {data.map((x, idx) => {
+        const isPending = x.status === "Awaiting payment";
+
         return (
-          <div key={x.id || x.factorNumber || idx} className="flex rounded-2xl bg-surface px-6 py-4 border border-border/40 shadow-xs">
-            <div className="flex w-full items-center justify-between">
-              <div className="flex items-center gap-4">
-                {x.type === "DOMAIN" ? (
-                  <GalleryWide size={32} />
-                ) : (
-                  <Server2 size={32} />
-                )}
-                <div className="flex flex-col gap-1.5">
-                  <span className="leading-none text-sm font-semibold text-foreground">
+          <div
+            key={x.id || x.factorNumber || idx}
+            className={`flex flex-col rounded-2xl bg-surface p-4 sm:px-6 sm:py-4 border shadow-xs transition-colors gap-3 ${
+              isPending ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-border/40"
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row w-full items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                <div className="shrink-0 p-2 rounded-xl bg-accent-soft text-accent">
+                  {x.type === "DOMAIN" ? (
+                    <GalleryWide size={28} />
+                  ) : (
+                    <Server2 size={28} />
+                  )}
+                </div>
+                <div className="flex flex-col gap-1 min-w-0">
+                  <span className="text-sm font-semibold text-foreground truncate">
                     {x.title}
                   </span>
 
-                  <span className="text-xs leading-none text-accent">
+                  <span className="text-xs text-accent truncate">
                     {x.subTitle}
                   </span>
                 </div>
               </div>
-              <div className="flex flex-col text-xs font-light gap-1 justify-end items-end">
-                <Chip className="w-fit px-3 py-0.5 text-[11px] font-medium bg-success/15 text-success rounded-[8px]">
-                  موفق
-                </Chip>
-                <span className="text-muted-foreground text-[11px]">
-                  {formatJalaliDate(x.factorCreated)}
-                </span>
-                <span className="font-semibold text-foreground text-sm">
-                  {(x.price || 0).toLocaleString("fa-IR")} تومــان
-                </span>
+
+              <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-end w-full sm:w-auto text-xs gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/20 shrink-0">
+                <div className="flex items-center gap-2">
+                  {isPending ? (
+                    <>
+                      <Chip className="w-fit px-2.5 py-0.5 text-[10px] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-[8px] whitespace-nowrap">
+                        معلق / در انتظار پرداخت
+                      </Chip>
+                      {onPay && (
+                        <button
+                          onClick={() => onPay(x)}
+                          disabled={payingId === x.id}
+                          className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer whitespace-nowrap"
+                        >
+                          {payingId === x.id ? "در حال اتصال..." : "پرداخت"}
+                        </button>
+                      )}
+                    </>
+                  ) : x.status === "cancelled" ? (
+                    <Chip className="w-fit px-2.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground rounded-[8px] whitespace-nowrap">
+                      لغو شده
+                    </Chip>
+                  ) : (
+                    <Chip className="w-fit px-2.5 py-0.5 text-[10px] font-medium bg-success/15 text-success rounded-[8px] whitespace-nowrap">
+                      موفق
+                    </Chip>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+                  <span className="text-muted-foreground text-[11px] font-mono whitespace-nowrap">
+                    {formatJalaliDate(x.factorCreated)}
+                  </span>
+                  <span
+                    className={`font-semibold text-sm whitespace-nowrap ${
+                      isPending ? "text-amber-600 dark:text-amber-400" : "text-foreground"
+                    }`}
+                  >
+                    {(x.price || 0).toLocaleString("fa-IR")} تومــان
+                  </span>
+                </div>
               </div>
             </div>
           </div>

@@ -28,8 +28,8 @@ export class LoginPasswordHandler implements ICommandHandler<LoginPasswordComman
       throw new UnauthorizedException("کاربری با این شماره موبایل یافت نشد");
     }
 
-    if (user.customer && (user.customer.status === "INACTIVE" || user.customer.status === "SUSPENDED")) {
-      throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
+    if (user.role !== "ADMIN") {
+      throw new ForbiddenException("دسترسی به پنل مدیریت مجاز نیست. لطفاً از پنل مشتریان استفاده کنید.");
     }
 
     const isPasswordValid = await this.passwordService.compare(
@@ -43,13 +43,14 @@ export class LoginPasswordHandler implements ICommandHandler<LoginPasswordComman
 
     await this.sessionService.recordLogin(user.id);
 
+    const resolvedName = user.customer?.displayName || user.customer?.name || user.name;
     const authUser: AuthenticatedUser = {
       id: user.id,
-      name: user.name,
+      name: resolvedName,
       phone: user.phone,
-      email: user.email,
+      email: user.customer?.email || user.email,
       role: user.role,
-      customerId: user.customer?.id || null,
+      customerId: user.customer?.id || (user as any).customerId || null,
       tokenVersion: user.tokenVersion,
     };
 

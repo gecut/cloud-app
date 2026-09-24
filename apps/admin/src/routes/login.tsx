@@ -8,7 +8,7 @@ import {
 } from "@/utils/api-client";
 import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
-import { Lock, Phone, User, ShieldCheck } from "lucide-react";
+import { Lock, Phone } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/login")({
 
 function AdminLoginPage() {
   const navigate = useNavigate();
-  
+
   // Login form state (Configured for primary admin)
   const [phone, setPhone] = useState("09363528608");
   const [password, setPassword] = useState("admin@Gecut-cloud");
@@ -72,96 +72,102 @@ function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-center items-center p-4 relative overflow-hidden select-none">
-      {/* Ambient background glow accents */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse-glow" />
-      <div className="absolute bottom-10 right-10 w-72 h-72 bg-teal-500/5 rounded-full blur-3xl pointer-events-none -z-10" />
+    <div className="min-h-screen bg-gradient-to-b from-emerald-950/70 via-zinc-950 to-zinc-950 text-foreground flex flex-col justify-center items-center p-4 relative overflow-hidden select-none">
+      {/* Intense ambient background glow accents */}
+      <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[600px] h-[450px] bg-gradient-to-b from-emerald-500/30 via-teal-500/20 to-transparent rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/3 -left-20 w-96 h-96 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-0 right-0 w-[500px] h-[400px] bg-gradient-to-tl from-teal-900/40 via-emerald-950/30 to-transparent blur-3xl pointer-events-none -z-10" />
 
-      {/* Main Glass Card */}
-      <div className="w-full max-w-sm flex flex-col gap-5 animate-entrance">
-        {/* Floating 3D Badge */}
-        <div className="relative flex flex-col items-center justify-center pt-2 pb-1 select-none">
-          <div className="relative flex items-center justify-center my-2 perspective-[1000px]">
-            {/* Isometric Pedestal Shadow/Plate */}
-            <div
-              className="absolute -bottom-3 w-24 h-10 rounded-[24px] bg-gradient-to-b from-emerald-500/25 via-zinc-900/80 to-black/90 border border-emerald-500/30 shadow-[0_8px_20px_rgba(16,185,129,0.25)] blur-[0.5px]"
-              style={{
-                transform: "rotateX(60deg) rotateZ(0deg)",
-              }}
+      {/* Main Container */}
+      <div className="w-full max-w-sm flex flex-col gap-3">
+        {/* Main Card */}
+        <div className="w-full rounded-[2rem] overflow-hidden bg-card/95 dark:bg-zinc-900/95 border border-emerald-500/30 shadow-[0_20px_60px_-10px_rgba(16,185,129,0.35)] flex flex-col transition-all">
+          {/* Green Header Card Section */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-800 p-6 pt-8 pb-10 text-white flex flex-col items-center text-center select-none shadow-inner">
+            {/* Decorative background curves */}
+            <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/10 blur-xs pointer-events-none" />
+            <div className="absolute -bottom-10 -left-10 w-36 h-36 rounded-full bg-black/15 blur-xs pointer-events-none" />
+            <div className="absolute top-1/2 -left-6 w-20 h-20 rounded-full bg-emerald-400/20 blur-sm pointer-events-none" />
+
+            {/* Bare Logo with Green Glow Shadow - NO BOX */}
+            <img
+              src="/logo.png"
+              alt="جیکات کلود"
+              className="relative z-10 w-16 h-16 object-contain mb-3 drop-shadow-[0_8px_20px_rgba(16,185,129,0.7)]"
             />
 
-            {/* Floating Glossy 3D Badge Box */}
-            <div className="relative z-10 flex items-center justify-center w-18 h-18 rounded-2xl bg-gradient-to-b from-zinc-800/90 via-zinc-900 to-black border border-emerald-500/40 shadow-[0_8px_24px_rgba(16,185,129,0.25),inset_0_1px_1px_rgba(255,255,255,0.2)] transform hover:scale-105 transition-transform duration-300">
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-emerald-500/15 via-transparent to-white/10 pointer-events-none" />
-              <img
-                src="/logo.png"
-                alt="Jecut Cloud"
-                className="w-10 h-10 object-contain drop-shadow-[0_4px_12px_rgba(16,185,129,0.5)]"
-              />
-            </div>
-          </div>
-
-          <div className="text-center flex flex-col items-center gap-1 mt-3">
-            <h1 className="text-xl font-black tracking-tight text-foreground">
-              ورود به سامانه مدیریت
+            {/* Titles */}
+            <h1 className="relative z-10 text-lg font-black tracking-tight text-white drop-shadow-xs">
+              پنل ادمین جیکات کلود
             </h1>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              جهت ورود، شماره همراه و گذرواژه معتبر خود را وارد نمایید
+            <p className="relative z-10 text-xs text-white/85 font-medium mt-1 leading-relaxed">
+              ورود به سامانه مدیریت زیرساخت و مالی
             </p>
           </div>
+
+          {/* Form Body Section with Negative Border Radius Overlap */}
+          <div className="-mt-6 relative z-10 rounded-t-[2rem] bg-card dark:bg-zinc-900 border-t border-emerald-500/20 p-5 sm:p-6 flex flex-col gap-4 shadow-sm">
+            <form onSubmit={handlePasswordLogin} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="admin-phone"
+                  className="text-xs font-semibold text-foreground/85 flex items-center justify-between"
+                >
+                  <span>شماره موبایل مدیر</span>
+                  <span className="text-emerald-500 text-xs">*</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    id="admin-phone"
+                    type="tel"
+                    dir="ltr"
+                    placeholder="09363528608"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="text-center pl-9 rounded-xl border-border/70 bg-background/50 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-xs h-11 font-mono"
+                    required
+                  />
+                  <Phone className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground opacity-60" />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="admin-password"
+                  className="text-xs font-semibold text-foreground/85 flex items-center justify-between"
+                >
+                  <span>رمز عبور مدیر</span>
+                  <span className="text-emerald-500 text-xs">*</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    id="admin-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="text-center pl-9 rounded-xl border-border/70 bg-background/50 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-xs h-11 font-mono"
+                    required
+                  />
+                  <Lock className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground opacity-60" />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 rounded-xl font-bold text-xs mt-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/25 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                {loading ? "در حال اعتبارسنجی..." : "ورود امن به پنل مدیریت"}
+              </Button>
+            </form>
+          </div>
         </div>
 
-        {/* Minimalist Card Container */}
-        <div className="rounded-2xl border border-border/60 bg-card/60 backdrop-blur-xl p-5 shadow-xl shadow-black/5 dark:shadow-black/20 flex flex-col gap-4">
-          <form onSubmit={handlePasswordLogin} className="flex flex-col gap-3.5">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="admin-phone" className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
-                <span>شماره موبایل مدیر</span>
-                <span className="text-emerald-500">*</span>
-              </label>
-              <div className="relative">
-                <Input
-                  id="admin-phone"
-                  type="tel"
-                  dir="ltr"
-                  placeholder="09363528608"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="text-center pl-9 rounded-xl border-border/60 bg-background/50 focus:border-emerald-500/50 focus:ring-emerald-500/20 text-xs h-10 font-mono"
-                  required
-                />
-                <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="admin-password" className="text-xs font-semibold text-foreground/80 flex items-center gap-1">
-                <span>رمز عبور مدیر</span>
-                <span className="text-emerald-500">*</span>
-              </label>
-              <div className="relative">
-                <Input
-                  id="admin-password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="text-center pl-9 rounded-xl border-border/60 bg-background/50 focus:border-emerald-500/50 focus:ring-emerald-500/20 text-xs h-10 font-mono"
-                  required
-                />
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground opacity-60" />
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-10 rounded-xl font-semibold text-xs mt-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-[0.98]"
-            >
-              {loading ? "در حال اعتبارسنجی..." : "ورود امن به پنل مدیریت"}
-            </Button>
-          </form>
-        </div>
+        {/* Footer Note */}
+        <p className="text-[11px] text-muted-foreground/80 text-center mt-2 font-medium">
+          سامانه یکپارچه مدیریت ابری جیکات وب
+        </p>
       </div>
     </div>
   );

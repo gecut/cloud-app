@@ -15,6 +15,7 @@ import { OtpService } from "./services/otp.service";
 import { PasswordService } from "./services/password.service";
 import { SessionService } from "./services/session.service";
 import { TokenService } from "./services/token.service";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 const CommandHandlers = [
   RequestOtpHandler,
@@ -39,7 +40,7 @@ const Services = [
 
 @Global()
 @Module({
-  imports: [CqrsModule],
+  imports: [CqrsModule, NotificationsModule],
   controllers: [AuthController],
   providers: [...CommandHandlers, ...QueryHandlers, ...Services],
   exports: [...Services, ...CommandHandlers, ...QueryHandlers],

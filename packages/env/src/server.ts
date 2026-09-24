@@ -10,6 +10,7 @@ export const env = createEnv({
     SESSION_SECRET: z.string().min(32),
     SESSION_COOKIE_NAME: z.string().min(1).default("gecut_session"),
     SESSION_TTL_SECONDS: z.coerce.number().int().min(300).default(604800),
+    KAVENEGAR_API_KEY: z.string().optional(),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

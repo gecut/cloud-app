@@ -44,6 +44,9 @@ export class PaymentsController {
       if (!invoice) {
         throw new NotFoundException("فاکتور مورد نظر یافت نشد");
       }
+      if (!invoice.customerId) {
+        throw new ForbiddenException("شما مجاز به پرداخت این فاکتور نیستید");
+      }
       const custId = user.customerId || user.id;
       if (invoice.customerId !== custId) {
         const customer = await this.prisma.customer.findFirst({

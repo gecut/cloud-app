@@ -19,6 +19,7 @@ interface JalaliDatePickerProps {
   disabled?: boolean;
   minYear?: number;
   maxYear?: number;
+  align?: "right" | "left";
 }
 
 const WEEK_DAYS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
@@ -33,6 +34,7 @@ export function JalaliDatePicker({
   disabled = false,
   minYear,
   maxYear,
+  align = "right",
 }: JalaliDatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -136,7 +138,7 @@ export function JalaliDatePicker({
   }, [todayJalali.jy, minYear, maxYear, viewYear]);
 
   return (
-    <div ref={containerRef} className={`relative flex flex-col gap-1.5 ${className}`}>
+    <div ref={containerRef} className={`relative ${isOpen ? "z-50" : "z-10"} flex flex-col gap-1.5 ${className}`}>
       {label && (
         <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 select-none">
           {label}
@@ -146,7 +148,7 @@ export function JalaliDatePicker({
       {/* Picker Trigger Input */}
       <div
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
-        className={`flex h-10 w-full items-center justify-between rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm shadow-xs backdrop-blur-xs transition-all cursor-pointer hover:border-emerald-500/50 focus-within:ring-2 focus-within:ring-emerald-500/20 ${
+        className={`relative flex items-center justify-between rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm shadow-xs backdrop-blur-xs transition-all cursor-pointer hover:border-emerald-500/50 focus-within:ring-2 focus-within:ring-emerald-500/20 ${
           disabled ? "opacity-50 cursor-not-allowed pointer-events-none" : ""
         } ${isOpen ? "ring-2 ring-emerald-500/20 border-emerald-500" : ""}`}
       >
@@ -173,7 +175,7 @@ export function JalaliDatePicker({
 
       {/* Popover Calendar */}
       {isOpen && (
-        <div className="absolute top-[calc(100%+6px)] right-0 z-50 w-72 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-xl backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 animate-in fade-in zoom-in-95 duration-150 notranslate">
+        <div className={`absolute z-50 top-[calc(100%+6px)] ${align === "left" ? "left-0" : "right-0"} w-72 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150 notranslate`}>
           {/* Calendar Header: Month, Year, Controls */}
           <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
             <button

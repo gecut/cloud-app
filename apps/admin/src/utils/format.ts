@@ -1,6 +1,7 @@
 export function formatInvoiceNumber(raw?: string | number | null): string {
-  if (!raw) return "30001";
+  if (raw === undefined || raw === null || raw === "") return "-";
   const str = String(raw).trim();
+  if (!str) return "-";
   // Strip INV-YYYY- or INV- prefixes
   const cleaned = str.replace(/^INV(-\d+)?-/i, "").replace(/^INV/i, "");
   if (/^\d+$/.test(cleaned)) {

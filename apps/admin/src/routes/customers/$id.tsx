@@ -18,7 +18,7 @@ import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
 import { normalizePhoneNumber, getTelegramChatUrl } from "@/utils/phone";
-import { formatJalaliDate, formatJalaliDateWords, formatJalaliDateTime } from "@gecut-cloud/contracts";
+import { formatJalaliDate, formatJalaliDateWords, formatJalaliDateTime, analyzeDateRange } from "@gecut-cloud/contracts";
 import {
   User,
   Users,
@@ -27,6 +27,7 @@ import {
   Mail,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Clock,
   Server,
   FileText,
@@ -52,48 +53,52 @@ import {
   Package,
   Repeat,
   MapPin,
+  Tag,
 } from "lucide-react";
 import { InvoiceDetailModal } from "@/components/invoices/invoice-detail-modal";
 
-function getServiceCategoryBadge(slug?: string) {
-  switch (slug) {
-    case "domain":
-      return {
-        label: "دامنه",
-        icon: Globe,
-        className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-      };
-    case "server":
-      return {
-        label: "سرور",
-        icon: Server,
-        className: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-      };
-    case "hosting":
-      return {
-        label: "هاست",
-        icon: HardDrive,
-        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-      };
-    case "api":
-      return {
-        label: "وب‌سرویس و API",
-        icon: Cpu,
-        className: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
-      };
-    case "package":
-      return {
-        label: "بسته تعدادی",
-        icon: Package,
-        className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-      };
-    default:
-      return {
-        label: "سرویس ابری",
-        icon: Layers,
-        className: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20",
-      };
+function getServiceCategoryBadge(slug?: string, name?: string) {
+  const s = `${slug || ""} ${name || ""}`.toLowerCase();
+  if (s.includes("domain") || s.includes("دامنه")) {
+    return {
+      label: name || "دامنه",
+      icon: Globe,
+      className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    };
   }
+  if (s.includes("server") || s.includes("سرور") || s.includes("vps") || s.includes("اختصاصی")) {
+    return {
+      label: name || "سرور",
+      icon: Server,
+      className: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+    };
+  }
+  if (s.includes("package") || s.includes("بسته") || s.includes("پکیج") || s.includes("تعدادی") || s.includes("اشتراک")) {
+    return {
+      label: name || "بسته تعدادی",
+      icon: Package,
+      className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    };
+  }
+  if (s.includes("api") || s.includes("وب‌سرویس") || s.includes("وب سرویس") || s.includes("هوش")) {
+    return {
+      label: name || "وب‌سرویس و API",
+      icon: Cpu,
+      className: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+    };
+  }
+  if (s.includes("host") || s.includes("هاست") || s.includes("میزبانی")) {
+    return {
+      label: name || "هاست",
+      icon: HardDrive,
+      className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    };
+  }
+  return {
+    label: name || "متفرقه",
+    icon: Tag,
+    className: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+  };
 }
 
 function getBillingCycleLabel(cycle?: string | number) {
@@ -135,6 +140,13 @@ function parsePriceInput(valStr: string): string {
 
 function safeDate(val?: string | Date | null, fallback = new Date()): Date {
   if (!val) return fallback;
+  if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+    const parts = val.split("-").map(Number);
+    const y = parts[0] ?? 2026;
+    const m = parts[1] ?? 1;
+    const d = parts[2] ?? 1;
+    return new Date(y, m - 1, d, 12, 0, 0);
+  }
   const d = new Date(val);
   return isNaN(d.getTime()) ? fallback : d;
 }
@@ -145,17 +157,108 @@ function safeIso(val?: string | Date | null, fallback = new Date()): string {
 
 function calcAddDays(baseIso: string | Date | null, days: number): string {
   const d = safeDate(baseIso);
-  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate() + Number(days || 0));
+  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate() + Number(days || 0), 12, 0, 0);
   return result.toISOString();
 }
 
 function calcDaysBetween(startIso: string | Date | null, endIso: string | Date | null): number {
   const s = safeDate(startIso);
   const e = safeDate(endIso);
-  const utcStart = Date.UTC(s.getFullYear(), s.getMonth(), s.getDate());
-  const utcEnd = Date.UTC(e.getFullYear(), e.getMonth(), e.getDate());
-  const diffDays = Math.round((utcEnd - utcStart) / (1000 * 60 * 60 * 24));
+  const startDay = new Date(s.getFullYear(), s.getMonth(), s.getDate(), 12, 0, 0).getTime();
+  const endDay = new Date(e.getFullYear(), e.getMonth(), e.getDate(), 12, 0, 0).getTime();
+  const diffDays = Math.round((endDay - startDay) / (1000 * 60 * 60 * 24));
   return Math.max(1, diffDays);
+}
+
+function parseBillingCycleDays(cycle?: string | number | null): number | null {
+  if (!cycle) return null;
+  const num = Number(cycle);
+  if (!isNaN(num) && num > 0) return num;
+  const s = String(cycle).toUpperCase();
+  if (s === "MONTHLY") return 30;
+  if (s === "QUARTERLY") return 90;
+  if (s === "SEMI_ANNUAL") return 180;
+  if (s === "ANNUAL") return 365;
+  return null;
+}
+
+function getServiceRemainingDetails(service: any) {
+  const trackingType = (service.trackingType || "HYBRID").toUpperCase();
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+  const configuredCycleDays = parseBillingCycleDays(service.billingCycle);
+
+  let end: Date;
+  if (service.renewalDate) {
+    end = new Date(service.renewalDate);
+    if (isNaN(end.getTime())) end = new Date(Date.now() + 30 * MS_PER_DAY);
+  } else {
+    end = new Date(Date.now() + (configuredCycleDays || 30) * MS_PER_DAY);
+  }
+
+  let start: Date;
+  const rawStart = service.purchaseDate || service.startDate || service.createdAt;
+  if (rawStart) {
+    start = new Date(rawStart);
+    if (isNaN(start.getTime())) {
+      start = new Date(end.getTime() - (configuredCycleDays || 30) * MS_PER_DAY);
+    }
+  } else {
+    start = new Date(end.getTime() - (configuredCycleDays || 30) * MS_PER_DAY);
+  }
+
+  // Prevent invalid negative range if legacy data had corrupted start date after renewalDate
+  if (trackingType !== "QUANTITY" && start.getTime() > end.getTime()) {
+    start = new Date(end.getTime() - (configuredCycleDays || 30) * MS_PER_DAY);
+  }
+
+  const analysis = analyzeDateRange({
+    startDate: start,
+    endDate: end,
+    configuredCycleDays,
+  });
+
+  // Quantity calculation
+  const totalQty = service.quantity || 1;
+  const usedQty = service.usedQuantity || 0;
+  const remainingQty = Math.max(0, totalQty - usedQty);
+
+  const isQuantityDepleted =
+    (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+    (remainingQty <= 0 || usedQty >= totalQty);
+
+  const isQuantityNearDepletion =
+    (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+    !isQuantityDepleted &&
+    (remainingQty <= Math.max(1, Math.ceil(totalQty * 0.05)) || (totalQty > 0 && (remainingQty / totalQty) <= 0.05));
+
+  const isTimeExpired = trackingType !== "QUANTITY" && analysis.isExpired;
+  const isTimeNearExpiry =
+    trackingType !== "QUANTITY" && !isTimeExpired && analysis.daysLeft > 0 && analysis.daysLeft <= 3;
+
+  const isExpired = isTimeExpired || isQuantityDepleted;
+
+  return {
+    trackingType,
+    daysTotal: analysis.totalDays,
+    daysPassed: analysis.daysPassed,
+    daysLeft: analysis.daysLeft,
+    remainingPercent: analysis.remainingPercent,
+    configuredCycleDays,
+    isAlarmExceeded: analysis.isAlarmExceeded,
+    isExpired,
+    isTimeExpired,
+    isTimeNearExpiry,
+    isQuantityDepleted,
+    isQuantityNearDepletion,
+    overdueDays: analysis.overdueDays,
+    urgency: analysis.urgency,
+    startDate: start,
+    renewalDate: end,
+    totalQty,
+    usedQty,
+    remainingQty,
+  };
 }
 
 export const Route = createFileRoute("/customers/$id")({
@@ -196,6 +299,13 @@ function AdminCustomerProfileDetailPage() {
     queryFn: () => apiClient<{ items: any[]; total: number }>("/services?limit=100"),
   });
 
+  // Fetch Categories for dynamic category resolution
+  const { data: categoriesData } = useQuery({
+    queryKey: ["admin", "categories"],
+    queryFn: () => apiClient<{ items: any[]; total: number }>("/categories"),
+  });
+  const dynamicCategories = categoriesData?.items || [];
+
   // Unique base services created in the system catalog
   const rawCatalogList = (allServicesData?.items || []).filter(
     (s: any) => !s.customerId && !s.parentServiceId,
@@ -208,6 +318,7 @@ function AdminCustomerProfileDetailPage() {
           id: s.id,
           name: s.name,
           categorySlug: s.serviceType?.slug || "hosting",
+          categoryName: s.serviceType?.name || "",
           serviceTypeId: s.serviceTypeId,
           serviceType: s.serviceType,
           description: s.description,
@@ -287,8 +398,14 @@ function AdminCustomerProfileDetailPage() {
   };
 
   // Derived span and alarm for Assign Service
-  const assignSpanDays = calcDaysBetween(servicePurchaseDate, newServiceRenewalDate);
-  const isAssignAlarmExceeded = serviceTrackingType !== "QUANTITY" && serviceDurationDays > assignSpanDays;
+  const assignRangeAnalysis = analyzeDateRange({
+    startDate: servicePurchaseDate,
+    endDate: newServiceRenewalDate,
+    configuredCycleDays: serviceTrackingType !== "QUANTITY" ? serviceDurationDays : undefined,
+  });
+  const assignSpanDays = assignRangeAnalysis.totalDays;
+  const isAssignAlarmExceeded =
+    serviceTrackingType !== "QUANTITY" && assignRangeAnalysis.isAlarmExceeded;
 
   const activeSelectedService =
     catalogServices.find((s: any) => s.id === selectedCatalogServiceId) ||
@@ -318,12 +435,14 @@ function AdminCustomerProfileDetailPage() {
   const [editServiceRenewalDate, setEditServiceRenewalDate] = useState("");
 
   // Derived span and alarm for Edit Service
-  const editServiceSpanDays = calcDaysBetween(
-    editServicePurchaseDate || selectedService?.purchaseDate || selectedService?.startDate,
-    editServiceRenewalDate,
-  );
+  const editServiceRangeAnalysis = analyzeDateRange({
+    startDate: editServicePurchaseDate || selectedService?.purchaseDate || selectedService?.startDate,
+    endDate: editServiceRenewalDate,
+    configuredCycleDays: editServiceTrackingType !== "QUANTITY" ? editServiceDurationDays : undefined,
+  });
+  const editServiceSpanDays = editServiceRangeAnalysis.totalDays;
   const isEditServiceAlarmExceeded =
-    editServiceTrackingType !== "QUANTITY" && editServiceDurationDays > editServiceSpanDays;
+    editServiceTrackingType !== "QUANTITY" && editServiceRangeAnalysis.isAlarmExceeded;
 
   const handleEditServiceDurationChange = (days: number) => {
     const cleanDays = Math.max(1, Number(days) || 1);
@@ -454,6 +573,25 @@ function AdminCustomerProfileDetailPage() {
     },
     onError: (err: any) => {
       toast.error(err.message || "خطا در ویرایش سرویس");
+    },
+  });
+
+  // Renew Service Mutation
+  const renewServiceMutation = useMutation({
+    mutationFn: (serviceId: string) =>
+      apiClient(`/services/${serviceId}/renew`, {
+        method: "POST",
+      }),
+    onSuccess: (res: any) => {
+      toast.success(res?.message || "سرویس با موفقیت تمدید شد و فاکتور تمدید صادر گردید");
+      queryClient.invalidateQueries({ queryKey: ["admin", "customer", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "services"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "payments"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "accounting"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در تمدید سرویس");
     },
   });
 
@@ -640,6 +778,10 @@ function AdminCustomerProfileDetailPage() {
       toast.error("لطفاً یک سرویس از سرویس‌های تعریف‌شده را انتخاب کنید");
       return;
     }
+    if (serviceTrackingType !== "QUANTITY" && assignRangeAnalysis.isNegativeRange) {
+      toast.error("خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
+      return;
+    }
     const qty = serviceTrackingType === "TIME" ? 1 : Math.max(1, Number(serviceQuantity) || 1);
     const finalPrice = Math.round(Number(servicePrice)) || 0;
     const finalName = serviceCustomName.trim() || activeSelectedService.name;
@@ -658,7 +800,7 @@ function AdminCustomerProfileDetailPage() {
       name: finalName,
       priceToman: finalPrice,
       billingCycle: serviceTrackingType === "QUANTITY" ? "NONE" : String(serviceDurationDays),
-      autoRenew: serviceTrackingType === "QUANTITY" ? false : serviceAutoRenew,
+      autoRenew: serviceAutoRenew,
       quantity: qty,
       trackingType: serviceTrackingType,
       purchaseDate: pDate.toISOString(),
@@ -672,24 +814,26 @@ function AdminCustomerProfileDetailPage() {
   const handleEditServiceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedService) return;
+    if (editServiceTrackingType !== "QUANTITY" && editServiceRangeAnalysis.isNegativeRange) {
+      toast.error("خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
+      return;
+    }
     updateServiceMutation.mutate({
       serviceId: selectedService.id,
       data: {
         name: editServiceName,
         priceToman: Math.round(Number(editServicePrice)) || 0,
         billingCycle: editServiceTrackingType === "QUANTITY" ? "NONE" : String(editServiceDurationDays),
-        autoRenew: editServiceTrackingType === "QUANTITY" ? false : editServiceAutoRenew,
+        autoRenew: editServiceAutoRenew,
         quantity: editServiceTrackingType === "TIME" ? 1 : Math.max(1, Number(editServiceQuantity) || 1),
         usedQuantity: editServiceTrackingType === "TIME" ? 0 : Math.max(0, Number(editServiceUsedQuantity) || 0),
         status: editServiceStatus,
         trackingType: editServiceTrackingType,
-        purchaseDate: editServicePurchaseDate ? safeIso(editServicePurchaseDate) : undefined,
+        purchaseDate: safeIso(editServicePurchaseDate || selectedService.purchaseDate || selectedService.startDate || new Date()),
         renewalDate:
           editServiceTrackingType === "QUANTITY"
             ? null
-            : editServiceRenewalDate
-            ? safeIso(editServiceRenewalDate)
-            : undefined,
+            : safeIso(editServiceRenewalDate, new Date(calcAddDays(editServicePurchaseDate || new Date(), editServiceDurationDays))),
       },
     });
   };
@@ -1382,9 +1526,39 @@ function AdminCustomerProfileDetailPage() {
             ) : (
               <div className="grid grid-cols-1 gap-5">
                 {servicesList.map((svc: any) => {
-                  const catBadge = getServiceCategoryBadge(svc.serviceType?.slug);
+                  const parentService =
+                    svc.parentService ||
+                    (allServicesData?.items || []).find((s: any) => s.id === svc.parentServiceId);
+
+                  const matchedCategory =
+                    dynamicCategories.find(
+                      (c: any) =>
+                        c.id === svc.serviceTypeId ||
+                        c.slug === svc.serviceTypeId ||
+                        c.slug === svc.serviceTypeSlug ||
+                        (svc.serviceType && (c.id === svc.serviceType.id || c.slug === svc.serviceType.slug))
+                    ) ||
+                    svc.serviceType ||
+                    parentService?.serviceType ||
+                    dynamicCategories.find(
+                      (c: any) =>
+                        c.id === parentService?.serviceTypeId ||
+                        c.slug === parentService?.serviceTypeId
+                    ) ||
+                    (allServicesData?.items || []).find(
+                      (s: any) => s.id === svc.serviceTypeId
+                    )?.serviceType;
+
+                  const parentName = parentService?.name;
+                  const categoryName = matchedCategory?.name || svc.serviceType?.name || parentService?.serviceType?.name;
+                  const targetSlug = matchedCategory?.slug || svc.serviceType?.slug || parentService?.serviceType?.slug || "";
+
+                  const catBadge = getServiceCategoryBadge(targetSlug, categoryName);
                   const CatIcon = catBadge.icon;
-                  const isPackage = svc.serviceType?.slug === "package" || svc.quantity;
+                  const isPackage = targetSlug === "package" || svc.quantity;
+                  const details = getServiceRemainingDetails(svc);
+                  const showDays = details.trackingType === "TIME" || details.trackingType === "HYBRID";
+                  const showQty = details.trackingType === "QUANTITY" || details.trackingType === "HYBRID";
 
                   return (
                     <Card key={svc.id} className="rounded-2xl border bg-card shadow-xs overflow-hidden">
@@ -1394,58 +1568,34 @@ function AdminCustomerProfileDetailPage() {
                             <CatIcon className="h-5 w-5" />
                           </div>
                           <div>
-                            {(() => {
-                              const rawCycle = Number(svc.billingCycle);
-                              let totalDays = 30;
-                              if (!isNaN(rawCycle) && rawCycle > 0) {
-                                totalDays = rawCycle;
-                              } else if (svc.renewalDate && (svc.purchaseDate || svc.startDate)) {
-                                const startMs = new Date(svc.purchaseDate || svc.startDate).getTime();
-                                const endMs = new Date(svc.renewalDate).getTime();
-                                const diff = Math.round((endMs - startMs) / 86400000);
-                                if (diff > 0) totalDays = diff;
-                              } else if (svc.billingCycle === "ANNUAL") {
-                                totalDays = 365;
-                              } else if (svc.billingCycle === "SEMI_ANNUAL") {
-                                totalDays = 180;
-                              } else if (svc.billingCycle === "QUARTERLY") {
-                                totalDays = 90;
-                              }
-
-                              const now = Date.now();
-                              const creationMs = svc.createdAt ? new Date(svc.createdAt).getTime() : now;
-                              const daysPassed = Math.max(0, Math.floor((now - creationMs) / 86400000));
-                              const remainingDays = Math.max(0, totalDays - daysPassed);
-                              const totalQty = Number(svc.quantity) || 1;
-                              const usedQty = Number(svc.usedQuantity) || 0;
-                              const remainingQty = Math.max(0, totalQty - usedQty);
-                              const trackingType = (svc.trackingType || "HYBRID").toUpperCase();
-                              const showDays = trackingType === "TIME" || trackingType === "HYBRID";
-                              const showQty = trackingType === "QUANTITY" || trackingType === "HYBRID";
-
-                              return (
-                                <div className="flex flex-col gap-2">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
-                                    {svc.parentService?.name && (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground border border-border/60">
-                                        سرویس مرجع: {svc.parentService.name}
+                            <div className="flex flex-col gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-bold text-sm text-foreground">{svc.name}</h4>
+                                    <span
+                                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${catBadge.className}`}
+                                    >
+                                      <CatIcon className="h-3 w-3" />
+                                      {categoryName || catBadge.label}
+                                    </span>
+                                    {parentName && parentName.trim().toLowerCase() !== svc.name.trim().toLowerCase() && (
+                                      <span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded border border-border/50">
+                                        قالب مرجع: {parentName}
                                       </span>
                                     )}
                                     <span
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${catBadge.className}`}
-                                    >
-                                      <CatIcon className="h-3 w-3" />
-                                      {catBadge.label}
-                                    </span>
-                                    <span
                                       className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                        svc.status === "ACTIVE"
+                                        details.isExpired && details.trackingType !== "QUANTITY"
+                                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-semibold"
+                                          : svc.status === "ACTIVE"
                                           ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                           : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                                       }`}
                                     >
-                                      {svc.status === "ACTIVE" ? "فعال" : "معلق"}
+                                      {details.isExpired && details.trackingType !== "QUANTITY"
+                                        ? "منقضی شده"
+                                        : svc.status === "ACTIVE"
+                                        ? "فعال"
+                                        : "معلق"}
                                     </span>
                                   </div>
 
@@ -1454,17 +1604,41 @@ function AdminCustomerProfileDetailPage() {
                                     {/* Days Remaining (for TIME and HYBRID only) */}
                                     {showDays && (
                                       <div className="flex flex-col gap-1 min-w-[190px]">
-                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20 font-mono">
-                                          <Clock className="h-3.5 w-3.5 text-blue-500" />
+                                        <div
+                                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold font-mono border ${
+                                            details.isExpired
+                                              ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
+                                              : details.urgency === "critical"
+                                              ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                                              : "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20"
+                                          }`}
+                                        >
+                                          <Clock
+                                            className={`h-3.5 w-3.5 ${
+                                              details.isExpired
+                                                ? "text-rose-500"
+                                                : details.urgency === "critical"
+                                                ? "text-amber-500"
+                                                : "text-blue-500"
+                                            }`}
+                                          />
                                           <span>
-                                            {remainingDays.toLocaleString("fa-IR")} روز باقی‌مانده از {totalDays.toLocaleString("fa-IR")} روز
+                                            {details.isExpired
+                                              ? `۰ روز باقی‌مانده (منقضی شده - ${details.overdueDays?.toLocaleString("fa-IR")} روز گذشته)`
+                                              : `${details.daysLeft.toLocaleString("fa-IR")} روز باقی‌مانده از ${details.daysTotal.toLocaleString("fa-IR")} روز`}
                                           </span>
                                         </div>
                                         <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                                           <div
-                                            className="h-full bg-blue-500 transition-all duration-300"
+                                            className={`h-full transition-all duration-300 ${
+                                              details.isExpired
+                                                ? "bg-rose-500"
+                                                : details.urgency === "critical"
+                                                ? "bg-amber-500"
+                                                : "bg-blue-500"
+                                            }`}
                                             style={{
-                                              width: `${Math.min(100, Math.max(5, (remainingDays / totalDays) * 100))}%`,
+                                              width: `${details.remainingPercent}%`,
                                             }}
                                           />
                                         </div>
@@ -1478,22 +1652,22 @@ function AdminCustomerProfileDetailPage() {
                                           <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold font-mono">
                                             <Package className="h-3.5 w-3.5 text-emerald-500" />
                                             <span>
-                                              {remainingQty.toLocaleString("fa-IR")} باقی‌مانده از {totalQty.toLocaleString("fa-IR")} عدد
+                                              {details.remainingQty.toLocaleString("fa-IR")} باقی‌مانده از {details.totalQty.toLocaleString("fa-IR")} عدد
                                             </span>
                                             <span className="text-[10px] text-muted-foreground">
-                                              ({usedQty.toLocaleString("fa-IR")} مصرف‌شده)
+                                              ({details.usedQty.toLocaleString("fa-IR")} مصرف‌شده)
                                             </span>
                                           </div>
                                           <div className="flex items-center gap-1">
                                             <button
                                               type="button"
                                               title="کاهش مصرف (بازگشت به موجودی)"
-                                              disabled={usedQty <= 0 || updateServiceMutation.isPending}
+                                              disabled={details.usedQty <= 0 || updateServiceMutation.isPending}
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 updateServiceMutation.mutate({
                                                   serviceId: svc.id,
-                                                  data: { usedQuantity: Math.max(0, usedQty - 1) },
+                                                  data: { usedQuantity: Math.max(0, details.usedQty - 1) },
                                                 });
                                               }}
                                               className="h-5 w-5 rounded bg-card border border-emerald-500/30 text-foreground hover:bg-muted flex items-center justify-center text-xs font-bold disabled:opacity-30 cursor-pointer"
@@ -1503,12 +1677,12 @@ function AdminCustomerProfileDetailPage() {
                                             <button
                                               type="button"
                                               title="ثبت یک واحد مصرف دستی"
-                                              disabled={remainingQty <= 0 || updateServiceMutation.isPending}
+                                              disabled={details.remainingQty <= 0 || updateServiceMutation.isPending}
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 updateServiceMutation.mutate({
                                                   serviceId: svc.id,
-                                                  data: { usedQuantity: usedQty + 1 },
+                                                  data: { usedQuantity: details.usedQty + 1 },
                                                 });
                                               }}
                                               className="h-5 px-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-0.5 text-[9px] font-semibold disabled:opacity-30 cursor-pointer shadow-xs"
@@ -1521,7 +1695,7 @@ function AdminCustomerProfileDetailPage() {
                                           <div
                                             className="h-full bg-emerald-500 transition-all duration-300"
                                             style={{
-                                              width: `${Math.min(100, Math.max(5, (remainingQty / totalQty) * 100))}%`,
+                                              width: `${Math.min(100, Math.max(0, (details.remainingQty / details.totalQty) * 100))}%`,
                                             }}
                                           />
                                         </div>
@@ -1529,12 +1703,42 @@ function AdminCustomerProfileDetailPage() {
                                     )}
                                   </div>
 
+                                  {/* Alarm, Depleted, and Warning Badges */}
+                                  {details.isAlarmExceeded && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-medium mt-0.5 animate-pulse w-fit">
+                                      <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                      <span>هشدار: دوره تعیین‌شده ({details.configuredCycleDays?.toLocaleString("fa-IR")} روز) بیشتر از بازه ({details.daysTotal.toLocaleString("fa-IR")} روز) است</span>
+                                    </span>
+                                  )}
+                                  {details.isTimeNearExpiry && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse w-fit">
+                                      <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                      <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرویس</span>
+                                    </span>
+                                  )}
+                                  {details.isTimeExpired && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded-md font-medium mt-0.5 w-fit">
+                                      <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
+                                      <span>خطا: موعد سررسید {details.overdueDays?.toLocaleString("fa-IR")} روز پیش منقضی شده است</span>
+                                    </span>
+                                  )}
+                                  {details.isQuantityDepleted && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded-md font-bold mt-0.5 w-fit">
+                                      <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
+                                      <span>بسته تمام شده (نیازمند تمدید سهمیه)</span>
+                                    </span>
+                                  )}
+                                  {details.isQuantityNearDepletion && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse w-fit">
+                                      <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                      <span>هشدار: کمتر از ۵٪ سهمیه بسته باقی‌مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
+                                    </span>
+                                  )}
+
                                   <span className="text-[11px] text-muted-foreground font-mono mt-0.5 block">
-                                    شناسه: {svc.id} • سرور: {svc.server?.name || "زیرساخت ابری جیکات"} • تاریخ ساخت: {formatJalaliDate(svc.createdAt)} • تاریخ خرید: {formatJalaliDate(svc.purchaseDate || svc.startDate || svc.createdAt)}
+                                    شناسه: {svc.id} • سرور: {svc.server?.name || "زیرساخت ابری جیکات"} • تاریخ خرید: {formatJalaliDate(svc.purchaseDate || svc.startDate || svc.createdAt)} • سررسید تمدید: {details.trackingType === "QUANTITY" ? "بدون انقضای زمانی" : formatJalaliDate(svc.renewalDate)}
                                   </span>
                                 </div>
-                              );
-                            })()}
                           </div>
                         </div>
 
@@ -1542,7 +1746,11 @@ function AdminCustomerProfileDetailPage() {
                           <div className="text-left">
                             <span className="text-[11px] text-muted-foreground block">هزینه دوره:</span>
                             <span className="font-bold text-sm text-foreground font-mono">
-                              {(svc.priceToman || 0).toLocaleString("fa-IR")} تومان
+                              {(svc.priceToman || 0) === 0 ? (
+                                <span className="text-emerald-600 dark:text-emerald-400">رایگان</span>
+                              ) : (
+                                `${(svc.priceToman || 0).toLocaleString("fa-IR")} تومان`
+                              )}
                             </span>
                           </div>
                           <div className="text-left">
@@ -1555,21 +1763,19 @@ function AdminCustomerProfileDetailPage() {
                                 : getBillingCycleLabel(svc.billingCycle)}
                             </span>
                           </div>
-                          {(svc.trackingType || "HYBRID").toUpperCase() !== "QUANTITY" && (
-                            <div className="text-left">
-                              <span className="text-[11px] text-muted-foreground block">تمدید خودکار:</span>
-                              {svc.autoRenew !== false ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                  <Repeat className="h-3 w-3" />
-                                  فعال
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground font-medium">
-                                  غیرفعال
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          <div className="text-left">
+                            <span className="text-[11px] text-muted-foreground block">تمدید خودکار:</span>
+                            {svc.autoRenew !== false ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                                <Repeat className="h-3 w-3" />
+                                فعال
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground font-medium">
+                                غیرفعال
+                              </span>
+                            )}
+                          </div>
                           <div className="text-left">
                             <span className="text-[11px] text-muted-foreground block">
                               {(svc.trackingType || "HYBRID").toUpperCase() === "QUANTITY" ? "اعتبار زمانی:" : "تاریخ سررسید:"}
@@ -1580,6 +1786,25 @@ function AdminCustomerProfileDetailPage() {
                                 : formatJalaliDate(svc.renewalDate)}
                             </span>
                           </div>
+                          {/* Renew Service Button (Available for all 3 models) */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={renewServiceMutation.isPending}
+                            onClick={() => renewServiceMutation.mutate(svc.id)}
+                            className={`gap-1.5 font-bold cursor-pointer ${
+                              details.isExpired || details.isQuantityDepleted
+                                ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 hover:bg-rose-500/25 border-rose-500/30 animate-pulse"
+                                : details.isQuantityNearDepletion || details.isTimeNearExpiry
+                                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border-amber-500/30"
+                                  : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-500/20"
+                            }`}
+                            title={`تمدید دستی سرویس ${svc.name} (شارژ مجدد و صدور فاکتور)`}
+                          >
+                            <Repeat className={`h-3.5 w-3.5 ${renewServiceMutation.isPending ? "animate-spin" : ""}`} />
+                            {renewServiceMutation.isPending ? "در حال تمدید..." : "تمدید سرویس"}
+                          </Button>
+
                           <Button
                             variant="outline"
                             size="sm"
@@ -1590,24 +1815,14 @@ function AdminCustomerProfileDetailPage() {
                               setEditServiceQuantity(svc.quantity || 1);
                               setEditServiceUsedQuantity(svc.usedQuantity || 0);
                               setEditServiceTrackingType(svc.trackingType || "HYBRID");
-                              setEditServicePurchaseDate(svc.purchaseDate ? new Date(svc.purchaseDate).toISOString() : null);
-                              setEditServiceAutoRenew(svc.autoRenew !== false);
-                              const rawCycle = Number(svc.billingCycle);
-                              const initialDays =
-                                !isNaN(rawCycle) && rawCycle > 0
-                                  ? rawCycle
-                                  : svc.billingCycle === "ANNUAL"
-                                  ? 365
-                                  : svc.billingCycle === "SEMI_ANNUAL"
-                                  ? 180
-                                  : svc.billingCycle === "QUARTERLY"
-                                  ? 90
-                                  : 30;
+                              const pDate = svc.purchaseDate || svc.startDate || svc.createdAt || new Date().toISOString();
+                              const initialDays = parseBillingCycleDays(svc.billingCycle) || 30;
+                              const rDate = svc.renewalDate || calcAddDays(pDate, initialDays);
+                              setEditServicePurchaseDate(safeIso(pDate));
+                              setEditServiceRenewalDate(safeIso(rDate));
                               setEditServiceDurationDays(initialDays);
+                              setEditServiceAutoRenew(svc.autoRenew !== false);
                               setEditServiceStatus(svc.status || "ACTIVE");
-                              setEditServiceRenewalDate(
-                                svc.renewalDate ? new Date(svc.renewalDate).toISOString().split("T")[0] : "",
-                              );
                               setIsEditServiceOpen(true);
                             }}
                             className="gap-1.5"
@@ -2087,7 +2302,7 @@ function AdminCustomerProfileDetailPage() {
                       required
                     >
                       {catalogServices.map((svc: any) => {
-                        const badge = getServiceCategoryBadge(svc.categorySlug);
+                        const badge = getServiceCategoryBadge(svc.categorySlug, svc.categoryName || svc.name);
                         return (
                           <option key={svc.id} value={svc.id}>
                             {svc.name} ({badge.label})
@@ -2117,7 +2332,7 @@ function AdminCustomerProfileDetailPage() {
                       <div className="flex items-center justify-between font-semibold">
                         <span className="text-foreground">{activeSelectedService.name}</span>
                         {(() => {
-                          const badge = getServiceCategoryBadge(activeSelectedService.categorySlug);
+                          const badge = getServiceCategoryBadge(activeSelectedService.categorySlug, activeSelectedService.categoryName || activeSelectedService.name);
                           const BadgeIcon = badge.icon;
                           return (
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.className}`}>
@@ -2338,18 +2553,39 @@ function AdminCustomerProfileDetailPage() {
                           </span>
                         </div>
 
-                        {isAssignAlarmExceeded && (
+                        {/* Negative Range Error */}
+                        {assignRangeAnalysis.isNegativeRange && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
+                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                            <span>
+                              خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Expired / Past Date Notice */}
+                        {!assignRangeAnalysis.isNegativeRange && assignRangeAnalysis.isExpired && (
+                          <div className="flex items-center gap-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-xs font-medium mt-1">
+                            <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                            <span>
+                              توجه: تاریخ سررسید در گذشته است ({assignRangeAnalysis.overdueDays.toLocaleString("fa-IR")} روز معوقه). این سرویس با وضعیت منقضی‌شده (۰ روز باقی‌مانده) ثبت خواهد شد.
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Inconsistency Warning: Cycle > Span */}
+                        {!assignRangeAnalysis.isNegativeRange && isAssignAlarmExceeded && (
                           <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-pulse mt-1">
                             <div className="flex items-center gap-1.5">
-                              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
                               <span>
-                                هشدار: دوره تعیین‌شده ({serviceDurationDays} روز) از بازه زمانی سررسید ({assignSpanDays} روز) بزرگ‌تر است!
+                                هشدار: دوره تعیین‌شده ({serviceDurationDays.toLocaleString("fa-IR")} روز) از بازه سررسید ({assignSpanDays.toLocaleString("fa-IR")} روز) بیشتر است!
                               </span>
                             </div>
                             <button
                               type="button"
-                              onClick={() => setServiceDurationDays(assignSpanDays)}
-                              className="text-[11px] font-bold underline hover:no-underline cursor-pointer text-amber-800 dark:text-amber-200"
+                              onClick={() => handleAssignDurationChange(assignSpanDays)}
+                              className="text-[11px] underline text-amber-800 dark:text-amber-200 font-bold hover:text-amber-900 cursor-pointer shrink-0"
                             >
                               تطبیق دوره با بازه
                             </button>
@@ -2359,23 +2595,23 @@ function AdminCustomerProfileDetailPage() {
                     </div>
                   )}
 
-                  {/* Auto-renew checkbox (only for TIME & HYBRID) */}
-                  {serviceTrackingType !== "QUANTITY" && (
-                    <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={serviceAutoRenew}
-                        onChange={(e) => setServiceAutoRenew(e.target.checked)}
-                        className="rounded h-4 w-4 text-primary focus:ring-primary"
-                      />
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-foreground">تمدید خودکار سرویس</span>
-                        <span className="text-[11px] text-muted-foreground">
-                          در تاریخ سررسید، صورت‌حساب تمدید به صورت اتوماتیک صادر شود
-                        </span>
-                      </div>
-                    </label>
-                  )}
+                  {/* Auto-renew checkbox (for ALL models: TIME, QUANTITY & HYBRID) */}
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={serviceAutoRenew}
+                      onChange={(e) => setServiceAutoRenew(e.target.checked)}
+                      className="rounded h-4 w-4 text-primary focus:ring-primary cursor-pointer"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-foreground">تمدید خودکار سرویس</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {serviceTrackingType === "QUANTITY"
+                          ? "پس از پایان یافتن سهمیه بسته، صورت‌حساب شارژ مجدد به صورت اتوماتیک صادر شود"
+                          : "در تاریخ سررسید، صورت‌حساب تمدید به صورت اتوماتیک صادر شود"}
+                      </span>
+                    </div>
+                  </label>
 
                   <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
                     <Button
@@ -2387,7 +2623,7 @@ function AdminCustomerProfileDetailPage() {
                     </Button>
                     <Button
                       type="submit"
-                      disabled={createServiceMutation.isPending}
+                      disabled={createServiceMutation.isPending || (serviceTrackingType !== "QUANTITY" && assignRangeAnalysis.isNegativeRange)}
                     >
                       {createServiceMutation.isPending ? "در حال تخصیص..." : "تخصیص سرویس به مشتری"}
                     </Button>
@@ -2640,26 +2876,81 @@ function AdminCustomerProfileDetailPage() {
                 )}
 
                 {editServiceTrackingType !== "QUANTITY" && (
-                  <div className="space-y-1.5">
-                    <JalaliDatePicker
-                      label="تاریخ خرید / شروع سرویس (شمسی)"
-                      value={editServicePurchaseDate}
-                      onChange={(val) => setEditServicePurchaseDate(val)}
-                    />
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <JalaliDatePicker
+                        label="تاریخ خرید / شروع سرویس (شمسی)"
+                        value={editServicePurchaseDate}
+                        onChange={(val) => handleEditServicePurchaseDateChange(val)}
+                      />
+                    </div>
+
+                    {/* Live Span & Alarm indicator for Edit Service */}
+                    <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col gap-2 mt-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">بازه زمانی کلی سررسید (از تاریخ شروع تا سررسید):</span>
+                        <span className="font-bold text-foreground font-mono">
+                          {editServiceSpanDays.toLocaleString("fa-IR")} روز
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">دوره تعیین‌شده برای سرویس:</span>
+                        <span className="font-bold text-foreground font-mono">
+                          {editServiceDurationDays.toLocaleString("fa-IR")} روز
+                        </span>
+                      </div>
+
+                      {/* Negative Range Error */}
+                      {editServiceRangeAnalysis.isNegativeRange && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
+                          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                          <span>
+                            خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Expired / Past Date Notice */}
+                      {!editServiceRangeAnalysis.isNegativeRange && editServiceRangeAnalysis.isExpired && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-xs font-medium mt-1">
+                          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                          <span>
+                            توجه: تاریخ سررسید در گذشته است ({editServiceRangeAnalysis.overdueDays.toLocaleString("fa-IR")} روز معوقه). این سرویس با وضعیت منقضی‌شده (۰ روز باقی‌مانده) ذخیره خواهد شد.
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Inconsistency Warning: Cycle > Span */}
+                      {!editServiceRangeAnalysis.isNegativeRange && isEditServiceAlarmExceeded && (
+                        <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-pulse mt-1">
+                          <div className="flex items-center gap-1.5">
+                            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                            <span>
+                              هشدار: دوره تعیین‌شده ({editServiceDurationDays.toLocaleString("fa-IR")} روز) از بازه سررسید ({editServiceSpanDays.toLocaleString("fa-IR")} روز) بیشتر است!
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleEditServiceDurationChange(editServiceSpanDays)}
+                            className="text-[11px] underline text-amber-800 dark:text-amber-200 font-bold hover:text-amber-900 cursor-pointer shrink-0"
+                          >
+                            تطبیق دوره با بازه
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {editServiceTrackingType !== "QUANTITY" && (
-                  <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editServiceAutoRenew}
-                      onChange={(e) => setEditServiceAutoRenew(e.target.checked)}
-                      className="rounded h-4 w-4 text-primary"
-                    />
-                    <span className="text-xs font-semibold">تمدید خودکار سرویس فعال باشد</span>
-                  </label>
-                )}
+                <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={editServiceAutoRenew}
+                    onChange={(e) => setEditServiceAutoRenew(e.target.checked)}
+                    className="rounded h-4 w-4 text-primary cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold">تمدید خودکار سرویس فعال باشد</span>
+                </label>
 
                 <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
                   <Button
@@ -2671,7 +2962,7 @@ function AdminCustomerProfileDetailPage() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={updateServiceMutation.isPending}
+                    disabled={updateServiceMutation.isPending || (editServiceTrackingType !== "QUANTITY" && editServiceRangeAnalysis.isNegativeRange)}
                   >
                     {updateServiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
                   </Button>

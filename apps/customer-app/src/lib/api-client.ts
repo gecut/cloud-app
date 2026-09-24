@@ -122,7 +122,7 @@ export function setActiveCustomerUser(user: DemoUser) {
 /**
  * Checks if a JWT token has expired or will expire within bufferSeconds.
  */
-export function isTokenExpired(token: string, bufferSeconds = 30): boolean {
+export function isTokenExpired(token: string, bufferSeconds = 15): boolean {
   try {
     const parts = token.split(".");
     if (parts.length !== 3 || !parts[1]) return true;
@@ -183,7 +183,9 @@ export async function refreshAccessToken(): Promise<string | null> {
     } catch {
       clearAuth();
       if (typeof window !== "undefined") {
-        toast.danger("نشست کاربری شما منقضی شد. لطفاً دوباره وارد شوید");
+        if (!window.location.pathname.includes("/login")) {
+          toast.danger("نشست کاربری شما منقضی شد. لطفاً دوباره وارد شوید");
+        }
         window.dispatchEvent(new CustomEvent("gecut-auth-expired"));
       }
       return null;
@@ -213,6 +215,12 @@ export async function getValidAccessToken(): Promise<string | null> {
 }
 
 export async function validateSession(): Promise<boolean> {
+  const rawToken = getAccessToken();
+  const rawRefreshToken = getRefreshToken();
+  if (!rawToken && !rawRefreshToken) {
+    return false;
+  }
+
   const token = await getValidAccessToken();
   if (!token) {
     clearAuth();
@@ -320,7 +328,15 @@ export async function apiClient<T>(
   options: RequestInit = {},
   isRetry = false,
 ): Promise<T> {
-  const validToken = await getValidAccessToken();
+  const isAuthEndpoint =
+    endpoint.includes("/auth/otp/") ||
+    endpoint.includes("/auth/login") ||
+    endpoint.includes("/auth/send-otp") ||
+    endpoint.includes("/auth/verify-otp") ||
+    endpoint.includes("/auth/refresh-token") ||
+    endpoint.includes("/auth/register");
+
+  const validToken = isAuthEndpoint ? null : await getValidAccessToken();
   const activeUser = getActiveCustomerUser();
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
@@ -346,7 +362,7 @@ export async function apiClient<T>(
     credentials: "include",
   });
 
-  if (res.status === 401 && !isRetry && getRefreshToken()) {
+  if (res.status === 401 && !isRetry && !isAuthEndpoint && getRefreshToken()) {
     const refreshedToken = await refreshAccessToken();
     if (refreshedToken) {
       return apiClient<T>(endpoint, options, true);

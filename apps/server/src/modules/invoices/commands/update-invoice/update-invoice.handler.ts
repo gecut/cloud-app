@@ -85,16 +85,28 @@ export class UpdateInvoiceHandler
       const processedItems = dto.items.map((item, idx) => {
         const unitPrice = item.unitPriceToman ?? item.amountToman ?? 0;
         const totalToman = item.totalToman ?? (item.quantity || 1) * unitPrice;
+        const existingItem = invoice.items?.[idx];
+        const serviceId =
+          item.serviceId !== undefined
+            ? item.serviceId
+            : existingItem?.serviceId || null;
 
         return {
-          id: `item_${Date.now()}_${idx}`,
+          id: existingItem?.id || `item_${Date.now()}_${idx}`,
           invoiceId,
-          serviceId: item.serviceId || null,
+          serviceId,
           title: item.title,
-          description: item.description || null,
+          description: item.description ?? existingItem?.description ?? null,
           quantity: item.quantity || 1,
           unitPriceToman: unitPrice,
           totalToman,
+          serviceNameSnapshot: existingItem?.serviceNameSnapshot,
+          serviceTypeSnapshot:
+            (item as any).serviceTypeSnapshot ||
+            existingItem?.serviceTypeSnapshot ||
+            null,
+          servicePriceSnapshotToman: existingItem?.servicePriceSnapshotToman,
+          serviceRenewalDateSnapshot: existingItem?.serviceRenewalDateSnapshot,
         };
       });
 
@@ -103,10 +115,32 @@ export class UpdateInvoiceHandler
         0,
       );
 
-      updateData.items = processedItems;
       updateData.subtotalToman = subtotalToman;
       updateData.totalToman = subtotalToman;
+
+      await this.prisma.invoiceItem.deleteMany({ where: { invoiceId } });
+      await this.prisma.invoiceItem.createMany({
+        data: processedItems.map((it) => ({
+          id: it.id,
+          invoiceId,
+          serviceId: it.serviceId,
+          title: it.title,
+          description: it.description,
+          quantity: it.quantity,
+          unitPriceToman: it.unitPriceToman,
+          totalToman: it.totalToman,
+          serviceNameSnapshot: it.serviceNameSnapshot,
+          serviceTypeSnapshot: it.serviceTypeSnapshot,
+          servicePriceSnapshotToman: it.servicePriceSnapshotToman,
+          serviceRenewalDateSnapshot: it.serviceRenewalDateSnapshot,
+        })),
+      });
+
+      updateData.items = processedItems;
     }
+
+    // invoiceNumber is permanent, immutable, and must NEVER change on update
+    delete (updateData as any).invoiceNumber;
 
     const updated = await this.prisma.invoice.update({
       where: { id: invoiceId },

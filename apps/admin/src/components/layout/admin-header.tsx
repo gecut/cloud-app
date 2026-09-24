@@ -250,14 +250,14 @@ export function AdminHeader() {
           >
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg">
               <ExternalLink className="h-3.5 w-3.5" />
-              پنل مشتریان
+              <span className="hidden lg:inline">پنل مشتریان</span>
             </Button>
           </a>
 
           {/* Admin User Info */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/60 bg-card/60 backdrop-blur-md text-xs font-medium">
+          <div className="hidden md:flex items-center gap-2 px-2.5 lg:px-3 py-1.5 rounded-xl border border-border/60 bg-card/60 backdrop-blur-md text-xs font-medium">
             <div className="h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 animate-pulse" />
-            <span className="max-w-[140px] truncate text-foreground font-semibold">
+            <span className="max-w-[90px] lg:max-w-[140px] truncate text-foreground font-semibold">
               {currentUser.name || "مدیر سامانه"}
             </span>
             <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
@@ -277,7 +277,7 @@ export function AdminHeader() {
             title="مدیریت مدیران و تغییر گذرواژه"
           >
             <ShieldCheck className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">مدیریت مدیران</span>
+            <span className="hidden md:inline">مدیریت مدیران</span>
           </Button>
 
           {/* Direct Purge Database Button */}
@@ -292,7 +292,7 @@ export function AdminHeader() {
             title="پاکسازی تمام داده‌ها و رکوردهای دیتابیس"
           >
             <Database className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">پاکسازی دیتابیس</span>
+            <span className="hidden xl:inline">پاکسازی دیتابیس</span>
           </Button>
 
           {/* Direct Logout Button */}
@@ -304,7 +304,7 @@ export function AdminHeader() {
             title="خروج از سامانه مدیریت"
           >
             <LogOut className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">خروج</span>
+            <span className="hidden lg:inline">خروج</span>
           </Button>
 
           {/* Mode Toggle */}

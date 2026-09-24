@@ -6,7 +6,7 @@ export class UpdateCustomerDto {
   @IsString()
   @IsOptional()
   name?: string;
-
+  
   @ApiPropertyOptional({ example: "چوبینو گستر" })
   @IsString()
   @IsOptional()

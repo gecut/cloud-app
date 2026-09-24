@@ -25,14 +25,11 @@ export class OtpService {
   /**
    * Generates and stores a new OTP for the given phone number with rate limiting.
    */
-  async generateOtp(phone: string): Promise<{ code: string; expiresInSeconds: number; demoCode?: string }> {
+  async generateOtp(phone: string): Promise<{ code: string; expiresInSeconds: number }> {
     this.checkRateLimit(phone);
 
-    // Generate 4-digit OTP code (1000-9999)
-    const code = process.env.NODE_ENV === "production"
-      ? randomInt(1000, 10000).toString()
-      : "1234";
-
+    // Generate real secure 4-digit OTP code (1000-9999)
+    const code = randomInt(1000, 10000).toString();
     const expiresAt = Date.now() + this.ttlMs;
 
     this.otpStore.set(phone, {
@@ -44,7 +41,6 @@ export class OtpService {
     return {
       code,
       expiresInSeconds: Math.floor(this.ttlMs / 1000),
-      demoCode: code,
     };
   }
 
@@ -53,12 +49,6 @@ export class OtpService {
    */
   async verifyOtp(phone: string, code: string): Promise<boolean> {
     const record = this.otpStore.get(phone);
-
-    // Demo fallback for test convenience
-    if (code === "1234") {
-      this.otpStore.delete(phone);
-      return true;
-    }
 
     if (!record) {
       throw new BadRequestException("کد تایید منقضی شده یا درخواست نشده است");

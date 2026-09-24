@@ -119,7 +119,7 @@ export function setActiveUser(user: DemoUser) {
 /**
  * Checks if a JWT token has expired or will expire within bufferSeconds.
  */
-export function isTokenExpired(token: string, bufferSeconds = 30): boolean {
+export function isTokenExpired(token: string, bufferSeconds = 15): boolean {
   try {
     const parts = token.split(".");
     if (parts.length !== 3 || !parts[1]) return true;
@@ -179,7 +179,9 @@ export async function refreshAdminToken(): Promise<string | null> {
     } catch {
       clearAdminAuth();
       if (typeof window !== "undefined") {
-        toast.error("نشست کاربری مدیر منقضی شده است. لطفاً دوباره وارد شوید");
+        if (!window.location.pathname.includes("/login")) {
+          toast.error("نشست کاربری مدیر منقضی شده است. لطفاً دوباره وارد شوید");
+        }
         window.dispatchEvent(new CustomEvent("gecut-auth-expired"));
       }
       return null;

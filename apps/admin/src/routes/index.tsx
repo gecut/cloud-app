@@ -69,9 +69,11 @@ function AdminDashboardPage() {
   const totalCustomersCount = customersData?.total ?? allCustomers.length;
 
   const allServices = servicesData?.items || [];
-  const activeServices = allServices.filter((s: any) => s.status === "ACTIVE");
+  // Active services must realistically count customer-assigned sub-services (excluding master catalog templates)
+  const customerAssignedServices = allServices.filter((s: any) => Boolean(s.customerId));
+  const activeServices = customerAssignedServices.filter((s: any) => s.status === "ACTIVE");
   const activeServicesCount = activeServices.length;
-  const totalServicesCount = servicesData?.total ?? allServices.length;
+  const totalServicesCount = customerAssignedServices.length;
 
   const allInvoices = invoicesData?.items || [];
   const suppliersList = suppliersData?.items || [];

@@ -10,6 +10,7 @@ import {
   Building2,
   User,
   ShieldCheck,
+  Server,
 } from "lucide-react";
 import { formatInvoiceNumber } from "@/utils/format";
 import { Button } from "@gecut-cloud/ui/components/button";
@@ -34,12 +35,14 @@ export function InvoiceDetailModal({
 }: InvoiceDetailModalProps) {
   if (!isOpen || !invoice) return null;
 
+  const isSupplier = Boolean(invoice.supplierId) || invoice.counterpartyType === "SUPPLIER";
+
   const items =
     invoice.items && invoice.items.length > 0
       ? invoice.items
       : [
           {
-            title: invoice.title || "صورت‌حساب خدمات ابری و زیرساخت",
+            title: invoice.title || (isSupplier ? "صورت‌حساب خدمات تامین‌کننده" : "صورت‌حساب خدمات ابری و زیرساخت"),
             quantity: 1,
             unitPriceToman: invoice.totalToman || 0,
           },
@@ -269,55 +272,108 @@ export function InvoiceDetailModal({
             </div>
           </div>
 
-          {/* Seller & Customer Information Cards */}
+          {/* Seller & Counterparty Information Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-            {/* Seller */}
-            <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
-              <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
-                <Building2 className="h-4 w-4 text-primary" />
-                <span>مشخصات فروشنده (ارائه‌دهنده خدمت)</span>
-              </div>
-              <div className="space-y-1.5 text-muted-foreground">
-                <p>
-                  <strong className="text-foreground">نام:</strong> شرکت جیکات کلود (Gecut Cloud)
-                </p>
-                <p>
-                  <strong className="text-foreground">موضوع فعالیت:</strong> خدمات زیرساخت ابری،
-                  هاستینگ سازمانی و سرور اختصاصی
-                </p>
-                <p>
-                  <strong className="text-foreground">پشتیبانی و مالی:</strong> support@gecut.local
-                </p>
-              </div>
-            </div>
+            {isSupplier ? (
+              <>
+                {/* Supplier is the Seller/Provider */}
+                <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
+                  <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
+                    <Building2 className="h-4 w-4 text-purple-600" />
+                    <span>مشخصات تامین‌کننده (بستانکار)</span>
+                  </div>
+                  <div className="space-y-1.5 text-muted-foreground">
+                    <p>
+                      <strong className="text-foreground">نام تامین‌کننده:</strong>{" "}
+                      {invoice.supplier?.name || invoice.supplierName || "تامین‌کننده زیرساخت"}
+                    </p>
+                    <p>
+                      <strong className="text-foreground">شخص رابط:</strong>{" "}
+                      {invoice.supplier?.contactName || "---"}
+                    </p>
+                    <p>
+                      <strong className="text-foreground">شماره تماس:</strong>{" "}
+                      <span className="font-mono">{invoice.supplier?.phone || "---"}</span>
+                    </p>
+                    <p>
+                      <strong className="text-foreground">ایمیل / شناسه:</strong>{" "}
+                      <span className="font-mono text-[11px]">
+                        {invoice.supplier?.email || invoice.supplierId || "---"}
+                      </span>
+                    </p>
+                  </div>
+                </div>
 
-            {/* Customer */}
-            <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
-              <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
-                <User className="h-4 w-4 text-primary" />
-                <span>مشخصات خریدار (مشتری)</span>
-              </div>
-              <div className="space-y-1.5 text-muted-foreground">
-                <p>
-                  <strong className="text-foreground">نام مشترک:</strong>{" "}
-                  {invoice.customer?.name || "نامشخص"}
-                </p>
-                <p>
-                  <strong className="text-foreground">عنوان سازمانی:</strong>{" "}
-                  {invoice.customer?.displayName || invoice.customer?.company || "حقیقی / سازمانی"}
-                </p>
-                <p>
-                  <strong className="text-foreground">شماره تماس:</strong>{" "}
-                  <span className="font-mono">{invoice.customer?.phone || "---"}</span>
-                </p>
-                <p>
-                  <strong className="text-foreground">شناسه کاربری:</strong>{" "}
-                  <span className="font-mono text-[11px]">
-                    {invoice.customerId || invoice.customer?.id || "---"}
-                  </span>
-                </p>
-              </div>
-            </div>
+                {/* Gecut Cloud is the Buyer/Payer */}
+                <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
+                  <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
+                    <Building2 className="h-4 w-4 text-primary" />
+                    <span>مشخصات پرداخت‌کننده (جیکات کلود)</span>
+                  </div>
+                  <div className="space-y-1.5 text-muted-foreground">
+                    <p>
+                      <strong className="text-foreground">نام:</strong> شرکت جیکات کلود (Gecut Cloud)
+                    </p>
+                    <p>
+                      <strong className="text-foreground">واحد ثبت هزینه:</strong> زیرساخت ابری و سرورها
+                    </p>
+                    <p>
+                      <strong className="text-foreground">بخش مالی:</strong> finance@gecut.local
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Seller is Gecut */}
+                <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
+                  <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
+                    <Building2 className="h-4 w-4 text-primary" />
+                    <span>مشخصات فروشنده (ارائه‌دهنده خدمت)</span>
+                  </div>
+                  <div className="space-y-1.5 text-muted-foreground">
+                    <p>
+                      <strong className="text-foreground">نام:</strong> شرکت جیکات کلود (Gecut Cloud)
+                    </p>
+                    <p>
+                      <strong className="text-foreground">موضوع فعالیت:</strong> خدمات زیرساخت ابری،
+                      هاستینگ سازمانی و سرور اختصاصی
+                    </p>
+                    <p>
+                      <strong className="text-foreground">پشتیبانی و مالی:</strong> support@gecut.local
+                    </p>
+                  </div>
+                </div>
+
+                {/* Customer is the Buyer */}
+                <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
+                  <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
+                    <User className="h-4 w-4 text-primary" />
+                    <span>مشخصات خریدار (مشتری)</span>
+                  </div>
+                  <div className="space-y-1.5 text-muted-foreground">
+                    <p>
+                      <strong className="text-foreground">نام مشترک:</strong>{" "}
+                      {invoice.customer?.name || "نامشخص"}
+                    </p>
+                    <p>
+                      <strong className="text-foreground">عنوان سازمانی:</strong>{" "}
+                      {invoice.customer?.displayName || invoice.customer?.company || "حقیقی / سازمانی"}
+                    </p>
+                    <p>
+                      <strong className="text-foreground">شماره تماس:</strong>{" "}
+                      <span className="font-mono">{invoice.customer?.phone || "---"}</span>
+                    </p>
+                    <p>
+                      <strong className="text-foreground">شناسه کاربری:</strong>{" "}
+                      <span className="font-mono text-[11px]">
+                        {invoice.customerId || invoice.customer?.id || "---"}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Invoice Items Table */}
@@ -343,7 +399,23 @@ export function InvoiceDetailModal({
                         {idx + 1}
                       </td>
                       <td className="py-3.5 px-5 font-medium text-foreground">
-                        {item.title || "خدمات زیرساخت جیکات کلود"}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>{item.title || "خدمات زیرساخت جیکات کلود"}</span>
+                          {(item.service?.serviceType?.name || item.serviceTypeSnapshot) && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-primary/5 text-primary border-primary/20">
+                              {item.service?.serviceType?.name || item.serviceTypeSnapshot}
+                            </span>
+                          )}
+                          {(item.serviceNameSnapshot || item.service?.name) && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                              <Server className="h-3 w-3" />
+                              سرویس: {item.serviceNameSnapshot || item.service?.name}
+                            </span>
+                          )}
+                        </div>
+                        {item.description && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{item.description}</p>
+                        )}
                       </td>
                       <td className="py-3.5 px-5 text-center font-mono">{qty}</td>
                       <td className="py-3.5 px-5 text-left font-mono">
@@ -386,7 +458,11 @@ export function InvoiceDetailModal({
               <div className="flex justify-between items-center pt-2 border-t font-bold text-sm text-foreground">
                 <span>مبلغ قابل پرداخت:</span>
                 <span className="font-mono text-primary text-base">
-                  {total.toLocaleString("fa-IR")} تومان
+                  {total === 0 ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">رایگان (تسویه شده)</span>
+                  ) : (
+                    `${total.toLocaleString("fa-IR")} تومان`
+                  )}
                 </span>
               </div>
             </div>

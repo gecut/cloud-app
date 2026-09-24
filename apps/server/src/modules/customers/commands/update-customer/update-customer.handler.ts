@@ -11,7 +11,7 @@ export class UpdateCustomerHandler
   constructor(private readonly prisma: PrismaService) {}
 
   async execute(command: UpdateCustomerCommand): Promise<any> {
-    const { id, dto } = command;
+    const { dto, id} = command;
 
     const existing = await this.prisma.customer.findUnique({
       where: { id },

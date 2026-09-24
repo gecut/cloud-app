@@ -31,8 +31,14 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand,
     // Invalidate consumed refresh token
     await this.sessionService.removeSessionByRefreshToken(refreshToken).catch(() => {});
 
-    // Generate new pair of tokens
-    const tokens = this.tokenService.generateAuthTokens(user);
+    // Generate new pair of tokens (preserve 2-minute expiration for OTP login)
+    const isOtp = payload.loginMethod === "otp";
+    const tokens = this.tokenService.generateAuthTokens(
+      user,
+      isOtp ? 120 : undefined,
+      undefined,
+      isOtp ? "otp" : undefined,
+    );
 
     // Persist new session
     const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);

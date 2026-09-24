@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
@@ -9,7 +9,7 @@ import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { Card, CardContent } from "@gecut-cloud/ui/components/card";
 import { toast } from "sonner";
-import { formatJalaliDate } from "@gecut-cloud/contracts";
+import { formatJalaliDate, analyzeDateRange } from "@gecut-cloud/contracts";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
 import { ConfirmModal } from "@/components/common/confirm-modal";
 import {
@@ -38,25 +38,32 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  MessageSquare,
+  Headphones,
+  Image,
   Tag,
+  Repeat,
 } from "lucide-react";
 
 export const Route = createFileRoute("/services/")({
   component: AdminServicesListPage,
 });
 
-function getCategoryIcon(slug: string) {
-  const s = slug?.toLowerCase() || "";
+function getCategoryIcon(slug?: string, name?: string) {
+  const s = `${slug || ""} ${name || ""}`.toLowerCase();
   if (s.includes("domain") || s.includes("دامنه")) return Globe;
   if (s.includes("server") || s.includes("سرور") || s.includes("vps")) return Server;
-  if (s.includes("host") || s.includes("هاست")) return HardDrive;
-  if (s.includes("api") || s.includes("ai") || s.includes("هوش")) return Cpu;
+  if (s.includes("host") || s.includes("هاست") || s.includes("میزبانی")) return HardDrive;
+  if (s.includes("sms") || s.includes("پیامک") || s.includes("پیام")) return MessageSquare;
+  if (s.includes("support") || s.includes("پشتیبانی") || s.includes("تیکت")) return Headphones;
+  if (s.includes("image") || s.includes("تصویر") || s.includes("عکس")) return Image;
+  if (s.includes("api") || s.includes("ai") || s.includes("هوش") || s.includes("وب‌سرویس")) return Cpu;
   if (s.includes("package") || s.includes("بسته") || s.includes("پکیج")) return Package;
   return Tag;
 }
 
 function getCategoryBadge(slug?: string, customName?: string) {
-  const s = slug?.toLowerCase() || "";
+  const s = `${slug || ""} ${customName || ""}`.toLowerCase();
   if (s.includes("domain") || s.includes("دامنه")) {
     return {
       label: customName || "دامنه",
@@ -71,14 +78,35 @@ function getCategoryBadge(slug?: string, customName?: string) {
       className: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
     };
   }
-  if (s.includes("host") || s.includes("هاست")) {
+  if (s.includes("host") || s.includes("هاست") || s.includes("میزبانی")) {
     return {
-      label: customName || "هاستینگ",
+      label: customName || "هاست",
       icon: HardDrive,
       className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     };
   }
-  if (s.includes("api") || s.includes("ai") || s.includes("هوش")) {
+  if (s.includes("sms") || s.includes("پیامک") || s.includes("پیام")) {
+    return {
+      label: customName || "پنل پیامکی",
+      icon: MessageSquare,
+      className: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
+    };
+  }
+  if (s.includes("support") || s.includes("پشتیبانی") || s.includes("تیکت")) {
+    return {
+      label: customName || "پشتیبانی متنی",
+      icon: Headphones,
+      className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    };
+  }
+  if (s.includes("image") || s.includes("تصویر") || s.includes("عکس")) {
+    return {
+      label: customName || "تصویر",
+      icon: Image,
+      className: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+    };
+  }
+  if (s.includes("api") || s.includes("ai") || s.includes("هوش") || s.includes("وب‌سرویس")) {
     return {
       label: customName || "وب‌سرویس و API",
       icon: Cpu,
@@ -89,55 +117,99 @@ function getCategoryBadge(slug?: string, customName?: string) {
     return {
       label: customName || "بسته تعدادی",
       icon: Package,
-      className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      className: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
     };
   }
   return {
-    label: customName || slug || "سرویس ابری",
+    label: customName || slug || "سایر",
     icon: Tag,
-    className: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+    className: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20",
   };
+}
+
+function parseBillingCycleDays(cycle?: string | number | null): number | null {
+  if (!cycle) return null;
+  const num = Number(cycle);
+  if (!isNaN(num) && num > 0) return num;
+  const s = String(cycle).toUpperCase();
+  if (s === "MONTHLY") return 30;
+  if (s === "QUARTERLY") return 90;
+  if (s === "SEMI_ANNUAL") return 180;
+  if (s === "ANNUAL") return 365;
+  return null;
 }
 
 function getServiceRemainingDetails(service: any) {
   const trackingType = (service.trackingType || "HYBRID").toUpperCase();
-
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
-  const start = new Date(service.purchaseDate || service.startDate || service.createdAt || Date.now());
-  const end = new Date(service.renewalDate || (start.getTime() + 30 * MS_PER_DAY));
-  const now = new Date();
 
-  // 1. بازه زمانی کلی (بازه زمانی تاریخ سررسید و تاریخ ثبت شده/خرید) یا دوره تعیین‌شده
-  const rawCycle = Number(service.billingCycle);
-  const configuredCycleDays = !isNaN(rawCycle) && rawCycle > 0 ? rawCycle : null;
+  const configuredCycleDays = parseBillingCycleDays(service.billingCycle);
 
-  const rawSpan = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY);
-  const spanDays = configuredCycleDays || Math.max(1, rawSpan);
+  let end: Date;
+  if (service.renewalDate) {
+    end = new Date(service.renewalDate);
+    if (isNaN(end.getTime())) end = new Date(Date.now() + 30 * MS_PER_DAY);
+  } else {
+    end = new Date(Date.now() + (configuredCycleDays || 30) * MS_PER_DAY);
+  }
 
-  // 2. محاسبه روزهای سپری‌شده از زمان ساخت/شروع سرویس
-  const creationMs = service.createdAt ? new Date(service.createdAt).getTime() : start.getTime();
-  const daysPassed = Math.max(0, Math.floor((now.getTime() - creationMs) / MS_PER_DAY));
-  const daysLeft = Math.max(0, spanDays - daysPassed);
-  const remainingPercent = Math.min(Math.max((daysLeft / spanDays) * 100, 0), 100);
+  let start: Date;
+  const rawStart = service.purchaseDate || service.startDate || service.createdAt;
+  if (rawStart) {
+    start = new Date(rawStart);
+    if (isNaN(start.getTime())) {
+      start = new Date(end.getTime() - (configuredCycleDays || 30) * MS_PER_DAY);
+    }
+  } else {
+    start = new Date(end.getTime() - (configuredCycleDays || 30) * MS_PER_DAY);
+  }
 
-  // 3. آلارم در صورتی که دوره تعیین‌شده از بازه کلی تقویمی بیشتر باشد
-  const isAlarmExceeded = configuredCycleDays !== null && rawSpan > 0 && configuredCycleDays > rawSpan;
-  const isExpired = daysLeft === 0 || end.getTime() < now.getTime();
+  // Prevent invalid negative range if legacy data had corrupted start date after renewalDate
+  if (trackingType !== "QUANTITY" && start.getTime() > end.getTime()) {
+    start = new Date(end.getTime() - (configuredCycleDays || 30) * MS_PER_DAY);
+  }
+
+  const analysis = analyzeDateRange({
+    startDate: start,
+    endDate: end,
+    configuredCycleDays,
+  });
 
   // Quantity calculation
-  const totalQty = service.quantity || 1;
-  const usedQty = service.usedQuantity || 0;
+  const totalQty = Math.max(1, Number(service.quantity) || 1);
+  const usedQty = Math.max(0, Number(service.usedQuantity) || 0);
   const remainingQty = Math.max(0, totalQty - usedQty);
+
+  const isQuantityDepleted =
+    (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+    (remainingQty <= 0 || usedQty >= totalQty);
+
+  const isQuantityNearDepletion =
+    (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+    !isQuantityDepleted &&
+    (remainingQty <= Math.max(1, Math.ceil(totalQty * 0.05)) || (totalQty > 0 && (remainingQty / totalQty) <= 0.05));
+
+  const isTimeExpired = trackingType !== "QUANTITY" && analysis.isExpired;
+  const isTimeNearExpiry =
+    trackingType !== "QUANTITY" && !isTimeExpired && analysis.daysLeft > 0 && analysis.daysLeft <= 3;
+
+  const isExpired = isTimeExpired || isQuantityDepleted;
 
   return {
     trackingType,
-    daysTotal: spanDays, // بازه کلی روزها
-    daysPassed,
-    daysLeft,
-    remainingPercent,
+    daysTotal: analysis.totalDays,
+    daysPassed: analysis.daysPassed,
+    daysLeft: analysis.daysLeft,
+    remainingPercent: analysis.remainingPercent,
     configuredCycleDays,
-    isAlarmExceeded,
+    isAlarmExceeded: analysis.isAlarmExceeded,
     isExpired,
+    isTimeExpired,
+    isTimeNearExpiry,
+    isQuantityDepleted,
+    isQuantityNearDepletion,
+    overdueDays: analysis.overdueDays,
+    urgency: analysis.urgency,
     startDate: start,
     renewalDate: end,
     totalQty,
@@ -165,6 +237,13 @@ function parsePriceInput(valStr: string): number {
 
 function safeDate(val?: string | Date | null, fallback = new Date()): Date {
   if (!val) return fallback;
+  if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+    const parts = val.split("-").map(Number);
+    const y = parts[0] ?? 2026;
+    const m = parts[1] ?? 1;
+    const d = parts[2] ?? 1;
+    return new Date(y, m - 1, d, 12, 0, 0);
+  }
   const d = new Date(val);
   return isNaN(d.getTime()) ? fallback : d;
 }
@@ -175,16 +254,16 @@ function safeIso(val?: string | Date | null, fallback = new Date()): string {
 
 function calcAddDays(baseIso: string | Date | null, days: number): string {
   const d = safeDate(baseIso);
-  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate() + Number(days || 0));
+  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate() + Number(days || 0), 12, 0, 0);
   return result.toISOString();
 }
 
 function calcDaysBetween(startIso: string | Date | null, endIso: string | Date | null): number {
   const s = safeDate(startIso);
   const e = safeDate(endIso);
-  const utcStart = Date.UTC(s.getFullYear(), s.getMonth(), s.getDate());
-  const utcEnd = Date.UTC(e.getFullYear(), e.getMonth(), e.getDate());
-  const diffDays = Math.round((utcEnd - utcStart) / (1000 * 60 * 60 * 24));
+  const startDay = new Date(s.getFullYear(), s.getMonth(), s.getDate(), 12, 0, 0).getTime();
+  const endDay = new Date(e.getFullYear(), e.getMonth(), e.getDate(), 12, 0, 0).getTime();
+  const diffDays = Math.round((endDay - startDay) / (1000 * 60 * 60 * 24));
   return Math.max(1, diffDays);
 }
 
@@ -201,6 +280,10 @@ function AdminServicesListPage() {
   // Quick allocation state
   const [assigningToCatalog, setAssigningToCatalog] = useState<any | null>(null);
   const [assignSubServiceName, setAssignSubServiceName] = useState("");
+  const [isQuickAddCustomer, setIsQuickAddCustomer] = useState(false);
+  const [quickCustomerName, setQuickCustomerName] = useState("");
+  const [quickCustomerPhone, setQuickCustomerPhone] = useState("");
+  const [isCreatingQuickCustomer, setIsCreatingQuickCustomer] = useState(false);
 
   // Form states for Create Service
   const [name, setName] = useState("");
@@ -215,6 +298,7 @@ function AdminServicesListPage() {
   const [assignRenewalDate, setAssignRenewalDate] = useState<string>(() =>
     calcAddDays(new Date().toISOString(), 30),
   );
+  const [assignAutoRenew, setAssignAutoRenew] = useState<boolean>(true);
 
   // Two-way reactive date handlers for Quick Assign
   const handleAssignDurationChange = (days: number) => {
@@ -239,9 +323,14 @@ function AdminServicesListPage() {
     setDurationDays(calculatedDays);
   };
 
-  // Derived span and alarm for Quick Assign
-  const assignSpanDays = calcDaysBetween(purchaseDate, assignRenewalDate);
-  const isAssignAlarmExceeded = trackingType !== "QUANTITY" && durationDays > assignSpanDays;
+  // Derived analysis for Quick Assign
+  const assignRangeAnalysis = analyzeDateRange({
+    startDate: purchaseDate,
+    endDate: assignRenewalDate,
+    configuredCycleDays: trackingType !== "QUANTITY" ? durationDays : undefined,
+  });
+  const assignSpanDays = assignRangeAnalysis.totalDays;
+  const isAssignAlarmExceeded = trackingType !== "QUANTITY" && assignRangeAnalysis.isAlarmExceeded;
 
   // Form states for Edit Service Template (Master Catalog)
   const [editName, setEditName] = useState("");
@@ -260,6 +349,7 @@ function AdminServicesListPage() {
     calcAddDays(new Date().toISOString(), 30),
   );
   const [editSubStatus, setEditSubStatus] = useState<string>("ACTIVE");
+  const [editSubAutoRenew, setEditSubAutoRenew] = useState<boolean>(true);
 
   // Two-way reactive date handlers for Edit Sub-Service
   const handleEditSubDurationChange = (days: number) => {
@@ -298,10 +388,17 @@ function AdminServicesListPage() {
     customerName: string;
   } | null>(null);
 
+  const [confirmDeleteCatalogModal, setConfirmDeleteCatalogModal] = useState<any | null>(null);
+
   // Derived span and alarm for Edit Sub-Service
-  const editSubSpanDays = calcDaysBetween(editSubPurchaseDate, editSubRenewalDate);
+  const editSubRangeAnalysis = analyzeDateRange({
+    startDate: editSubPurchaseDate,
+    endDate: editSubRenewalDate,
+    configuredCycleDays: editSubTrackingType !== "QUANTITY" ? editSubDurationDays : undefined,
+  });
+  const editSubSpanDays = editSubRangeAnalysis.totalDays;
   const isEditSubAlarmExceeded =
-    editSubTrackingType !== "QUANTITY" && editSubDurationDays > editSubSpanDays;
+    editSubTrackingType !== "QUANTITY" && editSubRangeAnalysis.isAlarmExceeded;
 
   // Queries
   const { data: servicesData, isLoading, refetch } = useQuery({
@@ -319,9 +416,38 @@ function AdminServicesListPage() {
     queryFn: () => apiClient<{ items: any[]; total: number }>("/categories"),
   });
 
+  const { data: invoicesData } = useQuery({
+    queryKey: ["admin", "invoices"],
+    queryFn: () => apiClient<{ items: any[]; total: number }>("/invoices?limit=500"),
+  });
+
   const allItems = servicesData?.items || [];
   const customersList = customersData?.items || [];
   const dynamicCategories = categoriesData?.items || [];
+  const allInvoices = invoicesData?.items || [];
+
+  useEffect(() => {
+    if (dynamicCategories.length > 0) {
+      if (
+        !category ||
+        category === "hosting" ||
+        !dynamicCategories.some((c: any) => c.slug === category || c.id === category)
+      ) {
+        setCategory(dynamicCategories[0].slug || dynamicCategories[0].id);
+      }
+    }
+  }, [dynamicCategories, category]);
+
+  const getServicePaymentStatus = (serviceId: string) => {
+    const svcInvoices = allInvoices.filter((inv: any) =>
+      inv.items?.some((it: any) => it.serviceId === serviceId)
+    );
+    const hasUnpaid = svcInvoices.some((inv: any) => inv.status === "UNPAID");
+    return {
+      isPaid: !hasUnpaid,
+      label: hasUnpaid ? "معلق" : "پرداخت شده",
+    };
+  };
 
   // Build dynamic category tabs
   const categoryTabs = useMemo(() => {
@@ -336,8 +462,8 @@ function AdminServicesListPage() {
           defaultTabs.push({
             id: c.slug || c.id,
             name: c.name,
-            slug: c.slug,
-            icon: getCategoryIcon(c.slug),
+            slug: c.slug || c.id,
+            icon: getCategoryIcon(c.slug, c.name),
           });
         });
     } else {
@@ -357,10 +483,13 @@ function AdminServicesListPage() {
   const isServiceInTab = (svc: any, tabSlug: string) => {
     if (tabSlug === "all") return true;
     const target = tabSlug.toLowerCase().trim();
-    const catSlug = (svc.categorySlug || "").toLowerCase().trim();
+    const matchedCategory = dynamicCategories.find(
+      (c: any) => c.id === svc.serviceTypeId || c.slug === svc.categorySlug
+    );
+    const catSlug = (matchedCategory?.slug || svc.categorySlug || "").toLowerCase().trim();
     const typeSlug = (svc.serviceType?.slug || "").toLowerCase().trim();
-    const typeId = (svc.serviceTypeId || svc.serviceType?.id || "").toLowerCase().trim();
-    const typeName = (svc.serviceType?.name || "").toLowerCase().trim();
+    const typeId = (matchedCategory?.id || svc.serviceTypeId || svc.serviceType?.id || "").toLowerCase().trim();
+    const typeName = (matchedCategory?.name || svc.serviceType?.name || "").toLowerCase().trim();
 
     return (
       catSlug === target ||
@@ -408,7 +537,10 @@ function AdminServicesListPage() {
     });
 
     sortedTopServices.forEach((top: any) => {
-      const catSlug = top.serviceType?.slug || top.serviceTypeId || "hosting";
+      const matchedCat = dynamicCategories.find(
+        (c: any) => c.id === top.serviceTypeId || c.slug === top.serviceType?.slug
+      );
+      const catSlug = matchedCat?.slug || top.serviceType?.slug || top.serviceTypeId || "hosting";
       const topName = (top.name || "").trim().toLowerCase();
 
       // Check if we already have a template card with the exact same name & category (to merge any duplicate catalog records)
@@ -448,8 +580,8 @@ function AdminServicesListPage() {
           id: top.id,
           name: top.name,
           categorySlug: catSlug,
-          serviceType: top.serviceType,
-          serviceTypeId: top.serviceTypeId,
+          serviceType: top.serviceType || matchedCat,
+          serviceTypeId: top.serviceTypeId || matchedCat?.id,
           description: top.description,
           createdAt: top.createdAt,
           assignedServices: allSubsForThisTop,
@@ -470,7 +602,19 @@ function AdminServicesListPage() {
       if (!isAlreadyInGroup) {
         const parent = allItems.find((x: any) => x.id === pid);
         const parentName = parent?.name || cs.name;
-        const catSlug = cs.serviceType?.slug || cs.serviceTypeId || parent?.serviceType?.slug || "hosting";
+        const matchedCat = dynamicCategories.find(
+          (c: any) =>
+            c.id === cs.serviceTypeId ||
+            c.slug === cs.serviceType?.slug ||
+            c.id === parent?.serviceTypeId ||
+            c.slug === parent?.serviceType?.slug
+        );
+        const catSlug =
+          matchedCat?.slug ||
+          cs.serviceType?.slug ||
+          cs.serviceTypeId ||
+          parent?.serviceType?.slug ||
+          "hosting";
 
         const existingGroup = resultTemplates.find(
           (r) => r.id === pid || r.name?.trim().toLowerCase() === parentName.trim().toLowerCase()
@@ -484,8 +628,8 @@ function AdminServicesListPage() {
             id: pid || cs.id,
             name: parentName,
             categorySlug: catSlug,
-            serviceType: cs.serviceType || parent?.serviceType,
-            serviceTypeId: cs.serviceTypeId || parent?.serviceTypeId,
+            serviceType: cs.serviceType || parent?.serviceType || matchedCat,
+            serviceTypeId: cs.serviceTypeId || parent?.serviceTypeId || matchedCat?.id,
             description: parent?.description || cs.description,
             createdAt: cs.createdAt,
             assignedServices: [cs],
@@ -508,7 +652,7 @@ function AdminServicesListPage() {
     });
 
     return resultTemplates;
-  }, [allItems]);
+  }, [allItems, dynamicCategories]);
 
   // Filter by category and search
   const filteredServices = catalogServices
@@ -560,6 +704,7 @@ function AdminServicesListPage() {
       queryClient.invalidateQueries({ queryKey: ["admin", "services"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
       if (assigningToCatalog) {
         setExpandedServices((prev) => ({
           ...prev,
@@ -597,6 +742,7 @@ function AdminServicesListPage() {
       queryClient.invalidateQueries({ queryKey: ["admin", "payments"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "accounting"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
       setEditingService(null);
       setEditingSubService(null);
     },
@@ -615,48 +761,87 @@ function AdminServicesListPage() {
       toast.success("سرویس با موفقیت حذف شد");
       queryClient.invalidateQueries({ queryKey: ["admin", "services"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
     },
     onError: (err: any) => {
       toast.error(err.message || "خطا در حذف سرویس");
     },
   });
 
+  // Renew Service Mutation
+  const renewServiceMutation = useMutation({
+    mutationFn: (serviceId: string) =>
+      apiClient(`/services/${serviceId}/renew`, {
+        method: "POST",
+      }),
+    onSuccess: (data: any) => {
+      toast.success(data?.message || "سرویس با موفقیت تمدید شد، تاریخ سررسید به‌روزرسانی و صورت‌حساب صادر گردید");
+      queryClient.invalidateQueries({ queryKey: ["admin", "services"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در تمدید سرویس");
+    },
+  });
+
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("نام سرویس / بسته الزامی است");
+      toast.error("نام بسته / سرویس کاتالوگ الزامی است");
       return;
     }
 
-    const payload: any = {
+    const matchedCategory = dynamicCategories.find(
+      (c: any) => c.slug === category || c.id === category
+    );
+
+    // Master Catalog service is purely template: name, category, and description
+    createServiceMutation.mutate({
       name: name.trim(),
-      serviceTypeSlug: category,
+      serviceTypeId: matchedCategory?.id,
+      serviceTypeSlug: matchedCategory?.slug || category,
       description: description.trim() || undefined,
-    };
-
-    if (selectedCustomerId) {
-      const pDate = purchaseDate ? new Date(purchaseDate) : new Date();
-      payload.customerId = selectedCustomerId;
-      payload.trackingType = trackingType;
-      payload.priceToman = Math.round(Number(priceToman)) || 0;
-      payload.quantity = trackingType === "TIME" ? 1 : Math.max(1, Number(quantity) || 1);
-      payload.billingCycle = trackingType === "QUANTITY" ? "NONE" : String(durationDays);
-      payload.purchaseDate = pDate.toISOString();
-      payload.startDate = pDate.toISOString();
-      payload.renewalDate =
-        trackingType === "QUANTITY"
-          ? new Date(pDate.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()
-          : new Date(pDate.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
-    }
-
-    createServiceMutation.mutate(payload);
+      status: "ACTIVE",
+    });
   };
 
-  const handleQuickAssignSubmit = (e: React.FormEvent) => {
+  const handleQuickAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!assigningToCatalog) return;
-    if (!selectedCustomerId) {
-      toast.error("لطفاً یک مشتری را انتخاب کنید");
+
+    let targetCustomerId = selectedCustomerId;
+
+    if (isQuickAddCustomer || customersList.length === 0) {
+      if (!quickCustomerName.trim()) {
+        toast.error("لطفاً نام مشتری را وارد کنید");
+        return;
+      }
+      try {
+        setIsCreatingQuickCustomer(true);
+        const newCust = await apiClient<any>("/customers", {
+          method: "POST",
+          body: JSON.stringify({
+            name: quickCustomerName.trim(),
+            displayName: quickCustomerName.trim(),
+            phone: quickCustomerPhone.trim() || undefined,
+          }),
+        });
+        targetCustomerId = newCust.id;
+        queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
+        toast.success(`مشتری ${quickCustomerName} با موفقیت ثبت شد`);
+      } catch (err: any) {
+        toast.error(err.message || "خطا در ثبت مشتری");
+        setIsCreatingQuickCustomer(false);
+        return;
+      } finally {
+        setIsCreatingQuickCustomer(false);
+      }
+    }
+
+    if (!targetCustomerId) {
+      toast.error("لطفاً یک مشتری را انتخاب یا ثبت کنید");
       return;
     }
 
@@ -664,14 +849,20 @@ function AdminServicesListPage() {
     const pDate = safeDate(purchaseDate);
     const renDate = safeDate(assignRenewalDate, new Date(calcAddDays(pDate, durationDays)));
 
+    if (trackingType !== "QUANTITY" && renDate.getTime() < pDate.getTime()) {
+      toast.error("خطا در بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!");
+      return;
+    }
+
     createServiceMutation.mutate({
       name: assignedName,
       parentServiceId: assigningToCatalog.id,
       serviceTypeId: assigningToCatalog.serviceTypeId,
       serviceTypeSlug: assigningToCatalog.categorySlug,
       description: assigningToCatalog.description || undefined,
-      customerId: selectedCustomerId,
+      customerId: targetCustomerId,
       trackingType,
+      autoRenew: assignAutoRenew,
       priceToman: Math.round(Number(priceToman)) || 0,
       quantity: trackingType === "TIME" ? 1 : Math.max(1, Number(quantity) || 1),
       billingCycle: trackingType === "QUANTITY" ? "NONE" : String(durationDays),
@@ -689,11 +880,16 @@ function AdminServicesListPage() {
       return;
     }
 
+    const matchedCategory = dynamicCategories.find(
+      (c: any) => c.slug === editCategory || c.id === editCategory
+    );
+
     updateServiceMutation.mutate({
       id: editingService.id,
       data: {
         name: editName.trim(),
-        serviceTypeSlug: editCategory,
+        serviceTypeId: matchedCategory?.id,
+        serviceTypeSlug: matchedCategory?.slug || editCategory,
         description: editDescription.trim() || undefined,
       },
     });
@@ -704,6 +900,7 @@ function AdminServicesListPage() {
     setEditSubName(sub.name || "");
     setEditSubPrice(Number(sub.priceToman) || 0);
     setEditSubTrackingType((sub.trackingType || "HYBRID").toUpperCase() as any);
+    setEditSubAutoRenew(sub.autoRenew !== false);
 
     const rawCycle = Number(sub.billingCycle);
     const totalDays = !isNaN(rawCycle) && rawCycle > 0 ? rawCycle : 30;
@@ -729,12 +926,18 @@ function AdminServicesListPage() {
     const pDate = safeDate(editSubPurchaseDate);
     const renDate = safeDate(editSubRenewalDate, new Date(calcAddDays(pDate, editSubDurationDays)));
 
+    if (editSubTrackingType !== "QUANTITY" && renDate.getTime() < pDate.getTime()) {
+      toast.error("خطا در بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!");
+      return;
+    }
+
     updateServiceMutation.mutate({
       id: editingSubService.id,
       data: {
         name: editSubName.trim(),
         priceToman: Math.round(Number(editSubPrice)) || 0,
         trackingType: editSubTrackingType,
+        autoRenew: editSubAutoRenew,
         quantity: editSubTrackingType === "TIME" ? 1 : Math.max(1, Number(editSubQuantity) || 1),
         usedQuantity: editSubTrackingType === "TIME" ? 0 : Math.max(0, Number(editSubUsedQuantity) || 0),
         billingCycle: editSubTrackingType === "QUANTITY" ? "NONE" : String(editSubDurationDays),
@@ -788,12 +991,12 @@ function AdminServicesListPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <Link to="/categories">
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 text-xs h-9 cursor-pointer rounded-xl border-border/70 px-3.5"
+                className="gap-2 text-xs h-8.5 cursor-pointer rounded-xl border-border/70 px-3 shrink-0"
               >
                 <Layers className="h-3.5 w-3.5 text-purple-500" />
                 مدیریت دسته‌بندی‌ها
@@ -803,7 +1006,7 @@ function AdminServicesListPage() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="gap-2 text-xs h-9 cursor-pointer rounded-xl px-3.5"
+              className="gap-2 text-xs h-8.5 cursor-pointer rounded-xl px-3 shrink-0"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
               بروزرسانی
@@ -819,7 +1022,7 @@ function AdminServicesListPage() {
                 setTrackingType("HYBRID");
                 setIsCreateOpen(true);
               }}
-              className="gap-2 text-xs h-9 shadow-sm bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl px-4"
+              className="gap-2 text-xs h-8.5 shadow-sm bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl px-3.5 shrink-0"
             >
               <Plus className="h-4 w-4" />
               ایجاد سرویس / بسته جدید
@@ -933,7 +1136,12 @@ function AdminServicesListPage() {
         ) : (
           <div className="grid grid-cols-1 gap-5">
             {filteredServices.map((svc: any) => {
-              const badge = getCategoryBadge(svc.categorySlug, svc.serviceType?.name);
+              const matchedCategory = dynamicCategories.find(
+                (c: any) => c.id === svc.serviceTypeId || c.slug === svc.categorySlug
+              );
+              const categoryName = matchedCategory?.name || svc.serviceType?.name;
+              const categorySlug = matchedCategory?.slug || svc.categorySlug;
+              const badge = getCategoryBadge(categorySlug, categoryName);
               const BadgeIcon = badge.icon;
               const isExpanded = expandedServices[svc.name] ?? true;
               const assignedList = svc.assignedServices || [];
@@ -945,26 +1153,31 @@ function AdminServicesListPage() {
                 >
                   <CardContent className="p-0">
                     {/* Catalog Header */}
-                    <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5 bg-muted/10 border-b border-border/30">
-                      <div className="flex items-start sm:items-center gap-4">
+                    <div className="p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/10 border-b border-border/30">
+                      <div className="flex items-start sm:items-center gap-4 min-w-0 flex-1">
                         <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shrink-0">
                           <BadgeIcon className="h-5 w-5" />
                         </div>
-                        <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-col gap-1.5 min-w-0">
                           <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="font-bold text-base text-foreground">{svc.name}</span>
+                            <span className="font-bold text-base text-foreground break-words">{svc.name}</span>
                             <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${badge.className}`}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${badge.className}`}
                             >
                               <BadgeIcon className="h-3.5 w-3.5" />
                               {badge.label}
                             </span>
-                            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted font-mono text-muted-foreground">
-                              {svc.assignedCount} مشترک فعال
-                            </span>
+                            {(() => {
+                              const activeSubs = assignedList.filter((s: any) => s.status === "ACTIVE").length;
+                              return (
+                                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted font-mono text-muted-foreground whitespace-nowrap">
+                                  {activeSubs.toLocaleString("fa-IR")} فعال از {svc.assignedCount.toLocaleString("fa-IR")} تخصیص
+                                </span>
+                              );
+                            })()}
                           </div>
                           {svc.description && (
-                            <p className="text-xs text-muted-foreground leading-relaxed">
+                            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
                               {svc.description}
                             </p>
                           )}
@@ -972,7 +1185,7 @@ function AdminServicesListPage() {
                       </div>
 
                       {/* Right actions */}
-                      <div className="flex items-center gap-2.5 self-end sm:self-center">
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-start md:self-center pt-2 md:pt-0">
                         <Button
                           size="sm"
                           variant="outline"
@@ -987,9 +1200,9 @@ function AdminServicesListPage() {
                             setAssignRenewalDate(calcAddDays(nowIso, 30));
                             setTrackingType("HYBRID");
                           }}
-                          className="h-8.5 text-xs gap-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 cursor-pointer rounded-xl px-3"
+                          className="h-8 text-xs gap-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 cursor-pointer rounded-xl px-2.5 whitespace-nowrap shrink-0"
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-3.5 w-3.5 shrink-0" />
                           <span>تخصیص به مشتری</span>
                         </Button>
 
@@ -999,26 +1212,45 @@ function AdminServicesListPage() {
                           onClick={() => {
                             setEditingService(svc);
                             setEditName(svc.name);
-                            setEditCategory(svc.categorySlug || "hosting");
+                            const matched = dynamicCategories.find(
+                              (c: any) => c.id === svc.serviceTypeId || c.slug === svc.categorySlug
+                            );
+                            setEditCategory(
+                              matched?.slug ||
+                                matched?.id ||
+                                svc.categorySlug ||
+                                svc.serviceTypeId ||
+                                dynamicCategories[0]?.slug ||
+                                "hosting"
+                            );
                             setEditDescription(svc.description || "");
                           }}
-                          className="h-8.5 w-8.5 text-muted-foreground hover:text-foreground cursor-pointer rounded-xl"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer rounded-xl shrink-0"
                           title="ویرایش قالب کاتالوگ"
                         >
-                          <Edit2 className="h-4 w-4" />
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setConfirmDeleteCatalogModal(svc)}
+                          className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer rounded-xl shrink-0"
+                          title="حذف سرویس / قالب کاتالوگ"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
 
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => toggleExpand(svc.name)}
-                          className="h-8.5 w-8.5 text-muted-foreground hover:text-foreground cursor-pointer rounded-xl"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer rounded-xl shrink-0"
                           title={isExpanded ? "بستن زیرمجموعه‌ها" : "مشاهده زیرمجموعه‌ها"}
                         >
                           {isExpanded ? (
-                            <ChevronUp className="h-4 w-4" />
+                            <ChevronUp className="h-3.5 w-3.5" />
                           ) : (
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-3.5 w-3.5" />
                           )}
                         </Button>
                       </div>
@@ -1058,18 +1290,18 @@ function AdminServicesListPage() {
                               هنوز هیچ مشتری این سرویس را دریافت نکرده است. از دکمه «تخصیص به مشتری» استفاده کنید.
                             </div>
                           ) : (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-right text-xs">
+                            <div className="overflow-x-auto w-full">
+                              <table className="w-full min-w-[880px] text-right text-xs">
                                 <thead>
                                   <tr className="text-muted-foreground border-b border-border/30">
                                     <th className="py-3 px-4">نام زیرسرویس و مشتری</th>
                                     <th className="py-3 px-4">مدل ردگیری و باقیمانده</th>
-                                    <th className="py-3 px-4">تاریخ ساخت</th>
-                                    <th className="py-3 px-4">تاریخ خرید</th>
+                                    <th className="py-3 px-4">تاریخ ثبت در سامانه</th>
+                                    <th className="py-3 px-4">تاریخ خرید / شروع</th>
                                     <th className="py-3 px-4">تاریخ پایان / سررسید</th>
                                     <th className="py-3 px-4">مبلغ قرارداد</th>
                                     <th className="py-3 px-4 text-center">وضعیت</th>
-                                    <th className="py-3 px-4 text-center">عملیات</th>
+                                    <th className="py-3 px-4 text-center whitespace-nowrap min-w-[240px]">عملیات</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border/20">
@@ -1109,37 +1341,79 @@ function AdminServicesListPage() {
                                         <td className="py-2.5 px-3">
                                           <div className="flex flex-col gap-0.5">
                                             {details.trackingType === "TIME" ? (
-                                              <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                                                {details.daysLeft.toLocaleString("fa-IR")} روز باقی‌مانده از {details.daysTotal.toLocaleString("fa-IR")} روز
-                                              </span>
+                                              details.isExpired ? (
+                                                <span className="text-rose-600 dark:text-rose-400 font-bold">
+                                                  ۰ روز باقی‌مانده (منقضی شده - {details.overdueDays?.toLocaleString("fa-IR")} روز گذشته)
+                                                </span>
+                                              ) : (
+                                                <span className={details.urgency === "critical" ? "text-amber-600 font-bold" : "text-blue-600 dark:text-blue-400 font-semibold"}>
+                                                  {details.daysLeft.toLocaleString("fa-IR")} روز باقی‌مانده از {details.daysTotal.toLocaleString("fa-IR")} روز
+                                                </span>
+                                              )
                                             ) : details.trackingType === "QUANTITY" ? (
                                               <span className="text-amber-600 dark:text-amber-400 font-semibold">
                                                 {details.remainingQty.toLocaleString("fa-IR")} عدد باقی‌مانده از {details.totalQty.toLocaleString("fa-IR")} بسته
                                               </span>
                                             ) : (
                                               <div className="flex items-center gap-2">
-                                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                                  {details.daysLeft.toLocaleString("fa-IR")} روز مانده
-                                                </span>
+                                                {details.isExpired ? (
+                                                  <span className="text-rose-600 dark:text-rose-400 font-bold">
+                                                    ۰ روز مانده (منقضی)
+                                                  </span>
+                                                ) : (
+                                                  <span className={details.urgency === "critical" ? "text-amber-600 font-bold" : "text-emerald-600 dark:text-emerald-400 font-semibold"}>
+                                                    {details.daysLeft.toLocaleString("fa-IR")} روز مانده
+                                                  </span>
+                                                )}
                                                 <span className="text-muted-foreground">•</span>
                                                 <span className="text-amber-600 dark:text-amber-400 font-semibold">
                                                   {details.remainingQty.toLocaleString("fa-IR")} عدد مانده
                                                 </span>
                                               </div>
                                             )}
-                                            <span className="text-[10px] text-muted-foreground">
-                                              مدل: {details.trackingType === "TIME" ? "زمان‌محور (فقط زمان)" : details.trackingType === "QUANTITY" ? "تعدادمحور (فقط تعداد)" : "ترکیبی (زمان و تعداد)"}
-                                            </span>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <span className="text-[10px] text-muted-foreground">
+                                                مدل: {details.trackingType === "TIME" ? "زمان‌محور (فقط زمان)" : details.trackingType === "QUANTITY" ? "تعدادمحور (فقط تعداد)" : "ترکیبی (زمان و تعداد)"}
+                                              </span>
+                                              <span className="text-muted-foreground">•</span>
+                                              <span
+                                                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md font-medium border ${
+                                                  sub.autoRenew !== false
+                                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                                    : "bg-muted text-muted-foreground border-border/40"
+                                                }`}
+                                              >
+                                                تمدید خودکار: {sub.autoRenew !== false ? "فعال" : "غیرفعال"}
+                                              </span>
+                                            </div>
                                             {details.isAlarmExceeded && (
                                               <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md font-medium mt-0.5 animate-pulse">
                                                 <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
                                                 <span>هشدار: دوره تعیین‌شده ({details.configuredCycleDays?.toLocaleString("fa-IR")} روز) بیشتر از بازه ({details.daysTotal.toLocaleString("fa-IR")} روز)</span>
                                               </span>
                                             )}
-                                            {details.isExpired && details.trackingType !== "QUANTITY" && (
+                                            {details.isTimeNearExpiry && (
+                                              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse">
+                                                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                                <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان اعتبار</span>
+                                              </span>
+                                            )}
+                                            {details.isTimeExpired && (
                                               <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 rounded-md font-medium mt-0.5">
                                                 <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
-                                                <span>سررسید منقضی شده</span>
+                                                <span>خطا: موعد سررسید {details.overdueDays?.toLocaleString("fa-IR")} روز پیش منقضی شده است</span>
+                                              </span>
+                                            )}
+                                            {details.isQuantityDepleted && (
+                                              <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 rounded-md font-bold mt-0.5">
+                                                <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
+                                                <span>بسته تمام شده (نیازمند تمدید سهمیه)</span>
+                                              </span>
+                                            )}
+                                            {details.isQuantityNearDepletion && (
+                                              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md font-semibold mt-0.5">
+                                                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                                <span>هشدار: کمتر از ۵٪ سهمیه بسته باقی‌مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
                                               </span>
                                             )}
                                           </div>
@@ -1147,12 +1421,12 @@ function AdminServicesListPage() {
 
                                         {/* Creation Date */}
                                         <td className="py-2.5 px-3 text-muted-foreground font-mono text-[11px]">
-                                          {formatJalaliDate(sub.createdAt || sub.startDate || sub.purchaseDate)}
+                                          {formatJalaliDate(sub.createdAt)}
                                         </td>
 
                                         {/* Purchase Date */}
                                         <td className="py-2.5 px-3 text-muted-foreground font-mono text-[11px]">
-                                          {formatJalaliDate(sub.purchaseDate || sub.startDate || sub.createdAt)}
+                                          {sub.purchaseDate || sub.startDate ? formatJalaliDate(sub.purchaseDate || sub.startDate) : "---"}
                                         </td>
 
                                         {/* End / Renewal Date */}
@@ -1168,67 +1442,116 @@ function AdminServicesListPage() {
 
                                         {/* Price */}
                                         <td className="py-2.5 px-3 font-bold text-foreground">
-                                          {(sub.priceToman || 0).toLocaleString("fa-IR")}{" "}
-                                          <span className="text-[10px] font-normal text-muted-foreground">تومان</span>
+                                          {(sub.priceToman || 0) === 0 ? (
+                                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">رایگان</span>
+                                          ) : (
+                                            <>
+                                              {(sub.priceToman || 0).toLocaleString("fa-IR")}{" "}
+                                              <span className="text-[10px] font-normal text-muted-foreground">تومان</span>
+                                            </>
+                                          )}
                                         </td>
 
-                                        {/* Status */}
+                                        {/* Status: single unified badge */}
                                         <td className="py-2.5 px-3 text-center">
-                                          <span
-                                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                                              sub.status === "ACTIVE"
-                                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                                                : sub.status === "SUSPENDED"
-                                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
-                                            }`}
-                                          >
-                                            {sub.status === "ACTIVE"
-                                              ? "فعال"
-                                              : sub.status === "SUSPENDED"
-                                              ? "معلق"
-                                              : "غیرفعال"}
-                                          </span>
+                                          {(() => {
+                                            const payStatus = getServicePaymentStatus(sub.id);
+                                            if (details.isQuantityDepleted) {
+                                              return (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                                                  <AlertCircle className="h-3 w-3" />
+                                                  پایان ظرفیت
+                                                </span>
+                                              );
+                                            }
+                                            if (details.isTimeExpired || details.isExpired) {
+                                              return (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                                  منقضی شده
+                                                </span>
+                                              );
+                                            }
+                                            if (sub.status === "INACTIVE") {
+                                              return (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground border border-border/50">
+                                                  غیرفعال
+                                                </span>
+                                              );
+                                            }
+                                            if (!payStatus.isPaid || sub.status === "SUSPENDED") {
+                                              return (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                                  <AlertCircle className="h-3 w-3" />
+                                                  معلق
+                                                </span>
+                                              );
+                                            }
+                                            return (
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                                <CheckCircle2 className="h-3 w-3" />
+                                                پرداخت شده
+                                              </span>
+                                            );
+                                          })()}
                                         </td>
 
                                         {/* Actions with Edit, Toggle, and Delete */}
-                                        <td className="py-2.5 px-3 text-center">
-                                          <div className="flex items-center justify-center gap-1">
+                                        <td className="py-2.5 px-3 text-center whitespace-nowrap min-w-[240px]">
+                                          <div className="flex items-center justify-center gap-1.5 flex-nowrap">
                                             <Button
                                               variant="ghost"
                                               size="sm"
                                               onClick={() => handleOpenEditSubService(sub)}
-                                              className="h-6 text-[11px] px-2 gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30 cursor-pointer rounded-md"
+                                              className="h-6.5 text-[10.5px] px-2 gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30 cursor-pointer rounded-md shrink-0"
                                               title={`ویرایش سرویس ${customerName}`}
                                             >
                                               <Edit2 className="h-3 w-3" />
                                               <span>ویرایش</span>
                                             </Button>
 
+                                            {/* Manual Renew: Always available for all 3 models */}
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              disabled={renewServiceMutation.isPending}
+                                              onClick={() => renewServiceMutation.mutate(sub.id)}
+                                              className={`h-6.5 text-[10.5px] px-2 gap-1 cursor-pointer rounded-md font-bold border shrink-0 ${
+                                                details.isExpired || details.isQuantityDepleted
+                                                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 hover:bg-rose-500/25 border-rose-500/30 animate-pulse"
+                                                  : details.isQuantityNearDepletion || details.isTimeNearExpiry
+                                                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border-amber-500/30"
+                                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-500/20"
+                                              }`}
+                                              title={`تمدید دستی سرویس ${customerName} (شارژ مجدد و صدور فاکتور)`}
+                                            >
+                                              <Repeat className="h-3 w-3" />
+                                              <span>تمدید دستی</span>
+                                            </Button>
+
                                             <Button
                                               variant="ghost"
                                               size="sm"
                                               onClick={() => handleToggleSubServiceStatus(sub)}
-                                              className={`h-6 text-[11px] px-2 gap-1 cursor-pointer rounded-md ${
+                                              className={`h-6.5 text-[10.5px] px-2 gap-1 cursor-pointer rounded-md shrink-0 ${
                                                 sub.status === "ACTIVE"
                                                   ? "text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
                                                   : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
                                               }`}
                                               title={
                                                 sub.status === "ACTIVE"
-                                                  ? `تعلیق سرویس ${customerName}`
+                                                  ? `غیرفعال‌سازی سرویس ${customerName}`
                                                   : `فعال‌سازی سرویس ${customerName}`
                                               }
                                             >
                                               {sub.status === "ACTIVE" ? (
                                                 <>
                                                   <Pause className="h-3 w-3" />
-                                                  تعلیق
+                                                  <span>غیرفعال‌سازی</span>
                                                 </>
                                               ) : (
                                                 <>
                                                   <Play className="h-3 w-3" />
-                                                  فعال‌سازی
+                                                  <span>فعال‌سازی</span>
                                                 </>
                                               )}
                                             </Button>
@@ -1237,7 +1560,7 @@ function AdminServicesListPage() {
                                               variant="ghost"
                                               size="sm"
                                               onClick={() => handleDeleteSubService(sub)}
-                                              className="h-6 text-[11px] px-2 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer rounded-md"
+                                              className="h-6.5 text-[10.5px] px-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer rounded-md shrink-0"
                                               title={`حذف سرویس ${customerName}`}
                                             >
                                               <Trash2 className="h-3 w-3" />
@@ -1300,7 +1623,7 @@ function AdminServicesListPage() {
                     {dynamicCategories.length > 0 ? (
                       dynamicCategories.map((c: any) => (
                         <option key={c.id} value={c.slug || c.id}>
-                          {c.name} ({c.slug})
+                          {c.name}
                         </option>
                       ))
                     ) : (
@@ -1327,201 +1650,7 @@ function AdminServicesListPage() {
                   />
                 </div>
 
-                {/* 3. Customer Assignment (Optional) */}
-                <div className="space-y-1.5 p-3 rounded-xl border border-border/60 bg-muted/20">
-                  <Label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                    <span>تخصیص به مشترک (اختیاری)</span>
-                    <span className="text-[11px] text-muted-foreground font-normal">
-                      {selectedCustomerId ? "تخصیص مستقیم" : "صرفاً ذخیره در کاتالوگ"}
-                    </span>
-                  </Label>
-                  <select
-                    value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-input bg-card px-3 py-1 text-xs shadow-xs font-medium cursor-pointer"
-                  >
-                    <option value="">بدون مشتری (فقط تعریف به عنوان قالب در کاتالوگ)</option>
-                    {customersList.map((c: any) => (
-                      <option key={c.id} value={c.id}>
-                        {c.displayName || c.name} ({c.phone || c.email || c.id})
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Customer Allocation Specific Fields */}
-                  {selectedCustomerId && (
-                    <div className="flex flex-col gap-3 pt-3 mt-2 border-t border-border/40 animate-in fade-in duration-200">
-                      {/* Tracking Type */}
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">مدل ردگیری و مصرف سرویس *</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={trackingType === "HYBRID" ? "default" : "outline"}
-                            onClick={() => setTrackingType("HYBRID")}
-                            className={`text-xs h-8 cursor-pointer rounded-xl ${
-                              trackingType === "HYBRID" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
-                            }`}
-                          >
-                            ترکیبی (هر دو)
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={trackingType === "TIME" ? "default" : "outline"}
-                            onClick={() => setTrackingType("TIME")}
-                            className={`text-xs h-8 cursor-pointer rounded-xl ${
-                              trackingType === "TIME" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
-                            }`}
-                          >
-                            زمان (فقط زمان)
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={trackingType === "QUANTITY" ? "default" : "outline"}
-                            onClick={() => setTrackingType("QUANTITY")}
-                            className={`text-xs h-8 cursor-pointer rounded-xl ${
-                              trackingType === "QUANTITY" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
-                            }`}
-                          >
-                            تعداد (فقط تعداد)
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Price, Duration, Quantity conditional inputs */}
-                      {trackingType === "TIME" && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">مبلغ قرارداد (تومان)</Label>
-                            <Input
-                              type="text"
-                              inputMode="numeric"
-                              dir="ltr"
-                              value={formatPriceInput(priceToman)}
-                              onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
-                              placeholder="0"
-                              className="rounded-xl h-9 text-xs font-mono text-left"
-                            />
-                            {priceToman > 0 && (
-                              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                معادل: {priceToman.toLocaleString("fa-IR")} تومان
-                              </p>
-                            )}
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">مدت اعتبار (روز) *</Label>
-                            <Input
-                              type="number"
-                              value={durationDays}
-                              onChange={(e) => setDurationDays(Number(e.target.value))}
-                              className="rounded-xl h-9 text-xs font-mono"
-                              required
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {trackingType === "QUANTITY" && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">مبلغ قرارداد (تومان)</Label>
-                            <Input
-                              type="text"
-                              inputMode="numeric"
-                              dir="ltr"
-                              value={formatPriceInput(priceToman)}
-                              onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
-                              placeholder="0"
-                              className="rounded-xl h-9 text-xs font-mono text-left"
-                            />
-                            {priceToman > 0 && (
-                              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                معادل: {priceToman.toLocaleString("fa-IR")} تومان
-                              </p>
-                            )}
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">تعداد ظرفیت / پکیج اولیه (عدد) *</Label>
-                            <Input
-                              type="number"
-                              value={quantity}
-                              onChange={(e) => setQuantity(Number(e.target.value))}
-                              className="rounded-xl h-9 text-xs font-mono"
-                              required
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {trackingType === "HYBRID" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">مبلغ قرارداد (تومان)</Label>
-                            <Input
-                              type="text"
-                              inputMode="numeric"
-                              dir="ltr"
-                              value={formatPriceInput(priceToman)}
-                              onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
-                              placeholder="0"
-                              className="rounded-xl h-9 text-xs font-mono text-left"
-                            />
-                            {priceToman > 0 && (
-                              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                معادل: {priceToman.toLocaleString("fa-IR")} تومان
-                              </p>
-                            )}
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">مدت اعتبار (روز) *</Label>
-                            <Input
-                              type="number"
-                              value={durationDays}
-                              onChange={(e) => setDurationDays(Number(e.target.value))}
-                              className="rounded-xl h-9 text-xs font-mono"
-                              required
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">ظرفیت پکیج (عدد) *</Label>
-                            <Input
-                              type="number"
-                              value={quantity}
-                              onChange={(e) => setQuantity(Number(e.target.value))}
-                              className="rounded-xl h-9 text-xs font-mono"
-                              required
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Jalali Dates (Only for TIME and HYBRID) */}
-                      {trackingType !== "QUANTITY" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">تاریخ ساخت و ایجاد (شمسی) *</Label>
-                            <JalaliDatePicker
-                              value={purchaseDate}
-                              onChange={(iso) => setPurchaseDate(iso)}
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">تاریخ شروع / خرید (شمسی) *</Label>
-                            <JalaliDatePicker
-                              value={purchaseDate}
-                              onChange={(iso) => setPurchaseDate(iso)}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 4. Description */}
+                {/* 3. Description */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">توضیحات و مشخصات فنی (اختیاری)</Label>
                   <Input
@@ -1588,7 +1717,15 @@ function AdminServicesListPage() {
                     <span className="font-bold text-foreground text-xs">{assigningToCatalog.name}</span>
                   </div>
                   {(() => {
-                    const badge = getCategoryBadge(assigningToCatalog.categorySlug);
+                    const matchedCat = dynamicCategories.find(
+                      (c: any) =>
+                        c.id === assigningToCatalog.serviceTypeId ||
+                        c.slug === assigningToCatalog.categorySlug
+                    );
+                    const badge = getCategoryBadge(
+                      matchedCat?.slug || assigningToCatalog.categorySlug,
+                      matchedCat?.name || assigningToCatalog.serviceType?.name
+                    );
                     const BadgeIcon = badge.icon;
                     return (
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.className}`}>
@@ -1616,34 +1753,76 @@ function AdminServicesListPage() {
                   </span>
                 </div>
 
-                {/* 2. Customer Select */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">انتخاب مشتری *</Label>
-                  <select
-                    value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-input bg-card px-3 py-1 text-xs shadow-xs font-medium cursor-pointer"
-                    required
-                  >
-                    <option value="">انتخاب کنید...</option>
-                    {customersList.map((c: any) => (
-                      <option key={c.id} value={c.id}>
-                        {c.displayName || c.name} ({c.phone || c.email || c.id})
-                      </option>
-                    ))}
-                  </select>
+                {/* 2. Customer Select & Quick Add */}
+                <div className="space-y-2 p-3 rounded-xl bg-muted/40 border border-border/50">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold">تخصیص به مشتری *</Label>
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickAddCustomer(!isQuickAddCustomer)}
+                      className="text-[11px] font-medium text-emerald-600 hover:text-emerald-500 cursor-pointer"
+                    >
+                      {isQuickAddCustomer ? "← انتخاب از لیست مشتریان" : "+ مشتری جدید (سریع)"}
+                    </button>
+                  </div>
+
+                  {isQuickAddCustomer || customersList.length === 0 ? (
+                    <div className="space-y-2 pt-1">
+                      {customersList.length === 0 && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                          هیچ مشتری فعالی در سیستم وجود ندارد. مشخصات مشتری را وارد کنید تا مستقیم ثبت و سرویس به او اختصاص یابد:
+                        </p>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">نام مشتری / شرکت *</Label>
+                          <Input
+                            value={quickCustomerName}
+                            onChange={(e) => setQuickCustomerName(e.target.value)}
+                            placeholder="مثال: شرکت داده‌پردازان"
+                            className="rounded-xl h-8 text-xs font-medium mt-1"
+                            required={isQuickAddCustomer || customersList.length === 0}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">شماره تماس (اختیاری)</Label>
+                          <Input
+                            value={quickCustomerPhone}
+                            onChange={(e) => setQuickCustomerPhone(e.target.value)}
+                            placeholder="09123456789"
+                            dir="ltr"
+                            className="rounded-xl h-8 text-xs font-medium mt-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedCustomerId}
+                      onChange={(e) => setSelectedCustomerId(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-input bg-card px-3 py-1 text-xs shadow-xs font-medium cursor-pointer"
+                      required={!isQuickAddCustomer && customersList.length > 0}
+                    >
+                      <option value="">انتخاب کنید...</option>
+                      {customersList.map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {c.displayName || c.name} ({c.phone || c.email || c.id})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 {/* 3. Tracking Mode */}
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">مدل ردگیری و مصرف سرویس *</Label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <Button
                       type="button"
                       size="sm"
                       variant={trackingType === "HYBRID" ? "default" : "outline"}
                       onClick={() => setTrackingType("HYBRID")}
-                      className={`text-xs h-8 cursor-pointer rounded-xl ${
+                      className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
                         trackingType === "HYBRID" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
                       }`}
                     >
@@ -1654,7 +1833,7 @@ function AdminServicesListPage() {
                       size="sm"
                       variant={trackingType === "TIME" ? "default" : "outline"}
                       onClick={() => setTrackingType("TIME")}
-                      className={`text-xs h-8 cursor-pointer rounded-xl ${
+                      className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
                         trackingType === "TIME" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
                       }`}
                     >
@@ -1665,7 +1844,7 @@ function AdminServicesListPage() {
                       size="sm"
                       variant={trackingType === "QUANTITY" ? "default" : "outline"}
                       onClick={() => setTrackingType("QUANTITY")}
-                      className={`text-xs h-8 cursor-pointer rounded-xl ${
+                      className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
                         trackingType === "QUANTITY" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
                       }`}
                     >
@@ -1788,7 +1967,7 @@ function AdminServicesListPage() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-xs font-semibold">تاریخ ثبت و خرید (شمسی) *</Label>
+                        <Label className="text-xs font-semibold">تاریخ خرید / شروع خدمت (شمسی) *</Label>
                         <JalaliDatePicker
                           value={purchaseDate}
                           onChange={handleAssignPurchaseDateChange}
@@ -1818,7 +1997,28 @@ function AdminServicesListPage() {
                         </span>
                       </div>
 
-                      {isAssignAlarmExceeded && (
+                      {/* Negative Range Error */}
+                      {assignRangeAnalysis.isNegativeRange && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
+                          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                          <span>
+                            خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Expired / Past Date Notice */}
+                      {!assignRangeAnalysis.isNegativeRange && assignRangeAnalysis.isExpired && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-xs font-medium mt-1">
+                          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                          <span>
+                            توجه: تاریخ سررسید در گذشته است ({assignRangeAnalysis.overdueDays.toLocaleString("fa-IR")} روز معوقه). این سرویس با وضعیت منقضی‌شده (۰ روز باقی‌مانده) ثبت خواهد شد.
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Inconsistency Warning: Cycle > Span */}
+                      {!assignRangeAnalysis.isNegativeRange && isAssignAlarmExceeded && (
                         <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-pulse mt-1">
                           <div className="flex items-center gap-1.5">
                             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
@@ -1839,6 +2039,24 @@ function AdminServicesListPage() {
                   </div>
                 )}
 
+                {/* Auto Renew Checkbox for Quick Assign */}
+                <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={assignAutoRenew}
+                    onChange={(e) => setAssignAutoRenew(e.target.checked)}
+                    className="rounded h-4 w-4 text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-foreground">تمدید خودکار سرویس</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {trackingType === "QUANTITY"
+                        ? "پس از مصرف کامل ظرفیت بسته، صورت‌حساب شارژ مجدد به صورت اتوماتیک صادر شود"
+                        : "در موعد سررسید، صورت‌حساب تمدید دوره به صورت اتوماتیک صادر شود"}
+                    </span>
+                  </div>
+                </label>
+
                 <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
                   <Button
                     type="button"
@@ -1850,8 +2068,8 @@ function AdminServicesListPage() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={createServiceMutation.isPending}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs"
+                    disabled={createServiceMutation.isPending || (trackingType !== "QUANTITY" && assignRangeAnalysis.isNegativeRange)}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs disabled:opacity-50"
                   >
                     {createServiceMutation.isPending ? "در حال ثبت..." : "تخصیص به مشتری و ثبت"}
                   </Button>
@@ -1899,7 +2117,7 @@ function AdminServicesListPage() {
                     {dynamicCategories.length > 0 ? (
                       dynamicCategories.map((c: any) => (
                         <option key={c.id} value={c.slug || c.id}>
-                          {c.name} ({c.slug})
+                          {c.name}
                         </option>
                       ))
                     ) : (
@@ -1999,13 +2217,13 @@ function AdminServicesListPage() {
                 {/* 2. Tracking Mode */}
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">مدل ردگیری و مصرف سرویس *</Label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <Button
                       type="button"
                       size="sm"
                       variant={editSubTrackingType === "HYBRID" ? "default" : "outline"}
                       onClick={() => setEditSubTrackingType("HYBRID")}
-                      className={`text-xs h-8 cursor-pointer rounded-xl ${
+                      className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
                         editSubTrackingType === "HYBRID" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
                       }`}
                     >
@@ -2016,7 +2234,7 @@ function AdminServicesListPage() {
                       size="sm"
                       variant={editSubTrackingType === "TIME" ? "default" : "outline"}
                       onClick={() => setEditSubTrackingType("TIME")}
-                      className={`text-xs h-8 cursor-pointer rounded-xl ${
+                      className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
                         editSubTrackingType === "TIME" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
                       }`}
                     >
@@ -2027,7 +2245,7 @@ function AdminServicesListPage() {
                       size="sm"
                       variant={editSubTrackingType === "QUANTITY" ? "default" : "outline"}
                       onClick={() => setEditSubTrackingType("QUANTITY")}
-                      className={`text-xs h-8 cursor-pointer rounded-xl ${
+                      className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
                         editSubTrackingType === "QUANTITY" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
                       }`}
                     >
@@ -2168,7 +2386,7 @@ function AdminServicesListPage() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-xs font-semibold">تاریخ ساخت و خرید (شمسی) *</Label>
+                        <Label className="text-xs font-semibold">تاریخ خرید / شروع خدمت (شمسی) *</Label>
                         <JalaliDatePicker
                           value={editSubPurchaseDate}
                           onChange={handleEditSubPurchaseDateChange}
@@ -2198,7 +2416,28 @@ function AdminServicesListPage() {
                         </span>
                       </div>
 
-                      {isEditSubAlarmExceeded && (
+                      {/* Negative Range Error */}
+                      {editSubRangeAnalysis.isNegativeRange && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
+                          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                          <span>
+                            خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Expired / Past Date Notice */}
+                      {!editSubRangeAnalysis.isNegativeRange && editSubRangeAnalysis.isExpired && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-xs font-medium mt-1">
+                          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                          <span>
+                            توجه: تاریخ سررسید در گذشته است ({editSubRangeAnalysis.overdueDays.toLocaleString("fa-IR")} روز معوقه). این سرویس با وضعیت منقضی‌شده (۰ روز باقی‌مانده) ذخیره خواهد شد.
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Inconsistency Warning: Cycle > Span */}
+                      {!editSubRangeAnalysis.isNegativeRange && isEditSubAlarmExceeded && (
                         <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-pulse mt-1">
                           <div className="flex items-center gap-1.5">
                             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
@@ -2218,6 +2457,24 @@ function AdminServicesListPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Auto Renew Checkbox for Edit Sub-Service */}
+                <label className="flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={editSubAutoRenew}
+                    onChange={(e) => setEditSubAutoRenew(e.target.checked)}
+                    className="rounded h-4 w-4 text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-foreground">تمدید خودکار سرویس</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {editSubTrackingType === "QUANTITY"
+                        ? "پس از مصرف کامل ظرفیت بسته، صورت‌حساب شارژ مجدد به صورت اتوماتیک صادر شود"
+                        : "در موعد سررسید، صورت‌حساب تمدید دوره به صورت اتوماتیک صادر شود"}
+                    </span>
+                  </div>
+                </label>
 
                 {/* 5. Status */}
                 <div className="space-y-1.5">
@@ -2244,8 +2501,8 @@ function AdminServicesListPage() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={updateServiceMutation.isPending}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs"
+                    disabled={updateServiceMutation.isPending || (editSubTrackingType !== "QUANTITY" && editSubRangeAnalysis.isNegativeRange)}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs disabled:opacity-50"
                   >
                     {updateServiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات زیرسرویس"}
                   </Button>
@@ -2307,6 +2564,37 @@ function AdminServicesListPage() {
               </div>
             }
             confirmText="بله، حذف دائم شود"
+            variant="danger"
+            isLoading={deleteServiceMutation.isPending}
+          />
+        )}
+
+        {/* Confirm Modal for Master Catalog Service Deletion */}
+        {confirmDeleteCatalogModal && (
+          <ConfirmModal
+            isOpen={!!confirmDeleteCatalogModal}
+            onClose={() => setConfirmDeleteCatalogModal(null)}
+            onConfirm={() => {
+              deleteServiceMutation.mutate(confirmDeleteCatalogModal.id);
+              setConfirmDeleteCatalogModal(null);
+            }}
+            title="حذف قالب کاتالوگ سرویس"
+            description={
+              <div className="space-y-2 text-xs">
+                <p>
+                  آیا از حذف کامل و دائمی قالب کاتالوگ <strong className="text-foreground font-semibold">«{confirmDeleteCatalogModal.name}»</strong> اطمینان دارید؟
+                </p>
+                {confirmDeleteCatalogModal.assignedCount > 0 && (
+                  <p className="text-amber-600 dark:text-amber-400 font-medium">
+                    توجه: این قالب کاتالوگ دارای {confirmDeleteCatalogModal.assignedCount.toLocaleString("fa-IR")} اشتراک تخصیص‌یافته است. با حذف قالب کاتالوگ، اشتراک‌های موجود به صورت مستقل حفظ می‌شوند.
+                  </p>
+                )}
+                <p className="text-rose-600 dark:text-rose-400 font-medium">
+                  هشدار: این عملیات غیرقابل بازگشت است و قالب کاتالوگ به طور کامل حذف خواهد شد.
+                </p>
+              </div>
+            }
+            confirmText="بله، حذف قالب کاتالوگ شود"
             variant="danger"
             isLoading={deleteServiceMutation.isPending}
           />

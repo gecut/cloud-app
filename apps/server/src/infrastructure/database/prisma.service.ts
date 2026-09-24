@@ -5,6 +5,20 @@ import { env } from "@gecut-cloud/env/server";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+const matchPhone = (a?: string | null, b?: string | null) => {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const cleanA = a
+    .replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1776 + 48))
+    .replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1632 + 48))
+    .replace(/[\s\-\(\)\+]/g, "");
+  const cleanB = b
+    .replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1776 + 48))
+    .replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1632 + 48))
+    .replace(/[\s\-\(\)\+]/g, "");
+  return cleanA === cleanB;
+};
+
 @Injectable()
 export class PrismaService
   extends PrismaClient
@@ -115,7 +129,17 @@ export class PrismaService
         return res;
       };
 
-      if (data.users && Array.isArray(data.users)) this.memUsers = new Map(reviveDates(data.users));
+      if (data.users && Array.isArray(data.users)) {
+        this.memUsers = new Map(reviveDates(data.users));
+        for (const user of this.memUsers.values()) {
+          if (typeof user.tokenVersion !== "number") {
+            user.tokenVersion =
+              typeof user.tokenVersion?.increment === "number"
+                ? user.tokenVersion.increment
+                : 0;
+          }
+        }
+      }
       if (data.customers && Array.isArray(data.customers)) this.memCustomers = new Map(reviveDates(data.customers));
       if (data.services && Array.isArray(data.services)) this.memServices = new Map(reviveDates(data.services));
       if (data.serviceGroups && Array.isArray(data.serviceGroups)) this.memServiceGroups = new Map(reviveDates(data.serviceGroups));
@@ -169,8 +193,14 @@ export class PrismaService
     if (primaryAdmin) {
       primaryAdmin.role = "ADMIN";
       primaryAdmin.passwordHash = "admin@Gecut-cloud";
-      if (!primaryAdmin.name || primaryAdmin.name === "علی طباطبایی") {
-        primaryAdmin.name = "مدیر ارشد (علی طباطبایی)";
+      const linkedCustomer = Array.from(this.memCustomers.values()).find(
+        (c) => c.userId === primaryAdmin.id || matchPhone(c.phone, primaryAdminPhone),
+      );
+      if (linkedCustomer?.name) {
+        primaryAdmin.name = linkedCustomer.name;
+        primaryAdmin.customerId = linkedCustomer.id;
+      } else if (!primaryAdmin.name) {
+        primaryAdmin.name = "مدیر ارشد";
       }
       this.saveToDisk();
     } else {
@@ -187,6 +217,180 @@ export class PrismaService
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+      this.saveToDisk();
+    }
+
+    // Ensure all customer.userId values accurately match the user with matching phone
+    for (const customer of Array.from(this.memCustomers.values())) {
+      const user = customer.userId ? this.memUsers.get(customer.userId) : null;
+      if (!user || !matchPhone(user.phone, customer.phone)) {
+        // Find correct user with matching phone
+        const correctUser = Array.from(this.memUsers.values()).find((u) => matchPhone(u.phone, customer.phone));
+        if (correctUser) {
+          customer.userId = correctUser.id;
+          correctUser.customerId = customer.id;
+        } else {
+          // If customer has no user, create one
+          const newUserId = `usr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+          this.memUsers.set(newUserId, {
+            id: newUserId,
+            name: customer.name || "کاربر جیکات",
+            phone: customer.phone,
+            email: customer.email,
+            passwordHash: "",
+            role: "CUSTOMER",
+            tokenVersion: 0,
+            customerId: customer.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          customer.userId = newUserId;
+        }
+      }
+    }
+
+    // Clean up any rogue/orphaned users whose phone is NOT registered in customers AND not an admin
+    const knownAdminPhones = ["09120000001", "09363528608"];
+    for (const [userId, user] of Array.from(this.memUsers.entries())) {
+      const isAdmin = knownAdminPhones.some((p) => matchPhone(user.phone, p));
+      const hasCustomer = Array.from(this.memCustomers.values()).some((c) => matchPhone(c.phone, user.phone));
+      if (!isAdmin && !hasCustomer) {
+        this.memUsers.delete(userId);
+      }
+    }
+    this.saveToDisk();
+
+    // Ensure all supplier purchased services have an active purchase invoice in memInvoices
+
+    let hasNewSupplierInvoice = false;
+    for (const [svcId, svc] of Array.from(this.memSupplierServices.entries())) {
+      const existingInv = Array.from(this.memInvoices.values()).find((inv) => {
+        const items = inv.items || [];
+        return (
+          items.some((it: any) => it.serviceId === svcId) ||
+          (inv.supplierId === svc.supplierId && (inv.notes || "").includes(svc.name))
+        );
+      });
+      if (!existingInv) {
+        const id = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const invoiceNumber = (30001 + this.memInvoices.size).toString();
+        const sup = this.memSuppliers.get(svc.supplierId);
+        const amount = Number(svc.priceToman ?? svc.monthlyExpenseToman) || 0;
+        const newInv = {
+          id,
+          customerId: null,
+          supplierId: svc.supplierId,
+          counterpartyType: "SUPPLIER",
+          invoiceNumber,
+          status: "UNPAID",
+          subtotalToman: amount,
+          totalToman: amount,
+          issuedAt: svc.purchaseDate ? new Date(svc.purchaseDate) : (svc.createdAt ? new Date(svc.createdAt) : new Date()),
+          dueDate: svc.renewalDate ? new Date(svc.renewalDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          paidAt: null,
+          cancelledAt: null,
+          notes: `فاکتور خرید دوره سرویس «${svc.name}» از تامین‌کننده ${sup?.name || ""}`,
+          customer: null,
+          supplier: sup || null,
+          supplierName: sup?.name || null,
+          items: [
+            {
+              id: `item_${Date.now()}_0`,
+              invoiceId: id,
+              serviceId: svcId,
+              title: svc.name,
+              quantity: 1,
+              unitPriceToman: amount,
+              totalToman: amount,
+              serviceNameSnapshot: svc.name,
+              serviceTypeSnapshot: svc.type,
+              servicePriceSnapshotToman: amount,
+              serviceRenewalDateSnapshot: svc.renewalDate ? new Date(svc.renewalDate) : null,
+              createdAt: svc.createdAt ? new Date(svc.createdAt) : new Date(),
+            },
+          ],
+          createdAt: svc.createdAt ? new Date(svc.createdAt) : new Date(),
+          updatedAt: new Date(),
+        };
+        this.memInvoices.set(id, newInv);
+        newInv.items.forEach((it: any) => this.memInvoiceItems.set(it.id, it));
+        hasNewSupplierInvoice = true;
+      }
+    }
+    if (hasNewSupplierInvoice) {
+      this.saveToDisk();
+    }
+
+    // Initialize standard base categories ONLY if the category store is empty
+    const baseCategories = [
+      {
+        id: "st_domain",
+        name: "دامنه",
+        slug: "domain",
+        description: "دامنه‌های ملی و بین‌المللی",
+        isActive: true,
+        sortOrder: 1,
+      },
+      {
+        id: "st_hosting",
+        name: "هاست",
+        slug: "hosting",
+        description: "میزبانی پرسرعت، هاستینگ لینوکس و وردپرس",
+        isActive: true,
+        sortOrder: 2,
+      },
+      {
+        id: "st_server",
+        name: "سرور",
+        slug: "server",
+        description: "سرورهای ابری، VPS و زیرساخت اختصاصی",
+        isActive: true,
+        sortOrder: 3,
+      },
+      {
+        id: "st_sms",
+        name: "پنل پیامکی",
+        slug: "sms",
+        description: "سامانه ارسال پیامک، وب‌سرویس و خطوط خدماتی",
+        isActive: true,
+        sortOrder: 4,
+      },
+      {
+        id: "st_support",
+        name: "پشتیبانی متنی",
+        slug: "support",
+        description: "پشتیبانی متنی، تیکتینگ و پاسخگویی آنلاین",
+        isActive: true,
+        sortOrder: 5,
+      },
+      {
+        id: "st_image",
+        name: "تصویر",
+        slug: "image",
+        description: "سرویس‌های پردازش، میزبانی و بهینه‌سازی تصویر",
+        isActive: true,
+        sortOrder: 6,
+      },
+      {
+        id: "st_other",
+        name: "سایر",
+        slug: "other",
+        description: "سایر خدمات و محصولات متفرقه",
+        isActive: true,
+        sortOrder: 7,
+      },
+    ];
+
+    if (!this.memServiceTypes) this.memServiceTypes = [];
+    if (this.memServiceTypes.length === 0) {
+      const now = new Date();
+      for (const cat of baseCategories) {
+        this.memServiceTypes.push({
+          ...cat,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
       this.saveToDisk();
     }
   }
@@ -276,18 +480,57 @@ export class PrismaService
       });
     };
 
-    const matchPhone = (a?: string | null, b?: string | null) => {
-      if (!a || !b) return false;
-      if (a === b) return true;
-      const cleanA = a
-        .replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1776 + 48))
-        .replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1632 + 48))
-        .replace(/[\s\-\(\)\+]/g, "");
-      const cleanB = b
-        .replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1776 + 48))
-        .replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1632 + 48))
-        .replace(/[\s\-\(\)\+]/g, "");
-      return cleanA === cleanB;
+    const enrichInvoiceItem = (it: any, invCustomerId?: string, invNotes?: string) => {
+      let svc = it.serviceId ? this.memServices.get(it.serviceId) : null;
+      let supSvc = it.serviceId ? this.memSupplierServices.get(it.serviceId) : null;
+
+      if (!svc && !supSvc && invCustomerId) {
+        const text = `${it.title || ""} ${invNotes || ""} ${it.description || ""} ${it.serviceNameSnapshot || ""}`.toLowerCase();
+        for (const s of this.memServices.values()) {
+          if (s.customerId === invCustomerId && s.name && text.includes(s.name.toLowerCase())) {
+            svc = s;
+            break;
+          }
+        }
+        if (!svc) {
+          for (const s of this.memSupplierServices.values()) {
+            if (s.name && text.includes(s.name.toLowerCase())) {
+              supSvc = s;
+              break;
+            }
+          }
+        }
+      }
+
+      if (supSvc) {
+        return {
+          ...it,
+          serviceId: supSvc.id,
+          serviceNameSnapshot: it.serviceNameSnapshot || supSvc.name || null,
+          serviceTypeSnapshot: supSvc.type || it.serviceTypeSnapshot || "سرویس تامین‌کننده",
+          service: {
+            id: supSvc.id,
+            name: supSvc.name,
+            type: supSvc.type,
+            priceToman: supSvc.priceToman || supSvc.monthlyExpenseToman,
+            isSupplierService: true,
+            supplierId: supSvc.supplierId,
+            supplier: this.memSuppliers.get(supSvc.supplierId) || null,
+          },
+        };
+      }
+
+      const sType = svc?.serviceTypeId
+        ? this.memServiceTypes.find((t: any) => t.id === svc.serviceTypeId)
+        : null;
+      const categoryName = sType?.name || sType?.slug || it.serviceTypeSnapshot;
+      return {
+        ...it,
+        serviceId: svc ? svc.id : it.serviceId,
+        serviceNameSnapshot: it.serviceNameSnapshot || svc?.name || null,
+        serviceTypeSnapshot: categoryName || it.serviceTypeSnapshot || null,
+        service: svc ? { ...svc, serviceType: sType } : it.service || null,
+      };
     };
 
     // User model
@@ -302,7 +545,7 @@ export class PrismaService
           ) {
             let cust = u.customerId ? this.memCustomers.get(u.customerId) || null : null;
             if (!cust) {
-              cust = Array.from(this.memCustomers.values()).find((c) => c.userId === u.id) || null;
+              cust = Array.from(this.memCustomers.values()).find((c) => c.userId === u.id || matchPhone(c.phone, u.phone)) || null;
               if (cust) {
                 u.customerId = cust.id;
               }
@@ -330,7 +573,7 @@ export class PrismaService
           }
           let cust = u.customerId ? this.memCustomers.get(u.customerId) || null : null;
           if (!cust) {
-            cust = Array.from(this.memCustomers.values()).find((c) => c.userId === u.id) || null;
+            cust = Array.from(this.memCustomers.values()).find((c) => c.userId === u.id || matchPhone(c.phone, u.phone)) || null;
             if (cust) {
               u.customerId = cust.id;
             }
@@ -380,9 +623,17 @@ export class PrismaService
       },
       update: async (args: any) => {
         const where = args?.where || {};
-        const d = args?.data || {};
+        const d = { ...(args?.data || {}) };
         for (const u of this.memUsers.values()) {
           if ((where.id && u.id === where.id) || (where.phone && matchPhone(u.phone, where.phone))) {
+            if (d.tokenVersion && typeof d.tokenVersion === "object" && "increment" in d.tokenVersion) {
+              const current = typeof u.tokenVersion === "number" ? u.tokenVersion : 0;
+              u.tokenVersion = current + (Number(d.tokenVersion.increment) || 1);
+              delete d.tokenVersion;
+            } else if (typeof d.tokenVersion === "number") {
+              u.tokenVersion = d.tokenVersion;
+              delete d.tokenVersion;
+            }
             Object.assign(u, d, { updatedAt: new Date() });
             let cust = u.customerId ? this.memCustomers.get(u.customerId) || null : null;
             if (!cust) {
@@ -410,7 +661,6 @@ export class PrismaService
     // Customer model
     wrapModel("customer", {
       findUnique: async (args: any) => {
-        if (this.memCustomers.size === 0) this.loadFromDisk();
         const where = args?.where || {};
         for (const c of this.memCustomers.values()) {
           if (
@@ -418,23 +668,38 @@ export class PrismaService
             (where.userId && c.userId === where.userId) ||
             (where.phone && matchPhone(c.phone, where.phone))
           ) {
-            const services = Array.from(this.memServices.values()).filter((s) => s.customerId === c.id);
-            const invoices = Array.from(this.memInvoices.values())
-              .filter((i) => i.customerId === c.id || (c.userId && i.customerId === c.userId))
-              .map((i) => ({
-                ...i,
-                customer: c,
-                items: i.items && i.items.length > 0 ? i.items : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === i.id),
-                payment: Array.from(this.memPayments.values()).find((p) => p.invoiceId === i.id) || null,
-              }));
-            const user = this.memUsers.get(c.userId);
-            return { ...c, services, invoices, user, _count: { services: services.length, invoices: invoices.length } };
+          const services = Array.from(this.memServices.values())
+            .filter((s) => s.customerId === c.id)
+            .map((s) => {
+              const parentService = s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null;
+              const effTypeId = s.serviceTypeId || parentService?.serviceTypeId;
+              const resolvedType = effTypeId
+                ? this.memServiceTypes.find((t) => t.id === effTypeId || t.slug === effTypeId) || null
+                : null;
+              return {
+                ...s,
+                parentServiceId: s.parentServiceId || null,
+                parentService,
+                serviceType: resolvedType || s.serviceType || parentService?.serviceType || null,
+                server: s.serverId ? this.memServers.get(s.serverId) || null : null,
+                endpoints: Array.from(this.memEndpoints.values()).filter((e) => e.serviceId === s.id),
+              };
+            });
+          const invoices = Array.from(this.memInvoices.values())
+            .filter((i) => i.customerId === c.id || (c.userId && i.customerId === c.userId))
+            .map((i) => ({
+              ...i,
+              customer: c,
+              items: (i.items && i.items.length > 0 ? i.items : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === i.id)).map((it: any) => enrichInvoiceItem(it, c.id, i.notes)),
+              payment: Array.from(this.memPayments.values()).find((p) => p.invoiceId === i.id) || null,
+            }));
+          const user = this.memUsers.get(c.userId);
+          return { ...c, services, invoices, user, _count: { services: services.length, invoices: invoices.length } };
           }
         }
         return null;
       },
       findFirst: async (args: any) => {
-        if (this.memCustomers.size === 0) this.loadFromDisk();
         const where = args?.where || {};
         for (const c of this.memCustomers.values()) {
           if (where.id && c.id !== where.id) continue;
@@ -450,13 +715,29 @@ export class PrismaService
             });
             if (!matchesOr) continue;
           }
-          const services = Array.from(this.memServices.values()).filter((s) => s.customerId === c.id);
+          const services = Array.from(this.memServices.values())
+            .filter((s) => s.customerId === c.id)
+            .map((s) => {
+              const parentService = s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null;
+              const effTypeId = s.serviceTypeId || parentService?.serviceTypeId;
+              const resolvedType = effTypeId
+                ? this.memServiceTypes.find((t) => t.id === effTypeId || t.slug === effTypeId) || null
+                : null;
+              return {
+                ...s,
+                parentServiceId: s.parentServiceId || null,
+                parentService,
+                serviceType: resolvedType || s.serviceType || parentService?.serviceType || null,
+                server: s.serverId ? this.memServers.get(s.serverId) || null : null,
+                endpoints: Array.from(this.memEndpoints.values()).filter((e) => e.serviceId === s.id),
+              };
+            });
           const invoices = Array.from(this.memInvoices.values())
             .filter((i) => i.customerId === c.id || (c.userId && i.customerId === c.userId))
             .map((i) => ({
               ...i,
               customer: c,
-              items: i.items && i.items.length > 0 ? i.items : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === i.id),
+              items: (i.items && i.items.length > 0 ? i.items : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === i.id)).map((it: any) => enrichInvoiceItem(it, c.id, i.notes)),
               payment: Array.from(this.memPayments.values()).find((p) => p.invoiceId === i.id) || null,
             }));
           const user = this.memUsers.get(c.userId);
@@ -472,7 +753,7 @@ export class PrismaService
             .map((i) => ({
               ...i,
               customer: c,
-              items: i.items && i.items.length > 0 ? i.items : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === i.id),
+              items: (i.items && i.items.length > 0 ? i.items : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === i.id)).map((it: any) => enrichInvoiceItem(it, c.id, i.notes)),
               payment: Array.from(this.memPayments.values()).find((p) => p.invoiceId === i.id) || null,
             }));
           const user = this.memUsers.get(c.userId);
@@ -543,7 +824,17 @@ export class PrismaService
       },
       delete: async (args: any) => {
         const where = args?.where || {};
-        const cust = this.memCustomers.get(where.id);
+        let targetId = where.id;
+        let cust = this.memCustomers.get(where.id);
+        if (!cust) {
+          for (const [cid, c] of this.memCustomers.entries()) {
+            if (c.id === where.id || c.userId === where.id) {
+              cust = c;
+              targetId = cid;
+              break;
+            }
+          }
+        }
         if (cust) {
           if (cust.userId) {
             const u = this.memUsers.get(cust.userId);
@@ -552,31 +843,94 @@ export class PrismaService
               u.customer = null;
             }
           }
-          this.memCustomers.delete(where.id);
+          // Clean up customer's services
+          for (const [sid, s] of Array.from(this.memServices.entries())) {
+            if (s.customerId === cust.id || s.customerId === cust.userId) {
+              this.memServices.delete(sid);
+            }
+          }
+          // Clean up customer's invoices and items
+          for (const [iid, inv] of Array.from(this.memInvoices.entries())) {
+            if (inv.customerId === cust.id || inv.customerId === cust.userId) {
+              for (const [itemId, it] of Array.from(this.memInvoiceItems.entries())) {
+                if (it.invoiceId === iid) this.memInvoiceItems.delete(itemId);
+              }
+              for (const [pid, p] of Array.from(this.memPayments.entries())) {
+                if (p.invoiceId === iid) this.memPayments.delete(pid);
+              }
+              this.memInvoices.delete(iid);
+            }
+          }
+          this.memCustomers.delete(targetId);
           this.saveToDisk();
-          return { count: 1, id: where.id };
+          return { count: 1, id: targetId, ...cust };
         }
         return { count: 0 };
       },
     });
 
     // ServiceType model
+    const matchServiceType = (t: any, where: any): boolean => {
+      if (!where) return true;
+      if (where.OR && Array.isArray(where.OR)) {
+        return where.OR.some((cond: any) => matchServiceType(t, cond));
+      }
+      if (where.AND && Array.isArray(where.AND)) {
+        return where.AND.every((cond: any) => matchServiceType(t, cond));
+      }
+      if (where.id !== undefined) {
+        if (typeof where.id === "object" && where.id !== null) {
+          if (where.id.not !== undefined && (t.id === where.id.not || t.slug === where.id.not)) {
+            return false;
+          }
+          if (where.id.in !== undefined && !where.id.in.includes(t.id) && !where.id.in.includes(t.slug)) {
+            return false;
+          }
+        } else {
+          if (t.id !== where.id && t.slug !== where.id) {
+            return false;
+          }
+        }
+      }
+      if (where.slug !== undefined) {
+        if (typeof where.slug === "object" && where.slug !== null) {
+          if (where.slug.not !== undefined && t.slug === where.slug.not) {
+            return false;
+          }
+        } else {
+          if (t.slug !== where.slug) {
+            return false;
+          }
+        }
+      }
+      if (where.name !== undefined) {
+        if (typeof where.name === "object" && where.name !== null) {
+          if (where.name.not !== undefined && t.name === where.name.not) {
+            return false;
+          }
+        } else {
+          if (t.name !== where.name) {
+            return false;
+          }
+        }
+      }
+      if (where.isActive !== undefined && t.isActive !== where.isActive) {
+        return false;
+      }
+      return true;
+    };
+
     wrapModel("serviceType", {
       findUnique: async (args: any) => {
         const where = args?.where || {};
-        const targetId = where.id;
-        const targetSlug = where.slug;
-        const item = this.memServiceTypes.find(
-          (t) =>
-            (targetId && (t.id === targetId || t.slug === targetId)) ||
-            (targetSlug && (t.slug === targetSlug || t.id === targetSlug)),
-        );
+        const item = this.memServiceTypes.find((t) => matchServiceType(t, where));
         if (!item) return null;
         const count = Array.from(this.memServices.values()).filter(
           (s: any) =>
             s.serviceTypeId === item.id ||
             s.serviceType?.id === item.id ||
-            (item.slug && (s.serviceTypeSlug === item.slug || s.serviceType?.slug === item.slug)),
+            s.serviceType?.slug === item.slug ||
+            s.serviceTypeSlug === item.slug,
         ).length;
         return {
           ...item,
@@ -585,21 +939,14 @@ export class PrismaService
       },
       findFirst: async (args: any) => {
         const where = args?.where || {};
-        let filtered = [...this.memServiceTypes];
-        if (where.slug && where.id && where.id.not) {
-          filtered = filtered.filter((t) => t.slug === where.slug && t.id !== where.id.not);
-        } else if (where.slug) {
-          filtered = filtered.filter((t) => t.slug === where.slug);
-        } else if (where.id) {
-          filtered = filtered.filter((t) => t.id === where.id || t.slug === where.id);
-        }
-        const item = filtered[0] || null;
+        const item = this.memServiceTypes.find((t) => matchServiceType(t, where));
         if (!item) return null;
         const count = Array.from(this.memServices.values()).filter(
           (s: any) =>
             s.serviceTypeId === item.id ||
             s.serviceType?.id === item.id ||
-            (item.slug && (s.serviceTypeSlug === item.slug || s.serviceType?.slug === item.slug)),
+            s.serviceType?.slug === item.slug ||
+            s.serviceTypeSlug === item.slug,
         ).length;
         return {
           ...item,
@@ -607,17 +954,15 @@ export class PrismaService
         };
       },
       findMany: async (args: any) => {
-        let items = [...this.memServiceTypes];
-        const where = args?.where || {};
-        if (where.isActive !== undefined) {
-          items = items.filter((t) => t.isActive === where.isActive);
-        }
+        const where = args?.where;
+        let items = this.memServiceTypes.filter((t) => matchServiceType(t, where));
         return items.map((item) => {
           const count = Array.from(this.memServices.values()).filter(
             (s: any) =>
               s.serviceTypeId === item.id ||
               s.serviceType?.id === item.id ||
-              (item.slug && (s.serviceTypeSlug === item.slug || s.serviceType?.slug === item.slug)),
+              s.serviceType?.slug === item.slug ||
+              s.serviceTypeSlug === item.slug,
           ).length;
           return {
             ...item,
@@ -645,13 +990,7 @@ export class PrismaService
       update: async (args: any) => {
         const where = args?.where || {};
         const d = args?.data || {};
-        const targetId = where.id;
-        const targetSlug = where.slug;
-        const idx = this.memServiceTypes.findIndex(
-          (t) =>
-            (targetId && (t.id === targetId || t.slug === targetId)) ||
-            (targetSlug && (t.slug === targetSlug || t.id === targetSlug)),
-        );
+        const idx = this.memServiceTypes.findIndex((t) => matchServiceType(t, where));
         if (idx === -1) return null;
         this.memServiceTypes[idx] = {
           ...this.memServiceTypes[idx],
@@ -663,13 +1002,7 @@ export class PrismaService
       },
       delete: async (args: any) => {
         const where = args?.where || {};
-        const targetId = where.id;
-        const targetSlug = where.slug;
-        const idx = this.memServiceTypes.findIndex(
-          (t) =>
-            (targetId && (t.id === targetId || t.slug === targetId)) ||
-            (targetSlug && (t.slug === targetSlug || t.id === targetSlug)),
-        );
+        const idx = this.memServiceTypes.findIndex((t) => matchServiceType(t, where));
         if (idx !== -1) {
           const deleted = this.memServiceTypes.splice(idx, 1)[0];
           this.saveToDisk();
@@ -680,49 +1013,128 @@ export class PrismaService
     });
 
     // Service model
+    const matchServiceFilter = (s: any, where: any) => {
+      if (!where) return true;
+      if (where.id && s.id !== where.id) return false;
+      if (where.status && where.status !== "ALL" && s.status !== where.status) return false;
+      if (where.serviceGroupId && s.serviceGroupId !== where.serviceGroupId) return false;
+      if (where.serverId && s.serverId !== where.serverId) return false;
+
+      if (where.trackingType) {
+        if (typeof where.trackingType === "object") {
+          if (where.trackingType.not && s.trackingType === where.trackingType.not) return false;
+          if (where.trackingType.equals && s.trackingType !== where.trackingType.equals) return false;
+        } else if (typeof where.trackingType === "string") {
+          if (s.trackingType !== where.trackingType) return false;
+        }
+      }
+
+      if (where.renewalDate) {
+        const sTime = s.renewalDate ? new Date(s.renewalDate).getTime() : null;
+        if (where.renewalDate.lt) {
+          const target = new Date(where.renewalDate.lt).getTime();
+          if (sTime === null || sTime >= target) return false;
+        }
+        if (where.renewalDate.lte) {
+          const target = new Date(where.renewalDate.lte).getTime();
+          if (sTime === null || sTime > target) return false;
+        }
+        if (where.renewalDate.gt) {
+          const target = new Date(where.renewalDate.gt).getTime();
+          if (sTime === null || sTime <= target) return false;
+        }
+        if (where.renewalDate.gte) {
+          const target = new Date(where.renewalDate.gte).getTime();
+          if (sTime === null || sTime < target) return false;
+        }
+      }
+
+      if (where.customerId) {
+        if (s.customerId !== where.customerId) {
+          const cust = this.memCustomers.get(s.customerId);
+          const matches = cust && (cust.userId === where.customerId || cust.id === where.customerId);
+          if (!matches) return false;
+        }
+      }
+
+      if (where.OR && Array.isArray(where.OR)) {
+        const matchesAny = where.OR.some((cond: any) => {
+          if (cond.customerId) {
+            if (s.customerId === cond.customerId) return true;
+            const cust = this.memCustomers.get(s.customerId);
+            return cust && (cust.userId === cond.customerId || cust.id === cond.customerId);
+          }
+          if (cond.id && s.id === cond.id) return true;
+          return false;
+        });
+        if (!matchesAny) return false;
+      }
+
+      return true;
+    };
+
     wrapModel("service", {
       findMany: async (args: any) => {
         const where = args?.where || {};
         let items = Array.from(this.memServices.values());
 
-        if (where.customerId) {
-          items = items.filter((s) => {
-            if (s.customerId === where.customerId) return true;
-            const cust = this.memCustomers.get(s.customerId);
-            return cust && (cust.userId === where.customerId || cust.id === where.customerId);
-          });
+        // Auto-heal: If service has valid date and remaining quota, ensure status is ACTIVE
+        const nowMs = Date.now();
+        for (const s of items) {
+          const isDateValid = !s.renewalDate || new Date(s.renewalDate).getTime() >= nowMs;
+          const hasQuota = s.quantity == null || Number(s.quantity) > Number(s.usedQuantity || 0);
+          if (s.status === "INACTIVE" && isDateValid && hasQuota) {
+            s.status = "ACTIVE";
+          }
         }
-        if (where.status && where.status !== "ALL") {
-          items = items.filter((s) => s.status === where.status);
-        }
-        if (where.serviceGroupId) {
-          items = items.filter((s) => s.serviceGroupId === where.serviceGroupId);
-        }
-        return items.map((s) => ({
-          ...s,
-          parentServiceId: s.parentServiceId || null,
-          parentService: s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null,
-          childServices: Array.from(this.memServices.values())
-            .filter((c) => c.parentServiceId === s.id)
-            .map((c) => ({
-              ...c,
-              customer: this.memCustomers.get(c.customerId) || null,
-              endpoints: Array.from(this.memEndpoints.values()).filter((e) => e.serviceId === c.id),
-            })),
-          serviceType: this.memServiceTypes.find((t) => t.id === s.serviceTypeId) || this.memServiceTypes[0],
-          customer: this.memCustomers.get(s.customerId) || null,
-          server: s.serverId ? this.memServers.get(s.serverId) || null : null,
-          endpoints: Array.from(this.memEndpoints.values()).filter((e) => e.serviceId === s.id),
-        }));
+
+        items = items.filter((s) => matchServiceFilter(s, where));
+
+        return items.map((s) => {
+          const parentSvc = s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null;
+          const effTypeId = s.serviceTypeId || parentSvc?.serviceTypeId;
+          const resolvedType = effTypeId
+            ? this.memServiceTypes.find((t) => t.id === effTypeId || t.slug === effTypeId) || null
+            : null;
+
+          return {
+            ...s,
+            parentServiceId: s.parentServiceId || null,
+            parentService: parentSvc,
+            childServices: Array.from(this.memServices.values())
+              .filter((c) => c.parentServiceId === s.id)
+              .map((c) => ({
+                ...c,
+                customer: this.memCustomers.get(c.customerId) || null,
+                endpoints: Array.from(this.memEndpoints.values()).filter((e) => e.serviceId === c.id),
+              })),
+            serviceType: resolvedType,
+            customer: this.memCustomers.get(s.customerId) || null,
+            server: s.serverId ? this.memServers.get(s.serverId) || null : null,
+            endpoints: Array.from(this.memEndpoints.values()).filter((e) => e.serviceId === s.id),
+          };
+        });
       },
       findUnique: async (args: any) => {
         const where = args?.where || {};
         const s = this.memServices.get(where.id);
         if (!s) return null;
+        const nowMs = Date.now();
+        const isDateValid = !s.renewalDate || new Date(s.renewalDate).getTime() >= nowMs;
+        const hasQuota = s.quantity == null || Number(s.quantity) > Number(s.usedQuantity || 0);
+        if (s.status === "INACTIVE" && isDateValid && hasQuota) {
+          s.status = "ACTIVE";
+        }
+        const parentSvc = s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null;
+        const effTypeId = s.serviceTypeId || parentSvc?.serviceTypeId;
+        const resolvedType = effTypeId
+          ? this.memServiceTypes.find((t) => t.id === effTypeId || t.slug === effTypeId) || null
+          : null;
+
         return {
           ...s,
           parentServiceId: s.parentServiceId || null,
-          parentService: s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null,
+          parentService: parentSvc,
           childServices: Array.from(this.memServices.values())
             .filter((c) => c.parentServiceId === s.id)
             .map((c) => ({
@@ -730,7 +1142,7 @@ export class PrismaService
               customer: this.memCustomers.get(c.customerId) || null,
               endpoints: Array.from(this.memEndpoints.values()).filter((e) => e.serviceId === c.id),
             })),
-          serviceType: this.memServiceTypes.find((t) => t.id === s.serviceTypeId) || this.memServiceTypes[0],
+          serviceType: resolvedType,
           customer: this.memCustomers.get(s.customerId) || null,
           server: s.serverId ? this.memServers.get(s.serverId) || null : null,
           endpoints: Array.from(this.memEndpoints.values()).filter((e) => e.serviceId === s.id),
@@ -738,12 +1150,24 @@ export class PrismaService
       },
       findFirst: async (args: any) => {
         const where = args?.where || {};
+        const nowMs = Date.now();
         for (const s of this.memServices.values()) {
-          if (!where.id || s.id === where.id) {
+          const isDateValid = !s.renewalDate || new Date(s.renewalDate).getTime() >= nowMs;
+          const hasQuota = s.quantity == null || Number(s.quantity) > Number(s.usedQuantity || 0);
+          if (s.status === "INACTIVE" && isDateValid && hasQuota) {
+            s.status = "ACTIVE";
+          }
+          if (matchServiceFilter(s, where)) {
+            const parentSvc = s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null;
+            const effTypeId = s.serviceTypeId || parentSvc?.serviceTypeId;
+            const resolvedType = effTypeId
+              ? this.memServiceTypes.find((t) => t.id === effTypeId || t.slug === effTypeId) || null
+              : null;
+
             return {
               ...s,
               parentServiceId: s.parentServiceId || null,
-              parentService: s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null,
+              parentService: parentSvc,
               childServices: Array.from(this.memServices.values())
                 .filter((c) => c.parentServiceId === s.id)
                 .map((c) => ({
@@ -751,7 +1175,7 @@ export class PrismaService
                   customer: this.memCustomers.get(c.customerId) || null,
                   endpoints: Array.from(this.memEndpoints.values()).filter((e) => e.serviceId === c.id),
                 })),
-              serviceType: this.memServiceTypes.find((t) => t.id === s.serviceTypeId) || this.memServiceTypes[0],
+              serviceType: resolvedType,
               customer: this.memCustomers.get(s.customerId) || null,
               server: s.serverId ? this.memServers.get(s.serverId) || null : null,
             };
@@ -761,17 +1185,7 @@ export class PrismaService
       },
       count: async (args: any) => {
         const where = args?.where || {};
-        let items = Array.from(this.memServices.values());
-        if (where.customerId) {
-          items = items.filter((s) => {
-            if (s.customerId === where.customerId) return true;
-            const cust = this.memCustomers.get(s.customerId);
-            return cust && (cust.userId === where.customerId || cust.id === where.customerId);
-          });
-        }
-        if (where.status && where.status !== "ALL") {
-          items = items.filter((s) => s.status === where.status);
-        }
+        const items = Array.from(this.memServices.values()).filter((s) => matchServiceFilter(s, where));
         return items.length;
       },
       create: async (args: any) => {
@@ -847,6 +1261,76 @@ export class PrismaService
         this.memServices.delete(where.id);
         this.saveToDisk();
         return { count: 1 };
+      },
+      deleteMany: async (args: any) => {
+        const where = args?.where || {};
+        let count = 0;
+        for (const [id, s] of Array.from(this.memServices.entries())) {
+          if (where.customerId && s.customerId === where.customerId) {
+            this.memServices.delete(id);
+            count++;
+          } else if (where.serviceTypeId && s.serviceTypeId === where.serviceTypeId) {
+            this.memServices.delete(id);
+            count++;
+          }
+        }
+        this.saveToDisk();
+        return { count };
+      },
+      updateMany: async (args: any) => {
+        const where = args?.where || {};
+        const data = args?.data || {};
+        let count = 0;
+        for (const s of this.memServices.values()) {
+          let matched = true;
+          if (where.OR && Array.isArray(where.OR)) {
+            matched = where.OR.some((cond: any) => {
+              if (cond.serviceTypeId) {
+                return (
+                  s.serviceTypeId === cond.serviceTypeId ||
+                  s.serviceType?.id === cond.serviceTypeId ||
+                  s.serviceType?.slug === cond.serviceTypeId ||
+                  s.serviceTypeSlug === cond.serviceTypeId
+                );
+              }
+              if (cond.customerId) return s.customerId === cond.customerId;
+              if (cond.id) return s.id === cond.id;
+              return false;
+            });
+          } else {
+            if (where.serviceTypeId) {
+              if (
+                s.serviceTypeId !== where.serviceTypeId &&
+                s.serviceType?.id !== where.serviceTypeId &&
+                s.serviceType?.slug !== where.serviceTypeId &&
+                s.serviceTypeSlug !== where.serviceTypeId
+              ) {
+                matched = false;
+              }
+            }
+            if (where.customerId && s.customerId !== where.customerId) matched = false;
+            if (where.status && s.status !== where.status) matched = false;
+          }
+
+          if (matched) {
+            if (data.serviceTypeId !== undefined) {
+              s.serviceTypeId = data.serviceTypeId;
+              const resolved = this.memServiceTypes.find(
+                (t) => t.id === data.serviceTypeId || t.slug === data.serviceTypeId,
+              );
+              s.serviceType = resolved || s.serviceType;
+              if (resolved) {
+                s.serviceTypeSlug = resolved.slug;
+              }
+            }
+            if (data.status !== undefined) s.status = data.status;
+            if (data.customerId !== undefined) s.customerId = data.customerId;
+            s.updatedAt = new Date();
+            count++;
+          }
+        }
+        this.saveToDisk();
+        return { count };
       },
     });
 
@@ -1039,6 +1523,63 @@ export class PrismaService
 
     // Invoice model
     wrapModel("invoice", {
+      findFirst: async (args: any) => {
+        const where = args?.where || {};
+        let items = Array.from(this.memInvoices.values());
+        if (where.id) {
+          items = items.filter((i) => i.id === where.id);
+        }
+        if (where.invoiceNumber) {
+          items = items.filter((i) => i.invoiceNumber === where.invoiceNumber);
+        }
+        if (where.customerId) {
+          const matchedCust =
+            this.memCustomers.get(where.customerId) ||
+            Array.from(this.memCustomers.values()).find((c) => c.userId === where.customerId);
+          const validIds = new Set([where.customerId]);
+          if (matchedCust) {
+            validIds.add(matchedCust.id);
+            if (matchedCust.userId) validIds.add(matchedCust.userId);
+          }
+          items = items.filter((i) => validIds.has(i.customerId));
+        }
+        if (where.supplierId) {
+          items = items.filter((i) => i.supplierId === where.supplierId);
+        }
+        if (where.counterpartyType) {
+          items = items.filter((i) => (i.counterpartyType || (i.supplierId ? "SUPPLIER" : "CUSTOMER")) === where.counterpartyType);
+        }
+        if (where.status && where.status !== "ALL") {
+          items = items.filter((i) => i.status === where.status);
+        }
+        if (where.items?.some?.serviceId) {
+          const targetSvcId = where.items.some.serviceId;
+          items = items.filter((inv) => {
+            const invItems =
+              inv.items && inv.items.length > 0
+                ? inv.items
+                : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id);
+            return invItems.some((it: any) => it.serviceId === targetSvcId);
+          });
+        }
+        const inv = items[0];
+        if (!inv) return null;
+        return {
+          ...inv,
+          customer: inv.customerId
+            ? this.memCustomers.get(inv.customerId) ||
+              Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
+              null
+            : null,
+          supplier: inv.supplierId ? this.memSuppliers.get(inv.supplierId) || null : null,
+          items: (
+            inv.items && inv.items.length > 0
+              ? inv.items
+              : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id)
+          ).map((it: any) => enrichInvoiceItem(it, inv.customerId, inv.notes)),
+          payment: Array.from(this.memPayments.values()).find((p) => p.invoiceId === inv.id) || null,
+        };
+      },
       findMany: async (args: any) => {
         const where = args?.where || {};
         let items = Array.from(this.memInvoices.values());
@@ -1053,8 +1594,24 @@ export class PrismaService
           }
           items = items.filter((i) => validIds.has(i.customerId));
         }
+        if (where.supplierId) {
+          items = items.filter((i) => i.supplierId === where.supplierId);
+        }
+        if (where.counterpartyType) {
+          items = items.filter((i) => (i.counterpartyType || (i.supplierId ? "SUPPLIER" : "CUSTOMER")) === where.counterpartyType);
+        }
         if (where.status && where.status !== "ALL") {
           items = items.filter((i) => i.status === where.status);
+        }
+        if (where.items?.some?.serviceId) {
+          const targetSvcId = where.items.some.serviceId;
+          items = items.filter((inv) => {
+            const invItems =
+              inv.items && inv.items.length > 0
+                ? inv.items
+                : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id);
+            return invItems.some((it: any) => it.serviceId === targetSvcId);
+          });
         }
         items.sort(
           (a, b) =>
@@ -1068,24 +1625,17 @@ export class PrismaService
         }
         return items.map((inv) => ({
           ...inv,
-          customer:
-            this.memCustomers.get(inv.customerId) ||
-            Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
-            null,
+          customer: inv.customerId
+            ? this.memCustomers.get(inv.customerId) ||
+              Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
+              null
+            : null,
+          supplier: inv.supplierId ? this.memSuppliers.get(inv.supplierId) || null : null,
           items: (
             inv.items && inv.items.length > 0
               ? inv.items
               : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id)
-          ).map((it: any) => {
-            const svc = it.serviceId ? this.memServices.get(it.serviceId) : null;
-            const sType = svc?.serviceTypeId
-              ? this.memServiceTypes.find((t) => t.id === svc.serviceTypeId)
-              : null;
-            return {
-              ...it,
-              service: svc ? { ...svc, serviceType: sType } : it.service || null,
-            };
-          }),
+          ).map((it: any) => enrichInvoiceItem(it, inv.customerId, inv.notes)),
           payment: Array.from(this.memPayments.values()).find((p) => p.invoiceId === inv.id) || null,
         }));
       },
@@ -1101,7 +1651,13 @@ export class PrismaService
             validIds.add(matchedCust.id);
             if (matchedCust.userId) validIds.add(matchedCust.userId);
           }
-          items = items.filter((i) => validIds.has(i.customerId));
+          items = items.filter((i) => i.customerId && validIds.has(i.customerId));
+        }
+        if (where.supplierId) {
+          items = items.filter((i) => i.supplierId === where.supplierId);
+        }
+        if (where.counterpartyType) {
+          items = items.filter((i) => (i.counterpartyType || (i.supplierId ? "SUPPLIER" : "CUSTOMER")) === where.counterpartyType);
         }
         if (where.status && where.status !== "ALL") {
           items = items.filter((i) => i.status === where.status);
@@ -1114,24 +1670,17 @@ export class PrismaService
         if (!inv) return null;
         return {
           ...inv,
-          customer:
-            this.memCustomers.get(inv.customerId) ||
-            Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
-            null,
+          customer: inv.customerId
+            ? this.memCustomers.get(inv.customerId) ||
+              Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
+              null
+            : null,
+          supplier: inv.supplierId ? this.memSuppliers.get(inv.supplierId) || null : null,
           items: (
             inv.items && inv.items.length > 0
               ? inv.items
               : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id)
-          ).map((it: any) => {
-            const svc = it.serviceId ? this.memServices.get(it.serviceId) : null;
-            const sType = svc?.serviceTypeId
-              ? this.memServiceTypes.find((t) => t.id === svc.serviceTypeId)
-              : null;
-            return {
-              ...it,
-              service: svc ? { ...svc, serviceType: sType } : it.service || null,
-            };
-          }),
+          ).map((it: any) => enrichInvoiceItem(it, inv.customerId, inv.notes)),
           payment: Array.from(this.memPayments.values()).find((p) => p.invoiceId === inv.id) || null,
         };
       },
@@ -1146,14 +1695,19 @@ export class PrismaService
           createdAt: new Date(),
         }));
 
-        const matchedCustomer =
-          this.memCustomers.get(d.customerId) ||
-          Array.from(this.memCustomers.values()).find((c) => c.userId === d.customerId);
-        const resolvedCustId = matchedCustomer ? matchedCustomer.id : d.customerId;
+        const matchedCustomer = d.customerId
+          ? this.memCustomers.get(d.customerId) ||
+            Array.from(this.memCustomers.values()).find((c) => c.userId === d.customerId) ||
+            null
+          : null;
+        const resolvedCustId = matchedCustomer ? matchedCustomer.id : (d.customerId || null);
+        const matchedSupplier = d.supplierId ? this.memSuppliers.get(d.supplierId) || null : null;
 
         const newInv = {
           id,
           customerId: resolvedCustId,
+          supplierId: d.supplierId || null,
+          counterpartyType: d.counterpartyType || (d.supplierId ? "SUPPLIER" : "CUSTOMER"),
           invoiceNumber: d.invoiceNumber || (30001 + this.memInvoices.size).toString(),
           status: d.status || "UNPAID",
           subtotalToman: d.subtotalToman || 0,
@@ -1163,8 +1717,10 @@ export class PrismaService
           paidAt: null,
           cancelledAt: null,
           notes: d.notes || null,
-          customer: matchedCustomer || null,
-          items: processedItems,
+          customer: matchedCustomer,
+          supplier: matchedSupplier,
+          supplierName: matchedSupplier?.name || null,
+          items: processedItems.map((it: any) => enrichInvoiceItem(it, resolvedCustId, d.notes)),
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -1188,10 +1744,60 @@ export class PrismaService
           return {
             ...inv,
             customer: this.memCustomers.get(inv.customerId) || null,
-            items: inv.items || [],
+            items: (inv.items || []).map((it: any) =>
+              enrichInvoiceItem(it, inv.customerId, inv.notes),
+            ),
           };
         }
         return null;
+      },
+      delete: async (args: any) => {
+        const where = args?.where || {};
+        const inv = this.memInvoices.get(where.id);
+        if (inv) {
+          for (const [itemId, it] of Array.from(this.memInvoiceItems.entries())) {
+            if (it.invoiceId === where.id) {
+              this.memInvoiceItems.delete(itemId);
+            }
+          }
+          for (const [pId, p] of Array.from(this.memPayments.entries())) {
+            if (p.invoiceId === where.id) {
+              this.memPayments.delete(pId);
+            }
+          }
+          this.memInvoices.delete(where.id);
+          this.saveToDisk();
+          return inv;
+        }
+        return null;
+      },
+      deleteMany: async (args: any) => {
+        const where = args?.where || {};
+        let count = 0;
+        for (const [id, inv] of Array.from(this.memInvoices.entries())) {
+          let matched = true;
+          if (where.id && inv.id !== where.id) matched = false;
+          if (where.id?.in && Array.isArray(where.id.in) && !where.id.in.includes(id)) matched = false;
+          if (where.customerId && inv.customerId !== where.customerId) matched = false;
+          if (where.supplierId && inv.supplierId !== where.supplierId) matched = false;
+          if (where.status && inv.status !== where.status) matched = false;
+          if (matched) {
+            for (const [itemId, it] of Array.from(this.memInvoiceItems.entries())) {
+              if (it.invoiceId === id) {
+                this.memInvoiceItems.delete(itemId);
+              }
+            }
+            for (const [pId, p] of Array.from(this.memPayments.entries())) {
+              if (p.invoiceId === id) {
+                this.memPayments.delete(pId);
+              }
+            }
+            this.memInvoices.delete(id);
+            count++;
+          }
+        }
+        this.saveToDisk();
+        return { count };
       },
     });
 
@@ -1232,10 +1838,44 @@ export class PrismaService
         const it = this.memInvoiceItems.get(where.id);
         if (it) {
           Object.assign(it, d, { updatedAt: new Date() });
+          const parentInv = this.memInvoices.get(it.invoiceId);
+          if (parentInv && Array.isArray(parentInv.items)) {
+            const idx = parentInv.items.findIndex((x: any) => x.id === it.id);
+            if (idx !== -1) {
+              parentInv.items[idx] = { ...parentInv.items[idx], ...d, updatedAt: new Date() };
+            }
+          }
           this.saveToDisk();
           return it;
         }
         return null;
+      },
+      deleteMany: async (args: any) => {
+        const where = args?.where || {};
+        let deletedCount = 0;
+        for (const [id, it] of Array.from(this.memInvoiceItems.entries())) {
+          if (where.invoiceId && it.invoiceId === where.invoiceId) {
+            this.memInvoiceItems.delete(id);
+            deletedCount++;
+          } else if (where.serviceId && it.serviceId === where.serviceId) {
+            this.memInvoiceItems.delete(id);
+            deletedCount++;
+          }
+        }
+        this.saveToDisk();
+        return { count: deletedCount };
+      },
+      createMany: async (args: any) => {
+        const dataList = args?.data || [];
+        const createdItems: any[] = [];
+        dataList.forEach((d: any, idx: number) => {
+          const id = d.id || `item_${Date.now()}_${idx}`;
+          const newItem = { id, ...d, createdAt: new Date() };
+          this.memInvoiceItems.set(id, newItem);
+          createdItems.push(newItem);
+        });
+        this.saveToDisk();
+        return { count: createdItems.length };
       },
     });
 
@@ -1267,23 +1907,33 @@ export class PrismaService
         if (args?.take) {
           items = items.slice(0, args.take);
         }
-        return items.map((p) => {
+        const buildEnrichedPayment = (p: any) => {
           const inv = this.memInvoices.get(p.invoiceId);
-          const cust = inv
-            ? this.memCustomers.get(inv.customerId) ||
-              Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
-              null
-            : null;
-          const invoiceItems = inv
-            ? inv.items && inv.items.length > 0
+          if (!inv) return { ...p, invoice: null };
+          const cust =
+            this.memCustomers.get(inv.customerId) ||
+            Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
+            null;
+          const supp = inv.supplierId ? this.memSuppliers.get(inv.supplierId) || null : null;
+          const invoiceItems = (
+            inv.items && inv.items.length > 0
               ? inv.items
               : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id)
-            : [];
+          ).map((it: any) => enrichInvoiceItem(it, inv.customerId, inv.notes));
+
           return {
             ...p,
-            invoice: inv ? { ...inv, customer: cust, items: invoiceItems } : null,
+            invoice: {
+              ...inv,
+              customer: cust,
+              supplier: supp,
+              supplierName: supp?.name || inv.supplierName,
+              items: invoiceItems,
+            },
           };
-        });
+        };
+
+        return items.map(buildEnrichedPayment);
       },
       findUnique: async (args: any) => {
         const where = args?.where || {};
@@ -1292,19 +1942,27 @@ export class PrismaService
           Array.from(this.memPayments.values()).find((x) => x.invoiceId === where.invoiceId);
         if (!p) return null;
         const inv = this.memInvoices.get(p.invoiceId);
-        const cust = inv
-          ? this.memCustomers.get(inv.customerId) ||
-            Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
-            null
-          : null;
-        const invoiceItems = inv
-          ? inv.items && inv.items.length > 0
+        if (!inv) return { ...p, invoice: null };
+        const cust =
+          this.memCustomers.get(inv.customerId) ||
+          Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
+          null;
+        const supp = inv.supplierId ? this.memSuppliers.get(inv.supplierId) || null : null;
+        const invoiceItems = (
+          inv.items && inv.items.length > 0
             ? inv.items
             : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id)
-          : [];
+        ).map((it: any) => enrichInvoiceItem(it, inv.customerId, inv.notes));
+
         return {
           ...p,
-          invoice: inv ? { ...inv, customer: cust, items: invoiceItems } : null,
+          invoice: {
+            ...inv,
+            customer: cust,
+            supplier: supp,
+            supplierName: supp?.name || inv.supplierName,
+            items: invoiceItems,
+          },
         };
       },
       findFirst: async (args: any) => {
@@ -1316,19 +1974,27 @@ export class PrismaService
         });
         if (!p) return null;
         const inv = this.memInvoices.get(p.invoiceId);
-        const cust = inv
-          ? this.memCustomers.get(inv.customerId) ||
-            Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
-            null
-          : null;
-        const invoiceItems = inv
-          ? inv.items && inv.items.length > 0
+        if (!inv) return { ...p, invoice: null };
+        const cust =
+          this.memCustomers.get(inv.customerId) ||
+          Array.from(this.memCustomers.values()).find((c) => c.userId === inv.customerId) ||
+          null;
+        const supp = inv.supplierId ? this.memSuppliers.get(inv.supplierId) || null : null;
+        const invoiceItems = (
+          inv.items && inv.items.length > 0
             ? inv.items
             : Array.from(this.memInvoiceItems.values()).filter((it) => it.invoiceId === inv.id)
-          : [];
+        ).map((it: any) => enrichInvoiceItem(it, inv.customerId, inv.notes));
+
         return {
           ...p,
-          invoice: inv ? { ...inv, customer: cust, items: invoiceItems } : null,
+          invoice: {
+            ...inv,
+            customer: cust,
+            supplier: supp,
+            supplierName: supp?.name || inv.supplierName,
+            items: invoiceItems,
+          },
         };
       },
       count: async (args: any) => {
@@ -1399,7 +2065,13 @@ export class PrismaService
           logs = logs.filter((l) => l.entityType === where.entityType);
         }
         if (where.entityId) {
-          logs = logs.filter((l) => l.entityId === where.entityId);
+          logs = logs.filter(
+            (l) =>
+              l.entityId === where.entityId ||
+              l.metadata?.customerId === where.entityId ||
+              l.after?.customerId === where.entityId ||
+              l.before?.customerId === where.entityId
+          );
         }
         if (where.userId) {
           logs = logs.filter((l) => l.userId === where.userId);
@@ -1416,7 +2088,13 @@ export class PrismaService
           logs = logs.filter((l) => l.entityType === where.entityType);
         }
         if (where.entityId) {
-          logs = logs.filter((l) => l.entityId === where.entityId);
+          logs = logs.filter(
+            (l) =>
+              l.entityId === where.entityId ||
+              l.metadata?.customerId === where.entityId ||
+              l.after?.customerId === where.entityId ||
+              l.before?.customerId === where.entityId
+          );
         }
         return logs.length;
       },

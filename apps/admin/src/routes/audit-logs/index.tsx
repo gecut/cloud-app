@@ -37,9 +37,25 @@ function getAuditLogCategory(log: any): string {
   const reason = (log.reason || "").toLowerCase();
   const combined = entity + " " + action + " " + reason;
 
+  // 1. Services & Infrastructure (Service, Server, Endpoint)
   if (
-    combined.includes("invoice") ||
-    combined.includes("payment") ||
+    entity === "service" ||
+    entity === "server" ||
+    entity === "endpoint" ||
+    action.startsWith("service.") ||
+    action.startsWith("server.") ||
+    action.startsWith("endpoint.")
+  ) {
+    return "SERVICES";
+  }
+
+  // 2. Financial & Invoices
+  if (
+    entity === "invoice" ||
+    entity === "payment" ||
+    entity === "paymentattempt" ||
+    action.startsWith("invoice.") ||
+    action.startsWith("payment.") ||
     combined.includes("فاکتور") ||
     combined.includes("پرداخت") ||
     combined.includes("تومان") ||
@@ -48,34 +64,35 @@ function getAuditLogCategory(log: any): string {
     return "FINANCE";
   }
 
+  // 3. Customers
   if (
-    combined.includes("service") ||
-    combined.includes("server") ||
-    combined.includes("endpoint") ||
-    combined.includes("سرویس") ||
-    combined.includes("سرور")
-  ) {
-    return "SERVICES";
-  }
-
-  if (
-    combined.includes("customer") ||
+    entity === "customer" ||
+    action.startsWith("customer.") ||
     combined.includes("مشتری") ||
-    combined.includes("پروفایل") ||
-    combined.includes("تعریف مشتری")
+    combined.includes("پروفایل")
   ) {
     return "CUSTOMERS";
   }
 
+  // 4. Security & Auth
   if (
+    entity === "user" ||
+    action.startsWith("auth.") ||
     combined.includes("login") ||
     combined.includes("auth") ||
-    combined.includes("user") ||
     combined.includes("رمز") ||
-    combined.includes("ورود") ||
-    combined.includes("امنیت")
+    combined.includes("ورود")
   ) {
     return "SECURITY";
+  }
+
+  if (
+    combined.includes("service") ||
+    combined.includes("server") ||
+    combined.includes("سرویس") ||
+    combined.includes("سرور")
+  ) {
+    return "SERVICES";
   }
 
   return "FINANCE";
@@ -237,8 +254,11 @@ function AdminAuditLogsListPage() {
                         "invoice.cancel": { label: "لغو فاکتور", color: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
                         "invoice.reactivate": { label: "فعال‌سازی مجدد فاکتور", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
                         "payment.record": { label: "پرداخت آنلاین", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-                        "service.create": { label: "تعریف/تخصیص سرویس", color: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+                        "service.create": { label: "تعریف سرویس", color: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+                        "service.update": { label: "ویرایش سرویس", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+                        "service.delete": { label: "حذف سرویس", color: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
                         "service.assign": { label: "تخصیص بسته", color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400" },
+                        "service.renewed_and_invoice_created": { label: "تمدید سرویس", color: "bg-teal-500/10 text-teal-600 dark:text-teal-400" },
                       };
 
                       const entityMap: Record<string, string> = {
@@ -246,7 +266,7 @@ function AdminAuditLogsListPage() {
                         Customer: "مشتری",
                         Invoice: "فاکتور مالی",
                         Payment: "تراکنش مالی",
-                        Service: "سرویس ابری",
+                        Service: "سرویس",
                         Server: "سرور زیرساخت",
                       };
 
@@ -262,6 +282,12 @@ function AdminAuditLogsListPage() {
                           : typeof log.details === "object"
                           ? JSON.stringify(log.details)
                           : log.details || "—");
+
+                      const isSupplierService =
+                        log.entityType === "Service" &&
+                        (log.metadata?.isSupplier ||
+                          log.after?.isSupplier ||
+                          (!log.after?.customerId && !log.before?.customerId));
 
                       return (
                         <tr key={log.id} className="hover:bg-muted/20 transition-colors">
@@ -285,7 +311,20 @@ function AdminAuditLogsListPage() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-muted-foreground">
-                            {entityMap[log.entityType] || log.entityType || "—"}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>{entityMap[log.entityType] || log.entityType || "—"}</span>
+                              {log.entityType === "Service" && (
+                                isSupplierService ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                    تامین‌کننده
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+                                    مشتری
+                                  </span>
+                                )
+                              )}
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 text-foreground font-medium max-w-md truncate">
                             {detailsText}

@@ -9,7 +9,7 @@ import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
-import { formatJalaliDateTime } from "@gecut-cloud/contracts";
+import { formatJalaliDateTime, formatJalaliDate } from "@gecut-cloud/contracts";
 import { formatInvoiceNumber } from "@/utils/format";
 import {
   CreditCard,
@@ -36,6 +36,7 @@ import {
   Check,
   ShieldCheck,
   UserCheck,
+  Building2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/payments/")({
@@ -53,50 +54,102 @@ const PAYMENT_CONTENT_CATEGORIES = [
   { id: "MANUAL", label: "حواله بانکی و کارت", icon: Landmark },
 ];
 
-function getPaymentCategory(pay: any): string {
-  const text = (
-    (pay.invoice?.items?.[0]?.title || "") + " " +
-    (pay.invoice?.notes || "") + " " +
-    (pay.invoice?.customer?.name || "") + " " +
-    (pay.invoice?.items?.[0]?.description || "") + " " +
-    (pay.gatewayRef || "")
-  ).toLowerCase();
-
-  if (text.includes("هاست") || text.includes("host") || text.includes("ابری") || text.includes("cloud")) return "HOSTING";
-  if (text.includes("سرور") || text.includes("server") || text.includes("vps") || text.includes("اختصاصی")) return "SERVER";
-  if (text.includes("دامنه") || text.includes("domain") || text.includes(".ir") || text.includes(".com")) return "DOMAIN";
-  if (text.includes("api") || text.includes("وب‌سرویس") || text.includes("سرویس")) return "API";
-  if (text.includes("بسته") || text.includes("پکیج") || text.includes("عدد") || text.includes("package")) return "PACKAGE";
-  return "HOSTING";
+function normalizeSearchText(val: any): string {
+  if (val === null || val === undefined) return "";
+  const str = String(val);
+  return str
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/,/g, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .trim();
 }
 
-function getInvoiceCategory(inv: any): string {
-  const text = (
-    (inv.items?.[0]?.title || "") + " " +
-    (inv.notes || "") + " " +
-    (inv.customer?.name || "") + " " +
-    (inv.items?.[0]?.description || "")
+function getItemOrInvoiceCategory(itemOrInv: any): string | null {
+  if (!itemOrInv) return null;
+  const items = itemOrInv.items || [itemOrInv];
+  for (const it of items) {
+    const sType = String(
+      it?.serviceTypeSnapshot ||
+        it?.service?.serviceType?.name ||
+        it?.service?.serviceType?.slug ||
+        it?.service?.type ||
+        it?.type ||
+        "",
+    ).toUpperCase();
+    if (sType === "SERVER" || sType === "VPS" || sType.includes("سرور")) return "SERVER";
+    if (sType === "HOSTING" || sType.includes("هاست") || sType.includes("میزبانی")) return "HOSTING";
+    if (sType === "DOMAIN" || sType.includes("دامنه")) return "DOMAIN";
+    if (sType === "API" || sType.includes("وب‌سرویس") || sType.includes("API")) return "API";
+    if (sType === "PACKAGE" || sType.includes("بسته") || sType.includes("پکیج")) return "PACKAGE";
+  }
+
+  const fullText = (
+    items
+      .map(
+        (it: any) =>
+          `${it?.title || ""} ${it?.serviceNameSnapshot || ""} ${it?.service?.name || ""} ${it?.description || ""}`,
+      )
+      .join(" ") +
+    " " +
+    (itemOrInv.notes || "")
   ).toLowerCase();
 
-  if (text.includes("هاست") || text.includes("host") || text.includes("ابری") || text.includes("cloud")) return "HOSTING";
-  if (text.includes("سرور") || text.includes("server") || text.includes("vps") || text.includes("اختصاصی")) return "SERVER";
-  if (text.includes("دامنه") || text.includes("domain") || text.includes(".ir") || text.includes(".com")) return "DOMAIN";
-  if (text.includes("api") || text.includes("وب‌سرویس") || text.includes("سرویس")) return "API";
-  if (text.includes("بسته") || text.includes("پکیج") || text.includes("عدد") || text.includes("package")) return "PACKAGE";
-  return "HOSTING";
+  if (fullText.includes("سرور") || fullText.includes("server") || fullText.includes("vps") || fullText.includes("اختصاصی") || fullText.includes("مجازی")) return "SERVER";
+  if (fullText.includes("هاست") || fullText.includes("host") || fullText.includes("میزبانی") || fullText.includes("cpanel")) return "HOSTING";
+  if (fullText.includes("دامنه") || fullText.includes("domain") || fullText.includes(".ir") || fullText.includes(".com") || fullText.includes("whois")) return "DOMAIN";
+  if (fullText.includes("وب‌سرویس") || fullText.includes("وب سرویس") || fullText.includes("endpoint") || fullText.includes("api ") || fullText.endsWith("api") || fullText.startsWith("api")) return "API";
+  if (fullText.includes("بسته") || fullText.includes("پکیج") || fullText.includes("package") || fullText.includes("پلن")) return "PACKAGE";
+  if (fullText.includes("ابری") || fullText.includes("cloud")) return "HOSTING";
+
+  return null;
+}
+
+function matchesCategory(p: any, catId: string): boolean {
+  if (catId === "ALL") return true;
+  if (catId === "GATEWAY") {
+    const prov = String(p.provider || p.invoice?.payment?.provider || "").toUpperCase();
+    const gRef = String(p.gatewayRef || p.invoice?.payment?.gatewayRef || "");
+    return (
+      prov === "ZARINPAL" ||
+      prov === "PAYPING" ||
+      prov === "ONLINE" ||
+      prov === "GATEWAY" ||
+      gRef.startsWith("TRX-") ||
+      gRef.startsWith("ZP_")
+    );
+  }
+  if (catId === "MANUAL") {
+    const prov = String(p.provider || p.invoice?.payment?.provider || "").toUpperCase();
+    const gRef = String(p.gatewayRef || p.invoice?.payment?.gatewayRef || "");
+    if (gRef.startsWith("TRX-") || gRef.startsWith("ZP_") || prov === "ONLINE" || prov === "ZARINPAL" || prov === "PAYPING") {
+      return false;
+    }
+    return prov === "MANUAL_TRANSFER" || prov === "CASH" || prov === "CARD_TO_CARD" || prov === "MANUAL" || prov === "CART_TO_CART" || !prov;
+  }
+
+  const invCat = getItemOrInvoiceCategory(p.invoice || p);
+  if (invCat === catId) return true;
+
+  const items = p.invoice?.items || [];
+  return items.some((it: any) => getItemOrInvoiceCategory(it) === catId);
 }
 
 function isPaymentConfirmedByCustomer(pay: any): boolean {
   if (pay.confirmedBy === "CUSTOMER") return true;
-  if (pay.provider === "ZARINPAL" || pay.provider === "PAYPING" || pay.provider === "online") return true;
-  if (typeof pay.gatewayRef === "string" && (pay.gatewayRef.startsWith("TRX-") || pay.gatewayRef.startsWith("ZP_"))) return true;
+  const prov = String(pay.provider || "").toUpperCase();
+  if (prov === "ZARINPAL" || prov === "PAYPING" || prov === "ONLINE") return true;
+  const gRef = String(pay.gatewayRef || "");
+  if (gRef.startsWith("TRX-") || gRef.startsWith("ZP_")) return true;
   return false;
 }
 
 function AdminPaymentsListPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"SETTLED" | "PENDING">("SETTLED");
+  const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "SETTLED">("ALL");
   const [approvalFilter, setApprovalFilter] = useState<"ALL" | "CUSTOMER" | "ADMIN">("ALL");
+  const [counterpartyFilter, setCounterpartyFilter] = useState<"ALL" | "CUSTOMER" | "SUPPLIER">("ALL");
   const [isRecordOpen, setIsRecordOpen] = useState(false);
 
   // Filter & Search states
@@ -138,6 +191,7 @@ function AdminPaymentsListPage() {
       toast.success("رسید پرداخت با موفقیت ثبت شد و فاکتور تسویه گردید");
       queryClient.invalidateQueries({ queryKey: ["admin", "payments"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
       setIsRecordOpen(false);
       setInvoiceId("");
@@ -175,9 +229,18 @@ function AdminPaymentsListPage() {
     const directPayments = paymentsData?.items || [];
     const directInvoiceIds = new Set(directPayments.map((p: any) => p.invoiceId));
     const allInvoices = allInvoicesData?.items || [];
+    const invoicesMap = new Map(allInvoices.map((inv: any) => [inv.id, inv]));
+
+    const enrichedDirectPayments = directPayments.map((p: any) => {
+      const matchedInv = invoicesMap.get(p.invoiceId) || p.invoice;
+      return {
+        ...p,
+        invoice: matchedInv || p.invoice,
+      };
+    });
 
     const paidInvoicesWithoutDirectPayment = allInvoices
-      .filter((inv: any) => inv.status === "PAID" && !directInvoiceIds.has(inv.id))
+      .filter((inv: any) => (inv.status === "PAID" || inv.status === "paid") && !directInvoiceIds.has(inv.id))
       .map((inv: any) => ({
         id: `pay_${inv.id}`,
         invoiceId: inv.id,
@@ -190,13 +253,19 @@ function AdminPaymentsListPage() {
         invoice: inv,
       }));
 
-    return [...directPayments, ...paidInvoicesWithoutDirectPayment];
+    return [...enrichedDirectPayments, ...paidInvoicesWithoutDirectPayment];
   }, [paymentsData?.items, allInvoicesData?.items]);
 
   const unpaidInvoices = useMemo(() => {
     const allInvoices = allInvoicesData?.items || [];
-    return allInvoices.filter((inv: any) => inv.status === "UNPAID");
+    return allInvoices.filter((inv: any) => inv.status === "UNPAID" || inv.status === "unpaid");
   }, [allInvoicesData?.items]);
+
+  const getSortTime = (dateVal: any) => {
+    if (!dateVal) return 0;
+    const t = new Date(dateVal).getTime();
+    return isNaN(t) ? 0 : t;
+  };
 
   // Financial Summary Metrics
   const totalSettledAmount = useMemo(() => {
@@ -223,136 +292,158 @@ function AdminPaymentsListPage() {
     return unpaidInvoices.reduce((sum: number, inv: any) => sum + (Number(inv.totalToman) || 0), 0);
   }, [unpaidInvoices]);
 
-  // Categorize, search, and sort payments (SETTLED)
-  const processedPayments = useMemo(() => {
-    let list = [...rawPayments];
+  // Unified payments list combining both settled payments and pending (unpaid invoices)
+  const allUnifiedPayments = useMemo(() => {
+    const settled = rawPayments.map((p: any) => ({
+      ...p,
+      paymentStatus: "SETTLED" as const,
+      sortDate: getSortTime(p.paidAt || p.createdAt),
+    }));
 
-    // Approval filter (Customer vs Admin confirmed)
+    const pending = unpaidInvoices.map((inv: any) => ({
+      id: `pending_${inv.id}`,
+      invoiceId: inv.id,
+      amountToman: Number(inv.totalToman || 0),
+      provider: "MANUAL_TRANSFER",
+      gatewayRef: "در انتظار پرداخت",
+      paidAt: null,
+      dueDate: inv.dueDate,
+      createdAt: inv.issuedAt || inv.createdAt,
+      confirmedBy: "NONE" as const,
+      paymentStatus: "PENDING" as const,
+      invoice: inv,
+      sortDate: getSortTime(inv.issuedAt || inv.createdAt),
+    }));
+
+    return [...pending, ...settled];
+  }, [rawPayments, unpaidInvoices]);
+
+  // Unified filter, search, and sort
+  const processedItems = useMemo(() => {
+    let list: any[] = [];
+    if (activeTab === "ALL") {
+      list = [...allUnifiedPayments];
+    } else if (activeTab === "PENDING") {
+      list = allUnifiedPayments.filter((p) => p.paymentStatus === "PENDING");
+    } else {
+      list = allUnifiedPayments.filter((p) => p.paymentStatus === "SETTLED");
+    }
+
+    // Counterparty filter (Customer vs Supplier)
+    if (counterpartyFilter === "CUSTOMER") {
+      list = list.filter((p: any) => {
+        const isSupplier = Boolean(p.invoice?.supplierId) || p.invoice?.counterpartyType === "SUPPLIER";
+        return !isSupplier;
+      });
+    } else if (counterpartyFilter === "SUPPLIER") {
+      list = list.filter((p: any) => {
+        const isSupplier = Boolean(p.invoice?.supplierId) || p.invoice?.counterpartyType === "SUPPLIER";
+        return isSupplier;
+      });
+    }
+
+    // Approval filter (Customer vs Admin confirmed) - only applies to settled
     if (approvalFilter === "CUSTOMER") {
-      list = list.filter(isPaymentConfirmedByCustomer);
+      list = list.filter((p) => p.paymentStatus === "SETTLED" && isPaymentConfirmedByCustomer(p));
     } else if (approvalFilter === "ADMIN") {
-      list = list.filter((p) => !isPaymentConfirmedByCustomer(p));
+      list = list.filter((p) => p.paymentStatus === "SETTLED" && !isPaymentConfirmedByCustomer(p));
     }
 
     // Category filter
     if (selectedCategory !== "ALL") {
-      if (selectedCategory === "GATEWAY") {
-        list = list.filter((p: any) => p.provider === "ZARINPAL" || p.provider === "PAYPING" || p.provider === "online");
-      } else if (selectedCategory === "MANUAL") {
-        list = list.filter((p: any) => p.provider === "MANUAL_TRANSFER" || p.provider === "CASH");
-      } else {
-        list = list.filter((p: any) => getPaymentCategory(p) === selectedCategory);
-      }
+      list = list.filter((p: any) => matchesCategory(p, selectedCategory));
     }
 
     // Search filter
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+      const q = normalizeSearchText(searchQuery);
       list = list.filter((p: any) => {
-        const invNum = formatInvoiceNumber(p.invoice?.invoiceNumber || p.invoiceId);
-        const custName = p.invoice?.customer?.name || p.invoice?.customer?.displayName || "";
-        const custPhone = p.invoice?.customer?.phone || "";
+        const inv = p.invoice;
+        const invNum = normalizeSearchText(formatInvoiceNumber(inv?.invoiceNumber || p.invoiceId));
+        const rawInvNum = normalizeSearchText(inv?.invoiceNumber || p.invoiceId);
+        const custName = normalizeSearchText(inv?.customer?.name || inv?.customer?.displayName || "");
+        const suppName = normalizeSearchText(inv?.supplier?.name || inv?.supplierName || "");
+        const custPhone = normalizeSearchText(inv?.customer?.phone || "");
+        const suppPhone = normalizeSearchText(inv?.supplier?.phone || "");
+        const notes = normalizeSearchText(inv?.notes || "");
+        const gRef = normalizeSearchText(p.gatewayRef || "");
+        const prov = normalizeSearchText(p.provider || "");
+        const amountStr = normalizeSearchText(p.amountToman);
+        const idStr = normalizeSearchText(p.id);
+
+        const itemsText = normalizeSearchText(
+          (inv?.items || [])
+            .map((it: any) => `${it.title || ""} ${it.serviceNameSnapshot || ""} ${it.service?.name || ""} ${it.description || ""}`)
+            .join(" ")
+        );
+
         return (
-          p.id?.toLowerCase().includes(q) ||
-          invNum.toLowerCase().includes(q) ||
-          custName.toLowerCase().includes(q) ||
-          custPhone.toLowerCase().includes(q) ||
-          p.gatewayRef?.toLowerCase().includes(q) ||
-          p.provider?.toLowerCase().includes(q)
+          idStr.includes(q) ||
+          invNum.includes(q) ||
+          rawInvNum.includes(q) ||
+          custName.includes(q) ||
+          suppName.includes(q) ||
+          custPhone.includes(q) ||
+          suppPhone.includes(q) ||
+          notes.includes(q) ||
+          itemsText.includes(q) ||
+          gRef.includes(q) ||
+          prov.includes(q) ||
+          amountStr.includes(q)
         );
       });
     }
 
     list.sort((a: any, b: any) => {
       if (sortBy === "newest") {
-        return new Date(b.paidAt || b.createdAt || 0).getTime() - new Date(a.paidAt || a.createdAt || 0).getTime();
+        return (b.sortDate || 0) - (a.sortDate || 0);
       }
       if (sortBy === "oldest") {
-        return new Date(a.paidAt || a.createdAt || 0).getTime() - new Date(b.paidAt || b.createdAt || 0).getTime();
+        return (a.sortDate || 0) - (b.sortDate || 0);
       }
       if (sortBy === "amount-desc") {
-        return (b.amountToman || 0) - (a.amountToman || 0);
+        return (Number(b.amountToman) || 0) - (Number(a.amountToman) || 0);
       }
       if (sortBy === "amount-asc") {
-        return (a.amountToman || 0) - (b.amountToman || 0);
+        return (Number(a.amountToman) || 0) - (Number(b.amountToman) || 0);
       }
       return 0;
     });
 
     return list;
-  }, [rawPayments, approvalFilter, selectedCategory, searchQuery, sortBy]);
-
-  // Categorize, search, and sort pending invoices (PENDING)
-  const processedPendingInvoices = useMemo(() => {
-    let list = [...unpaidInvoices];
-
-    if (selectedCategory !== "ALL" && selectedCategory !== "GATEWAY" && selectedCategory !== "MANUAL") {
-      list = list.filter((inv: any) => getInvoiceCategory(inv) === selectedCategory);
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter((inv: any) => {
-        const invNum = formatInvoiceNumber(inv.invoiceNumber || inv.id);
-        const custName = inv.customer?.name || inv.customer?.displayName || "";
-        const custPhone = inv.customer?.phone || "";
-        const notes = inv.notes || "";
-        const itemTitle = inv.items?.[0]?.title || "";
-        return (
-          inv.id?.toLowerCase().includes(q) ||
-          invNum.toLowerCase().includes(q) ||
-          custName.toLowerCase().includes(q) ||
-          custPhone.toLowerCase().includes(q) ||
-          notes.toLowerCase().includes(q) ||
-          itemTitle.toLowerCase().includes(q)
-        );
-      });
-    }
-
-    list.sort((a: any, b: any) => {
-      if (sortBy === "newest") {
-        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      }
-      if (sortBy === "oldest") {
-        return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-      }
-      if (sortBy === "amount-desc") {
-        return (b.totalToman || 0) - (a.totalToman || 0);
-      }
-      if (sortBy === "amount-asc") {
-        return (a.totalToman || 0) - (b.totalToman || 0);
-      }
-      return 0;
-    });
-
-    return list;
-  }, [unpaidInvoices, selectedCategory, searchQuery, sortBy]);
+  }, [allUnifiedPayments, activeTab, approvalFilter, counterpartyFilter, selectedCategory, searchQuery, sortBy]);
 
   // Active items list based on current tab
-  const activeItems = activeTab === "SETTLED" ? processedPayments : processedPendingInvoices;
-  const totalItems = activeItems.length;
+  const totalItems = processedItems.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_LIMIT));
   const currentPage = Math.min(page, totalPages);
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * PAGE_LIMIT;
-    return activeItems.slice(start, start + PAGE_LIMIT);
-  }, [activeItems, currentPage, PAGE_LIMIT]);
+    return processedItems.slice(start, start + PAGE_LIMIT);
+  }, [processedItems, currentPage, PAGE_LIMIT]);
 
-  // Category counts for settled tab
+  // Category counts
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { ALL: rawPayments.length };
+    let baseList =
+      activeTab === "SETTLED"
+        ? rawPayments
+        : activeTab === "PENDING"
+        ? unpaidInvoices
+        : allUnifiedPayments;
+
+    if (counterpartyFilter === "CUSTOMER") {
+      baseList = baseList.filter((p: any) => !p.invoice?.supplierId && p.invoice?.counterpartyType !== "SUPPLIER");
+    } else if (counterpartyFilter === "SUPPLIER") {
+      baseList = baseList.filter((p: any) => Boolean(p.invoice?.supplierId) || p.invoice?.counterpartyType === "SUPPLIER");
+    }
+
+    const counts: Record<string, number> = { ALL: baseList.length };
     for (const cat of PAYMENT_CONTENT_CATEGORIES) {
       if (cat.id === "ALL") continue;
-      if (cat.id === "GATEWAY") {
-        counts[cat.id] = rawPayments.filter((p: any) => p.provider === "ZARINPAL" || p.provider === "PAYPING" || p.provider === "online").length;
-      } else if (cat.id === "MANUAL") {
-        counts[cat.id] = rawPayments.filter((p: any) => p.provider === "MANUAL_TRANSFER" || p.provider === "CASH").length;
-      } else {
-        counts[cat.id] = rawPayments.filter((p: any) => getPaymentCategory(p) === cat.id).length;
-      }
+      counts[cat.id] = baseList.filter((p: any) => matchesCategory(p, cat.id)).length;
     }
     return counts;
-  }, [rawPayments]);
+  }, [activeTab, rawPayments, unpaidInvoices, allUnifiedPayments, counterpartyFilter]);
 
   return (
     <AppShell header={<AdminHeader />}>
@@ -393,7 +484,18 @@ function AdminPaymentsListPage() {
         {/* Top Summary Metrics Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* 1. Total Settled Amount */}
-          <Card className="rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+          <Card
+            onClick={() => {
+              setActiveTab("SETTLED");
+              setApprovalFilter("ALL");
+              setPage(1);
+            }}
+            className={`rounded-xl border p-4 shadow-xs cursor-pointer transition-all ${
+              activeTab === "SETTLED" && approvalFilter === "ALL"
+                ? "border-emerald-500/80 bg-emerald-500/10 ring-1 ring-emerald-500/30"
+                : "border-border/60 bg-card hover:border-emerald-500/50"
+            }`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">کل پرداخت‌های تاییدشده</p>
@@ -412,7 +514,18 @@ function AdminPaymentsListPage() {
           </Card>
 
           {/* 2. Customer Online Payments */}
-          <Card className="rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+          <Card
+            onClick={() => {
+              setActiveTab("SETTLED");
+              setApprovalFilter("CUSTOMER");
+              setPage(1);
+            }}
+            className={`rounded-xl border p-4 shadow-xs cursor-pointer transition-all ${
+              activeTab === "SETTLED" && approvalFilter === "CUSTOMER"
+                ? "border-blue-500/80 bg-blue-500/10 ring-1 ring-blue-500/30"
+                : "border-border/60 bg-card hover:border-blue-500/50"
+            }`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-blue-600 dark:text-blue-400 font-semibold">تایید آنلاین توسط مشتری</p>
@@ -431,7 +544,18 @@ function AdminPaymentsListPage() {
           </Card>
 
           {/* 3. Admin Approved / Manual Transfers */}
-          <Card className="rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+          <Card
+            onClick={() => {
+              setActiveTab("SETTLED");
+              setApprovalFilter("ADMIN");
+              setPage(1);
+            }}
+            className={`rounded-xl border p-4 shadow-xs cursor-pointer transition-all ${
+              activeTab === "SETTLED" && approvalFilter === "ADMIN"
+                ? "border-purple-500/80 bg-purple-500/10 ring-1 ring-purple-500/30"
+                : "border-border/60 bg-card hover:border-purple-500/50"
+            }`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-purple-600 dark:text-purple-400 font-semibold">تایید و تسویه توسط ادمین</p>
@@ -450,7 +574,17 @@ function AdminPaymentsListPage() {
           </Card>
 
           {/* 4. Pending Client Invoices */}
-          <Card className="rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+          <Card
+            onClick={() => {
+              setActiveTab("PENDING");
+              setPage(1);
+            }}
+            className={`rounded-xl border p-4 shadow-xs cursor-pointer transition-all ${
+              activeTab === "PENDING"
+                ? "border-amber-500/80 bg-amber-500/10 ring-1 ring-amber-500/30"
+                : "border-border/60 bg-card hover:border-amber-500/50"
+            }`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-amber-600 dark:text-amber-400 font-semibold">مبالغ معلق کلاینت‌ها</p>
@@ -469,24 +603,72 @@ function AdminPaymentsListPage() {
           </Card>
         </div>
 
-        {/* Primary View Switcher: Settled vs Pending */}
+        {/* Counterparty Filter Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/30">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <span className="text-xs text-muted-foreground font-medium ml-1">نوع طرف‌حساب:</span>
+            <Button
+              variant={counterpartyFilter === "ALL" ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setCounterpartyFilter("ALL");
+                setPage(1);
+              }}
+              className={`text-xs rounded-xl h-8 px-3 cursor-pointer ${
+                counterpartyFilter === "ALL" ? "bg-emerald-600 text-white shadow-xs" : ""
+              }`}
+            >
+              همه طرف‌های حساب
+            </Button>
+            <Button
+              variant={counterpartyFilter === "CUSTOMER" ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setCounterpartyFilter("CUSTOMER");
+                setPage(1);
+              }}
+              className={`text-xs rounded-xl h-8 px-3 cursor-pointer gap-1.5 ${
+                counterpartyFilter === "CUSTOMER" ? "bg-emerald-600 text-white shadow-xs" : ""
+              }`}
+            >
+              <User className="h-3.5 w-3.5" />
+              دریافتی از مشتریان (فروش)
+            </Button>
+            <Button
+              variant={counterpartyFilter === "SUPPLIER" ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setCounterpartyFilter("SUPPLIER");
+                setPage(1);
+              }}
+              className={`text-xs rounded-xl h-8 px-3 cursor-pointer gap-1.5 ${
+                counterpartyFilter === "SUPPLIER" ? "bg-purple-600 text-white shadow-xs" : ""
+              }`}
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              پرداختی به تامین‌کنندگان (خرید)
+            </Button>
+          </div>
+        </div>
+
+        {/* Primary View Switcher: All vs Pending vs Settled */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 p-1.5 bg-muted/40 rounded-2xl border border-border/60 w-fit">
             <button
               onClick={() => {
-                setActiveTab("SETTLED");
+                setActiveTab("ALL");
                 setPage(1);
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "SETTLED"
+                activeTab === "ALL"
                   ? "bg-card text-foreground shadow-xs border border-border/50 text-emerald-600 dark:text-emerald-400"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <CheckCircle className="h-4 w-4 text-emerald-500" />
-              <span>پرداخت‌های تایید و تسویه‌شده</span>
+              <Layers className="h-4 w-4 text-emerald-500" />
+              <span>همه پرداخت‌ها (تسویه‌شده و معلق)</span>
               <span className="text-[11px] px-2 py-0.5 rounded-full font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
-                {rawPayments.length.toLocaleString("fa-IR")}
+                {allUnifiedPayments.length.toLocaleString("fa-IR")}
               </span>
             </button>
 
@@ -502,17 +684,35 @@ function AdminPaymentsListPage() {
               }`}
             >
               <Clock className="h-4 w-4 text-amber-500" />
-              <span>پرداخت‌های معلق و در انتظار کلاینت</span>
+              <span>پرداخت‌های معلق</span>
               <span className="text-[11px] px-2 py-0.5 rounded-full font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
                 {unpaidInvoices.length.toLocaleString("fa-IR")}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("SETTLED");
+                setPage(1);
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "SETTLED"
+                  ? "bg-card text-foreground shadow-xs border border-border/50 text-blue-600 dark:text-blue-400"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <CheckCircle className="h-4 w-4 text-blue-500" />
+              <span>پرداخت‌های تسویه‌شده</span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">
+                {rawPayments.length.toLocaleString("fa-IR")}
               </span>
             </button>
           </div>
 
           {/* Approval Source Sub-filter (Customer vs Admin) */}
-          {activeTab === "SETTLED" && (
+          {(activeTab === "SETTLED" || activeTab === "ALL") && (
             <div className="flex items-center gap-1.5 p-1 bg-card rounded-xl border border-border/60 text-xs">
-              <span className="text-[11px] text-muted-foreground px-2 font-medium">مرجع تایید:</span>
+              <span className="text-[11px] text-muted-foreground px-2 font-medium">مرجع تایید تسویه:</span>
               <button
                 onClick={() => {
                   setApprovalFilter("ALL");
@@ -559,8 +759,7 @@ function AdminPaymentsListPage() {
         </div>
 
         {/* Content Category Tabs */}
-        {activeTab === "SETTLED" && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             {PAYMENT_CONTENT_CATEGORIES.map((cat) => {
               const Icon = cat.icon;
               const count = categoryCounts[cat.id] || 0;
@@ -594,7 +793,6 @@ function AdminPaymentsListPage() {
               );
             })}
           </div>
-        )}
 
         {/* Search and Sort Toolbar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3 rounded-xl border border-border/60 shadow-xs">
@@ -656,7 +854,7 @@ function AdminPaymentsListPage() {
               <form onSubmit={handleRecordSubmit} className="flex flex-col gap-4 mt-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="pinv" className="text-xs font-semibold">
-                    فاکتور در انتظار پرداخت (کلاینت) *
+                    فاکتور در انتظار پرداخت (طرف‌حساب) *
                   </Label>
                   <select
                     id="pinv"
@@ -670,11 +868,18 @@ function AdminPaymentsListPage() {
                     required
                   >
                     <option value="">-- یک فاکتور را انتخاب کنید --</option>
-                    {unpaidInvoices.map((inv: any) => (
-                      <option key={inv.id} value={inv.id}>
-                        فاکتور {formatInvoiceNumber(inv.invoiceNumber || inv.id)} - {inv.customer?.displayName || inv.customer?.name || "مشتری"} - ({inv.totalToman?.toLocaleString("fa-IR")} تومان)
-                      </option>
-                    ))}
+                    {unpaidInvoices.map((inv: any) => {
+                      const isSupp = Boolean(inv.supplierId) || inv.counterpartyType === "SUPPLIER";
+                      const partyName = isSupp
+                        ? `[تامین‌کننده] ${inv.supplier?.name || inv.supplierName || "تامین‌کننده زیرساخت"}`
+                        : `[مشتری] ${inv.customer?.displayName || inv.customer?.name || "مشتری"}`;
+                      const svcName = inv.items?.[0]?.serviceNameSnapshot || inv.items?.[0]?.service?.name || inv.items?.[0]?.title;
+                      return (
+                        <option key={inv.id} value={inv.id}>
+                          فاکتور {formatInvoiceNumber(inv.invoiceNumber || inv.id)} - {partyName} {svcName ? `(سرویس: ${svcName})` : ""} - ({(inv.totalToman || 0).toLocaleString("fa-IR")} تومان)
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -746,215 +951,284 @@ function AdminPaymentsListPage() {
         <Card className="rounded-xl border bg-card shadow-xs overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              {activeTab === "SETTLED" ? (
-                /* Settled Payments Table (Customer & Admin Confirmed) */
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
+                  <tr>
+                    <th className="py-4 px-6 whitespace-nowrap">شناسه رسید / نوع</th>
+                    <th className="py-4 px-6 whitespace-nowrap">شماره فاکتور</th>
+                    <th className="py-4 px-6 whitespace-nowrap">طرف‌حساب</th>
+                    <th className="py-4 px-6 whitespace-nowrap">مبلغ (تومان)</th>
+                    <th className="py-4 px-6 whitespace-nowrap">کد رهگیری / ارجاع</th>
+                    <th className="py-4 px-6 whitespace-nowrap">شیوه پرداخت</th>
+                    <th className="py-4 px-6 whitespace-nowrap">مرجع تایید</th>
+                    <th className="py-4 px-6 whitespace-nowrap">تاریخ</th>
+                    <th className="py-4 px-6 whitespace-nowrap">وضعیت پرداخت</th>
+                    <th className="py-4 px-6 text-center whitespace-nowrap">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedItems.length === 0 ? (
                     <tr>
-                      <th className="py-4 px-6 whitespace-nowrap">شناسه رسید</th>
-                      <th className="py-4 px-6 whitespace-nowrap">شماره فاکتور</th>
-                      <th className="py-4 px-6 whitespace-nowrap">کلاینت / مشتری</th>
-                      <th className="py-4 px-6 whitespace-nowrap">مبلغ تسویه‌شده (تومان)</th>
-                      <th className="py-4 px-6 whitespace-nowrap">کد رهگیری / ارجاع</th>
-                      <th className="py-4 px-6 whitespace-nowrap">شیوه پرداخت</th>
-                      <th className="py-4 px-6 whitespace-nowrap">مرجع تایید</th>
-                      <th className="py-4 px-6 whitespace-nowrap">تاریخ پرداخت</th>
-                      <th className="py-4 px-6 whitespace-nowrap">وضعیت</th>
+                      <td colSpan={10} className="py-12 px-6 text-center text-muted-foreground whitespace-nowrap">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <p className="text-sm">
+                            {searchQuery
+                              ? `موردی مطابق با عبارت جستجوی «${searchQuery}» یافت نشد.`
+                              : activeTab === "PENDING"
+                              ? "هیچ فاکتور معلق یا پرداخت‌نشده‌ای یافت نشد. تمامی حساب‌ها تسویه هستند."
+                              : activeTab === "SETTLED"
+                              ? "هیچ پرداخت تسویه‌شده‌ای در این فیلتر یافت نشد."
+                              : "هیچ پرداختی در این دسته‌بندی یافت نشد."}
+                          </p>
+                          {(searchQuery || selectedCategory !== "ALL" || approvalFilter !== "ALL" || counterpartyFilter !== "ALL") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSearchQuery("");
+                                setSelectedCategory("ALL");
+                                setApprovalFilter("ALL");
+                                setCounterpartyFilter("ALL");
+                                setPage(1);
+                              }}
+                              className="text-xs gap-1.5 h-8 cursor-pointer"
+                            >
+                              پاک کردن تمامی فیلترها
+                            </Button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {paginatedItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="py-12 px-6 text-center text-muted-foreground whitespace-nowrap">
-                          هیچ پرداختی در این دسته‌بندی یافت نشد
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedItems.map((pay: any) => {
-                        const custName =
-                          pay.invoice?.customer?.displayName ||
-                          pay.invoice?.customer?.name ||
-                          "مشتری";
-                        const custPhone = pay.invoice?.customer?.phone;
-                        const isCustomer = isPaymentConfirmedByCustomer(pay);
+                  ) : (
+                    paginatedItems.map((item: any) => {
+                      const isPending = item.paymentStatus === "PENDING";
+                      const isSupplier = Boolean(item.invoice?.supplierId) || item.invoice?.counterpartyType === "SUPPLIER";
+                      const partyName = isSupplier
+                        ? item.invoice?.supplier?.name || item.invoice?.supplierName || "تامین‌کننده زیرساخت"
+                        : item.invoice?.customer?.displayName || item.invoice?.customer?.name || "مشتری";
+                      const partyPhone = isSupplier
+                        ? item.invoice?.supplier?.phone || item.invoice?.supplier?.contactName
+                        : item.invoice?.customer?.phone;
+                      const isCustomer = !isPending && isPaymentConfirmedByCustomer(item);
+                      const isOverdue =
+                        isPending &&
+                        item.dueDate &&
+                        new Date(item.dueDate).getTime() < Date.now();
 
-                        return (
-                          <tr key={pay.id} className="hover:bg-muted/20 transition-colors">
-                            <td className="py-4 px-6 font-mono font-medium text-foreground whitespace-nowrap">
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`transition-colors ${
+                            isPending
+                              ? "hover:bg-amber-500/5 bg-amber-500/[0.02]"
+                              : "hover:bg-muted/20"
+                          }`}
+                        >
+                          {/* 1. شناسه رسید */}
+                          <td className="py-4 px-6 font-mono font-medium text-foreground whitespace-nowrap">
+                            {isPending ? (
+                              <div className="flex items-center gap-1.5 font-mono text-amber-600 dark:text-amber-400 font-bold">
+                                <Clock className="h-4 w-4 shrink-0 text-amber-500" />
+                                <span>معلق</span>
+                              </div>
+                            ) : (
                               <div className="flex items-center gap-2">
                                 <Receipt className="h-4 w-4 text-emerald-500 shrink-0" />
-                                <span className="truncate max-w-[110px]">{pay.id}</span>
+                                <span className="truncate max-w-[110px]">{item.id}</span>
                               </div>
-                            </td>
-                            <td className="py-4 px-6 font-mono font-bold text-foreground whitespace-nowrap">
-                              {formatInvoiceNumber(pay.invoice?.invoiceNumber || pay.invoiceId)}
-                            </td>
-                            <td className="py-4 px-6 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
-                                  {custName.charAt(0) || "م"}
-                                </div>
-                                <div>
-                                  <span className="font-semibold text-foreground block whitespace-nowrap">
-                                    {custName}
-                                  </span>
-                                  {custPhone && (
-                                    <span className="text-[10px] text-muted-foreground font-mono block whitespace-nowrap">
-                                      {custPhone}
+                            )}
+                          </td>
+
+                          {/* 2. شماره فاکتور */}
+                          <td className="py-4 px-6 font-mono font-bold text-foreground whitespace-nowrap">
+                            {formatInvoiceNumber(item.invoice?.invoiceNumber || item.invoiceId)}
+                          </td>
+
+                          {/* 3. طرف‌حساب */}
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  isSupplier
+                                    ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                                    : isPending
+                                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                }`}
+                              >
+                                {isSupplier ? (
+                                  <Building2 className="h-3.5 w-3.5" />
+                                ) : (
+                                  partyName.charAt(0) || (isPending ? "ک" : "م")
+                                )}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  {isSupplier && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 whitespace-nowrap">
+                                      تامین‌کننده
                                     </span>
                                   )}
+                                  <span className="font-semibold text-foreground block whitespace-nowrap">
+                                    {partyName}
+                                  </span>
                                 </div>
+                                {partyPhone && (
+                                  <span className="text-[10px] text-muted-foreground font-mono block whitespace-nowrap">
+                                    {partyPhone}
+                                  </span>
+                                )}
+                                {(item.invoice?.items?.[0]?.serviceNameSnapshot || item.invoice?.items?.[0]?.service?.name || item.invoice?.items?.[0]?.title) && (
+                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium mt-0.5 whitespace-nowrap">
+                                    <Server className="h-3 w-3 shrink-0 text-purple-500" />
+                                    <span className="truncate max-w-[150px]" title={item.invoice.items[0].serviceNameSnapshot || item.invoice.items[0].service?.name || item.invoice.items[0].title}>
+                                      سرویس: {item.invoice.items[0].serviceNameSnapshot || item.invoice.items[0].service?.name || item.invoice.items[0].title}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                            </td>
-                            <td className="py-4 px-6 font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                              {(pay.amountToman || 0).toLocaleString("fa-IR")} تومان
-                            </td>
-                            <td className="py-4 px-6 font-mono text-muted-foreground whitespace-nowrap">
-                              {pay.gatewayRef || "---"}
-                            </td>
-                            <td className="py-4 px-6 whitespace-nowrap">
-                              <span className="font-mono text-[11px] bg-muted px-2.5 py-1 rounded-lg border whitespace-nowrap inline-flex items-center">
-                                {pay.provider === "MANUAL_TRANSFER" ? "کارت به کارت / پایا" :
-                                 pay.provider === "ZARINPAL" ? "زرین‌پال" :
-                                 pay.provider === "PAYPING" ? "پی‌پینگ" :
-                                 pay.provider === "online" ? "درگاه آنلاین" :
-                                 pay.provider === "CASH" ? "نقدی" : pay.provider}
-                              </span>
-                            </td>
-                            <td className="py-4 px-6 whitespace-nowrap">
-                              {isCustomer ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
-                                  <UserCheck className="h-3 w-3 shrink-0" />
-                                  تایید مشتری (آنلاین)
-                                </span>
+                            </div>
+                          </td>
+
+                          {/* 4. مبلغ */}
+                          <td className="py-4 px-6 font-bold whitespace-nowrap">
+                            <span
+                              className={
+                                isPending
+                                  ? "text-amber-600 dark:text-amber-400 font-mono"
+                                  : "text-emerald-600 dark:text-emerald-400 font-mono"
+                              }
+                            >
+                              {(item.amountToman || 0) === 0 ? (
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">رایگان</span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 whitespace-nowrap">
-                                  <ShieldCheck className="h-3 w-3 shrink-0" />
-                                  تایید ادمین (دستی)
-                                </span>
+                                `${(item.amountToman || 0).toLocaleString("fa-IR")} تومان`
                               )}
-                            </td>
-                            <td className="py-4 px-6 text-muted-foreground font-mono text-[11px] whitespace-nowrap">
-                              {formatJalaliDateTime(pay.paidAt)}
-                            </td>
-                            <td className="py-4 px-6 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                            </span>
+                          </td>
+
+                          {/* 5. کد رهگیری */}
+                          <td className="py-4 px-6 font-mono text-muted-foreground whitespace-nowrap">
+                            {isPending ? (
+                              <span className="text-muted-foreground/70 text-[11px]">
+                                در انتظار پرداخت
+                              </span>
+                            ) : (
+                              item.gatewayRef || "---"
+                            )}
+                          </td>
+
+                          {/* 6. شیوه پرداخت */}
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            {isPending ? (
+                              <span className="font-mono text-[11px] bg-amber-500/10 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-lg border border-amber-500/20 inline-flex items-center">
+                                در انتظار واریز / درگاه
+                              </span>
+                            ) : (
+                              <span className="font-mono text-[11px] bg-muted px-2.5 py-1 rounded-lg border whitespace-nowrap inline-flex items-center">
+                                {item.provider === "MANUAL_TRANSFER"
+                                  ? "کارت به کارت / پایا"
+                                  : item.provider === "ZARINPAL"
+                                  ? "زرین‌پال"
+                                  : item.provider === "PAYPING"
+                                  ? "پی‌پینگ"
+                                  : item.provider === "online"
+                                  ? "درگاه آنلاین"
+                                  : item.provider === "CASH"
+                                  ? "نقدی"
+                                  : item.provider}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 7. مرجع تایید */}
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            {isPending ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap">
+                                <Clock className="h-3 w-3 shrink-0" />
+                                در انتظار تسویه
+                              </span>
+                            ) : isCustomer ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
+                                <UserCheck className="h-3 w-3 shrink-0" />
+                                تایید مشتری (آنلاین)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 whitespace-nowrap">
+                                <ShieldCheck className="h-3 w-3 shrink-0" />
+                                تایید ادمین (دستی)
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 8. تاریخ */}
+                          <td className="py-4 px-6 text-muted-foreground font-mono text-[11px] whitespace-nowrap">
+                            {isPending ? (
+                              <div className="flex flex-col">
+                                <span>صدور: {formatJalaliDateTime(item.createdAt)}</span>
+                                {item.dueDate && (
+                                  <span
+                                    className={
+                                      isOverdue
+                                        ? "text-rose-600 font-bold text-[10px]"
+                                        : "text-muted-foreground/80 text-[10px]"
+                                    }
+                                  >
+                                    سررسید: {formatJalaliDate(item.dueDate)}
+                                    {isOverdue && " (گذشته)"}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              formatJalaliDateTime(item.paidAt || item.createdAt)
+                            )}
+                          </td>
+
+                          {/* 9. وضعیت پرداخت */}
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            {isPending ? (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium whitespace-nowrap border ${
+                                  isOverdue
+                                    ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30"
+                                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                                }`}
+                              >
+                                <Clock className="h-3 w-3 shrink-0" />
+                                {isOverdue ? "معلق (سررسید گذشته)" : "معلق / در انتظار پرداخت"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 whitespace-nowrap border border-emerald-500/20">
                                 <CheckCircle className="h-3 w-3 shrink-0" />
                                 تسویه شده
                               </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              ) : (
-                /* Pending Invoices / Unpaid Payments Table */
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
-                    <tr>
-                      <th className="py-4 px-6 whitespace-nowrap">کلاینت / مشتری</th>
-                      <th className="py-4 px-6 whitespace-nowrap">شماره فاکتور</th>
-                      <th className="py-4 px-6 whitespace-nowrap">شرح خدمت / سرویس</th>
-                      <th className="py-4 px-6 whitespace-nowrap">مبلغ معلق (تومان)</th>
-                      <th className="py-4 px-6 whitespace-nowrap">تاریخ صدور</th>
-                      <th className="py-4 px-6 whitespace-nowrap">مهلت سررسید</th>
-                      <th className="py-4 px-6 whitespace-nowrap">وضعیت پرداخت</th>
-                      <th className="py-4 px-6 text-center whitespace-nowrap">عملیات تسویه</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {paginatedItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="py-12 px-6 text-center text-muted-foreground whitespace-nowrap">
-                          هیچ فاکتور معلق یا پرداخت‌نشده‌ای یافت نشد. تمامی حساب‌ها تسویه هستند.
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedItems.map((inv: any) => {
-                        const custName =
-                          inv.customer?.displayName ||
-                          inv.customer?.name ||
-                          "مشتری";
-                        const custPhone = inv.customer?.phone;
-                        const custEmail = inv.customer?.email;
-                        const itemTitle =
-                          inv.items?.[0]?.title ||
-                          inv.notes ||
-                          "صورت‌حساب سرویس ابری";
+                            )}
+                          </td>
 
-                        const isOverdue = inv.dueDate && new Date(inv.dueDate).getTime() < Date.now();
-
-                        return (
-                          <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
-                            <td className="py-4 px-6 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
-                                  {custName.charAt(0) || "ک"}
-                                </div>
-                                <div>
-                                  <span className="font-bold text-foreground block whitespace-nowrap">
-                                    {custName}
-                                  </span>
-                                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono mt-0.5 whitespace-nowrap">
-                                    {custPhone && <span>{custPhone}</span>}
-                                    {custPhone && custEmail && <span>•</span>}
-                                    {custEmail && <span className="truncate max-w-[120px]">{custEmail}</span>}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-4 px-6 font-mono font-bold text-foreground whitespace-nowrap">
-                              {formatInvoiceNumber(inv.invoiceNumber || inv.id)}
-                            </td>
-                            <td className="py-4 px-6 max-w-[200px] truncate text-foreground font-medium whitespace-nowrap">
-                              {itemTitle}
-                            </td>
-                            <td className="py-4 px-6 font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                              {(inv.totalToman || 0).toLocaleString("fa-IR")} تومان
-                            </td>
-                            <td className="py-4 px-6 text-muted-foreground font-mono text-[11px] whitespace-nowrap">
-                              {formatJalaliDateTime(inv.issuedAt || inv.createdAt)}
-                            </td>
-                            <td className="py-4 px-6 font-mono text-[11px] whitespace-nowrap">
-                              {inv.dueDate ? (
-                                <span className={isOverdue ? "text-rose-600 font-bold inline-flex items-center whitespace-nowrap" : "text-muted-foreground inline-flex items-center whitespace-nowrap"}>
-                                  {formatJalaliDateTime(inv.dueDate)}
-                                  {isOverdue && (
-                                    <span className="mr-1.5 px-1.5 py-0.5 rounded text-[9px] bg-rose-500/10 text-rose-600 whitespace-nowrap">
-                                      سررسید گذشته
-                                    </span>
-                                  )}
-                                </span>
-                              ) : (
-                                "---"
-                              )}
-                            </td>
-                            <td className="py-4 px-6 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                                <Clock className="h-3 w-3 shrink-0" />
-                                معلق / در انتظار پرداخت
-                              </span>
-                            </td>
-                            <td className="py-4 px-6 text-center whitespace-nowrap">
+                          {/* 10. عملیات */}
+                          <td className="py-4 px-6 text-center whitespace-nowrap">
+                            {isPending ? (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleOpenRecordForInvoice(inv)}
+                                onClick={() => handleOpenRecordForInvoice(item.invoice)}
                                 className="h-7 px-2.5 text-xs gap-1 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 font-medium cursor-pointer whitespace-nowrap"
                               >
                                 <Check className="h-3.5 w-3.5 shrink-0" />
                                 تسویه دستی
                               </Button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              )}
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground/70 font-mono">
+                                ثبت شده
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
 
             {/* Pagination Controls */}

@@ -18,17 +18,19 @@ export function Factor({
   const numericPrice = typeof price === "number" ? price : Number(price) || 0;
 
   return (
-    <div className="w-full flex items-center bg-surface px-6 py-4 rounded-[20px] gap-2 text-sm font-light border border-border/40 shadow-xs">
-      <span className="flex-1 text-muted-foreground">{title}</span>
-      <span className="font-semibold text-foreground text-base">
-        {numericPrice.toLocaleString("fa-IR")}{" "}
-        <span className="text-xs text-muted-foreground font-normal">تومان</span>
-      </span>
+    <div className="w-full flex flex-col bg-surface p-4 sm:p-5 rounded-[20px] gap-3.5 text-sm border border-border/40 shadow-xs">
+      <div className="w-full flex items-center justify-between gap-3 min-w-0">
+        <span className="text-muted-foreground text-xs sm:text-sm font-medium truncate">{title}</span>
+        <div className="flex items-center gap-1.5 font-bold text-foreground text-sm sm:text-base whitespace-nowrap">
+          <span>{numericPrice.toLocaleString("fa-IR")}</span>
+          <span className="text-xs text-muted-foreground font-normal">تومان</span>
+        </div>
+      </div>
       {showAction && (
         <Button
           variant="primary"
-          className="rounded-xl px-5 py-2 text-center text-xs font-medium mr-2 cursor-pointer shadow-xs"
-          size="sm"
+          className="w-full rounded-xl py-2.5 sm:py-3 text-center text-xs sm:text-sm font-medium cursor-pointer shadow-xs whitespace-nowrap"
+          size="md"
           onPress={onAction}
         >
           {actionText}

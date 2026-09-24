@@ -42,6 +42,11 @@ export class CreateServiceDto {
   @IsOptional()
   description?: string;
 
+  @ApiPropertyOptional({ description: "Service status (ACTIVE, SUSPENDED, INACTIVE)" })
+  @IsString()
+  @IsOptional()
+  status?: string;
+
   @ApiPropertyOptional({ description: "Price in Toman" })
   @IsInt()
   @IsOptional()

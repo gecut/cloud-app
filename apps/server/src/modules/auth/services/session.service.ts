@@ -73,34 +73,47 @@ export class SessionService {
       throw new UnauthorizedException("کاربر یافت نشد");
     }
 
-    if (user.tokenVersion !== tokenVersion) {
+    const userTokenVersion =
+      typeof user.tokenVersion === "number"
+        ? user.tokenVersion
+        : (typeof (user.tokenVersion as any)?.increment === "number"
+            ? (user.tokenVersion as any).increment
+            : 0);
+
+    const claimTokenVersion =
+      typeof tokenVersion === "number"
+        ? tokenVersion
+        : (typeof (tokenVersion as any)?.increment === "number"
+            ? (tokenVersion as any).increment
+            : 0);
+
+    if (userTokenVersion !== claimTokenVersion) {
       throw new UnauthorizedException(
         "نشست کاربری شما به دلیل ورود جدید یا تغییر رمز منقضی شده است",
       );
     }
 
-    if (user.customer && (user.customer.status === "INACTIVE" || user.customer.status === "SUSPENDED")) {
+    let targetCustomer = user.customer;
+    if (!targetCustomer) {
+      targetCustomer = await this.prisma.customer.findFirst({
+        where: {
+          OR: [{ userId: user.id }, { phone: user.phone }],
+        },
+      });
+    }
+
+    if (user.role === "CUSTOMER" && targetCustomer && (targetCustomer.status === "INACTIVE" || targetCustomer.status === "SUSPENDED")) {
       throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
     }
 
-    let customerId = user.customer?.id || (user as any).customerId || null;
-    if (!customerId) {
-      const cust = await this.prisma.customer.findFirst({
-        where: { userId: user.id },
-      });
-      if (cust) {
-        if (cust.status === "INACTIVE" || cust.status === "SUSPENDED") {
-          throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
-        }
-        customerId = cust.id;
-      }
-    }
+    const customerId = targetCustomer?.id || (user as any).customerId || null;
+    const resolvedName = targetCustomer?.displayName || targetCustomer?.name || user.name;
 
     return {
       id: user.id,
-      name: user.name,
+      name: resolvedName,
       phone: user.phone,
-      email: user.email,
+      email: targetCustomer?.email || user.email,
       role: user.role,
       customerId: customerId,
       tokenVersion: user.tokenVersion,
@@ -150,28 +163,27 @@ export class SessionService {
       throw new UnauthorizedException("کاربر یافت نشد");
     }
 
-    if (user.customer && (user.customer.status === "INACTIVE" || user.customer.status === "SUSPENDED")) {
+    let targetCustomer = user.customer;
+    if (!targetCustomer) {
+      targetCustomer = await this.prisma.customer.findFirst({
+        where: {
+          OR: [{ userId: user.id }, { phone: user.phone }],
+        },
+      });
+    }
+
+    if (targetCustomer && (targetCustomer.status === "INACTIVE" || targetCustomer.status === "SUSPENDED")) {
       throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
     }
 
-    let customerId = user.customer?.id || (user as any).customerId || null;
-    if (!customerId) {
-      const cust = await this.prisma.customer.findFirst({
-        where: { userId: user.id },
-      });
-      if (cust) {
-        if (cust.status === "INACTIVE" || cust.status === "SUSPENDED") {
-          throw new ForbiddenException("حساب شما غیرفعال شده است، لطفاً با ادمین تماس بگیرید.");
-        }
-        customerId = cust.id;
-      }
-    }
+    const customerId = targetCustomer?.id || (user as any).customerId || null;
+    const resolvedName = targetCustomer?.displayName || targetCustomer?.name || user.name;
 
     return {
       id: user.id,
-      name: user.name,
+      name: resolvedName,
       phone: user.phone,
-      email: user.email,
+      email: targetCustomer?.email || user.email,
       role: user.role,
       customerId: customerId,
       tokenVersion: user.tokenVersion,

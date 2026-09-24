@@ -1,11 +1,15 @@
 import { Service } from "@/app/data";
 import { DashboardCard } from "./dashboard-card";
+import { Factor } from "./factor";
+import { useNavigate } from "@tanstack/react-router";
 
 interface DashboardListProps {
   data: Service[];
 }
 
 export function DashboardList({ data }: DashboardListProps) {
+  const navigate = useNavigate();
+
   if (!data || data.length === 0) {
     return (
       <div className="w-full flex flex-col items-center justify-center p-12 rounded-[24px] bg-surface/50 border border-dashed border-border/40 text-center gap-3">
@@ -24,11 +28,23 @@ export function DashboardList({ data }: DashboardListProps) {
     );
   }
 
+  const totalPrice = data.reduce((acc, s) => acc + (Number(s.priceToman) || 0), 0);
+
   return (
-    <div className="w-full flex flex-col gap-2">
-      {data.map((service) => (
-        <DashboardCard key={service.id} data={service} />
-      ))}
+    <div className="w-full flex flex-col gap-3">
+      <div className="w-full flex flex-col gap-2">
+        {data.map((service) => (
+          <DashboardCard key={service.id} data={service} />
+        ))}
+      </div>
+
+      <Factor
+        price={totalPrice}
+        title="مجموع هزینه سرویس‌ها"
+        actionText="مشاهده و پرداخت صورت‌حساب"
+        showAction={totalPrice > 0}
+        onAction={() => navigate({ to: "/payments" })}
+      />
     </div>
   );
 }

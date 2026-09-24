@@ -7,6 +7,7 @@ export interface JwtPayload {
   customerId?: string | null;
   tokenVersion: number;
   type: "access" | "refresh";
+  loginMethod?: "otp" | "password";
   iat?: number;
   exp?: number;
 }

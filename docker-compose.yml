@@ -11,6 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gcloud"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -20,7 +25,66 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: gecut-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/gcloud?schema=public"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:8080,http://localhost:8081"
+      SESSION_SECRET: "super-secret-development-session-key-must-be-32-chars-long"
+      SESSION_COOKIE_NAME: "gecut_session"
+      SESSION_TTL_SECONDS: 604800
+      KAVENEGAR_API_KEY: ""
+    volumes:
+      - server_data:/app/apps/server/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        VITE_SERVER_URL: "http://localhost:3000"
+    container_name: gecut-admin
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+
+  customer-app:
+    build:
+      context: .
+      dockerfile: apps/customer-app/Dockerfile
+      args:
+        VITE_SERVER_URL: "http://localhost:3000"
+    container_name: gecut-customer-app
+    restart: unless-stopped
+    ports:
+      - "5174:80"
+    depends_on:
+      - server
 
 volumes:
   postgres_data:
   redis_data:
+  server_data:

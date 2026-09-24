@@ -14,7 +14,11 @@ export class GetInvoiceHandler implements IQueryHandler<GetInvoiceQuery> {
         customer: true,
         items: {
           include: {
-            service: true,
+            service: {
+              include: {
+                serviceType: true,
+              },
+            },
           },
         },
         payment: true,

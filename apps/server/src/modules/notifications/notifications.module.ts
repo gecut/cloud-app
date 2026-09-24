@@ -4,6 +4,7 @@ import { CqrsModule } from "@nestjs/cqrs";
 import { SendNotificationHandler } from "./commands/send-notification/send-notification.handler";
 import { NotificationsController } from "./notifications.controller";
 import { NotificationProcessor } from "./processors/notification.processor";
+import { KavenegarService } from "./services/kavenegar.service";
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { NotificationProcessor } from "./processors/notification.processor";
     }),
   ],
   controllers: [NotificationsController],
-  providers: [SendNotificationHandler, NotificationProcessor],
-  exports: [BullModule, SendNotificationHandler],
+  providers: [SendNotificationHandler, NotificationProcessor, KavenegarService],
+  exports: [BullModule, SendNotificationHandler, KavenegarService],
 })
 export class NotificationsModule {}

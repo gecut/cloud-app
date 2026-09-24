@@ -83,15 +83,57 @@ export class CustomersController {
       throw new NotFoundException("مشتری مورد نظر یافت نشد");
     }
 
-    // Clean up or disassociate customer's services and invoices
-    await this.prisma.service.deleteMany({
+    // 1. Delete payments and items of customer invoices
+    const customerInvoices = await this.prisma.invoice.findMany({
+      where: {
+        OR: [{ customerId: customer.id }, { customerId: customer.userId }],
+      },
+      select: { id: true },
+    }).catch(() => []);
+    const invIds = (customerInvoices || []).map((i: any) => i.id);
+
+    for (const invId of invIds) {
+      await this.prisma.payment.deleteMany({ where: { invoiceId: invId } }).catch(() => {});
+      await this.prisma.invoiceItem.deleteMany({ where: { invoiceId: invId } }).catch(() => {});
+    }
+
+    if (invIds.length > 0) {
+      await this.prisma.invoice.deleteMany({
+        where: { id: { in: invIds } },
+      }).catch(() => {});
+    }
+
+    // 2. Unlink child services and delete services
+    const customerServices = await this.prisma.service.findMany({
+      where: {
+        OR: [{ customerId: customer.id }, { customerId: customer.userId }],
+      },
+      select: { id: true },
+    }).catch(() => []);
+    const svcIds = (customerServices || []).map((s: any) => s.id);
+
+    if (svcIds.length > 0) {
+      await this.prisma.service.updateMany({
+        where: { parentServiceId: { in: svcIds } },
+        data: { parentServiceId: null },
+      }).catch(() => {});
+      await this.prisma.endpoint.deleteMany({
+        where: { serviceId: { in: svcIds } },
+      }).catch(() => {});
+      await this.prisma.invoiceItem.deleteMany({
+        where: { serviceId: { in: svcIds } },
+      }).catch(() => {});
+      await this.prisma.service.deleteMany({
+        where: { id: { in: svcIds } },
+      }).catch(() => {});
+    }
+
+    // 3. Delete service groups
+    await this.prisma.serviceGroup.deleteMany({
       where: { customerId: customer.id },
     }).catch(() => {});
 
-    await this.prisma.invoice.deleteMany({
-      where: { customerId: customer.id },
-    }).catch(() => {});
-
+    // 4. Delete customer record
     await this.prisma.customer.delete({
       where: { id: customer.id },
     });
