@@ -1,28 +1,25 @@
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: gecut-postgres
+    image: postgres:18.6-alpine3.24
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: gcloud
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-gcloud}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d gcloud"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-gcloud}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
 
   redis:
-    image: redis:7-alpine
-    container_name: gecut-redis
+    image: redis:8.10.2-alpine3.23
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
@@ -30,26 +27,25 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
 
   server:
-    build:
-      context: .
-      dockerfile: apps/server/Dockerfile
-    container_name: gecut-server
+    image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-0.4.23}}
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/gcloud?schema=public"
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://localhost:8080,http://localhost:8081"
-      SESSION_SECRET: "super-secret-development-session-key-must-be-32-chars-long"
-      SESSION_COOKIE_NAME: "gecut_session"
-      SESSION_TTL_SECONDS: 604800
-      KAVENEGAR_API_KEY: ""
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/gcloud?schema=public}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://${ADMIN_DOMAIN:-admin.cloud.gecut.ir},https://${CUSTOMER_APP_DOMAIN:-app.cloud.gecut.ir}}
+      SESSION_SECRET: ${SESSION_SECRET:-super-secret-development-session-key-must-be-32-chars-long}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-gecut_session}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-604800}
+      KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
     volumes:
       - server_data:/app/apps/server/data
     depends_on:
@@ -57,34 +53,43 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - internal
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gecut-server.rule=Host(`${SERVER_DOMAIN:-api.cloud.gecut.ir}`)"
+      - "traefik.http.routers.gecut-server.entrypoints=websecure"
+      - "traefik.http.routers.gecut-server.tls.certResolver=letsencrypt"
+      - "traefik.http.services.gecut-server.loadbalancer.server.port=3000"
 
   admin:
-    build:
-      context: .
-      dockerfile: apps/admin/Dockerfile
-      args:
-        VITE_SERVER_URL: "http://localhost:3000"
-    container_name: gecut-admin
+    image: ghcr.io/gecut/cloud-app/admin:${ADMIN_TAG:-${TAG:-0.4.23}}
     restart: unless-stopped
-    ports:
-      - "5173:80"
+    expose:
+      - "80"
     depends_on:
       - server
+    networks:
+      - dokploy-network
 
   customer-app:
-    build:
-      context: .
-      dockerfile: apps/customer-app/Dockerfile
-      args:
-        VITE_SERVER_URL: "http://localhost:3000"
-    container_name: gecut-customer-app
+    image: ghcr.io/gecut/cloud-app/customer-app:${CUSTOMER_APP_TAG:-${TAG:-0.4.23}}
     restart: unless-stopped
-    ports:
-      - "5174:80"
+    expose:
+      - "80"
     depends_on:
       - server
+    networks:
+      - dokploy-network
 
 volumes:
   postgres_data:
   redis_data:
   server_data:
+
+networks:
+  internal:
+    driver: bridge
+  dokploy-network:
+    external: true
