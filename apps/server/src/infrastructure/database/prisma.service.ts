@@ -2158,7 +2158,7 @@ export class PrismaService
     } catch (err: any) {
       this.isDbConnected = false;
       this.logger.warn(
-        `⚠️ [PrismaService] PostgreSQL database is not reachable (${err?.message || "connection error"}). Resilient store activated.`,
+        "⚠️ [PrismaService] PostgreSQL database on localhost:5432 is not reachable. Resilient in-memory repository activated.",
       );
     }
   }

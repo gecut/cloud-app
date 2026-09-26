@@ -65,6 +65,7 @@ services:
 
   admin:
 <<<<<<< HEAD
+<<<<<<< HEAD
     image: ghcr.io/gecut/cloud-app/admin:${ADMIN_TAG:-${TAG:-0.4.23}}
     restart: unless-stopped
     expose:
@@ -79,7 +80,12 @@ services:
     restart: unless-stopped
     ports:
       - "${ADMIN_PORT:-5173}:80"
->>>>>>> ce7501e (c)
+=======
+    image: ghcr.io/gecut/cloud-app/admin:${ADMIN_TAG:-${TAG:-0.4.23}}
+    restart: unless-stopped
+    expose:
+      - "80"
+>>>>>>> c007dbc (c)
     depends_on:
       - server
     networks:
@@ -104,4 +110,8 @@ networks:
   internal:
     driver: bridge
   dokploy-network:
+<<<<<<< HEAD
     external: true
+=======
+    external: true
+>>>>>>> c007dbc (c)
