@@ -16,6 +16,7 @@ export class RenewalsSchedulerService implements OnModuleInit {
     });
   }
 
+  
   // Run every 15 minutes to catch expired services promptly
   @Cron("*/15 * * * *")
   async handleCron() {
