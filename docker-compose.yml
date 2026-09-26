@@ -64,10 +64,22 @@ services:
       - "traefik.http.services.gecut-server.loadbalancer.server.port=3000"
 
   admin:
+<<<<<<< HEAD
     image: ghcr.io/gecut/cloud-app/admin:${ADMIN_TAG:-${TAG:-0.4.23}}
     restart: unless-stopped
     expose:
       - "80"
+=======
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        VITE_SERVER_URL: "${VITE_SERVER_URL:-http://localhost:3000}"
+    container_name: gecut-admin
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-5173}:80"
+>>>>>>> ce7501e (c)
     depends_on:
       - server
     networks:
