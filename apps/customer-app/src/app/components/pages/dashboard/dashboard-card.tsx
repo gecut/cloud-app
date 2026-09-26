@@ -4,7 +4,7 @@ import { cn, Button } from "@heroui/react";
 import { ServerSquareCloud } from "@solar-icons/react-perf/category/devices/LineDuotone";
 import { LayersMinimalistic } from "@solar-icons/react-perf/category/tools/BoldDuotone";
 import { Progress } from "../../common/progress";
-import { analyzeDateRange } from "@gecut-cloud/contracts";
+import { analyzeDateRange, analyzeServiceLifecycle } from "@gecut-cloud/contracts";
 import { apiClient } from "@/lib/api-client";
 
 interface DashboardCardProps {
@@ -45,14 +45,25 @@ export function DashboardCard({ data }: DashboardCardProps) {
       ? data.renewalDate
       : new Date(data.renewalDate || (startDate.getTime() + 30 * MS_PER_DAY));
 
-  const trackingType = (data.trackingType || "HYBRID").toUpperCase();
+  const lifecycle = analyzeServiceLifecycle({
+    trackingType: data.trackingType,
+    startDate,
+    renewalDate,
+    billingCycle: data.billingCycle,
+    quantity: data.quantity,
+    usedQuantity: data.usedQuantity,
+    status: data.status,
+    paymentStatus: data.paymentStatus,
+  });
+
+  const trackingType = lifecycle.trackingType;
   const showDays = trackingType === "TIME" || trackingType === "HYBRID";
   const showQty = trackingType === "QUANTITY" || trackingType === "HYBRID";
   const isPackage = trackingType === "QUANTITY" || data.type === "PACKAGE";
 
-  const totalQty = data.quantity || 1;
-  const remainedQty = data.remainedQuantity ?? Math.max(0, totalQty - (data.usedQuantity || 0));
-  const quantityPercent = Math.min(Math.max((remainedQty / totalQty) * 100, 0), 100);
+  const totalQty = lifecycle.totalQty;
+  const remainedQty = lifecycle.remainingQty;
+  const quantityPercent = lifecycle.quantityPercent;
 
   // 1. تحلیل دقیق و استاندارد بازه زمانی
   const rawCycle = Number(data.billingCycle);
@@ -64,19 +75,19 @@ export function DashboardCard({ data }: DashboardCardProps) {
     configuredCycleDays,
   });
 
-  const totalDays = dateAnalysis.totalSpanDays;
-  const daysLeft = dateAnalysis.daysLeft; // به صورت تضمینی در صورت انقضا دقیقاً ۰ است
-  const remainingDaysPercent = dateAnalysis.remainingPercent; // در صورت انقضا ۰٪
-  const isExpired = trackingType === "QUANTITY" ? false : dateAnalysis.isExpired;
+  const totalDays = lifecycle.totalDays;
+  const daysLeft = lifecycle.daysLeft;
+  const remainingDaysPercent = lifecycle.remainingPercent;
+  const isExpired = lifecycle.isExpired;
+  const isTimeExpired = lifecycle.isTimeExpired;
   const isAlarmExceeded = Boolean(dateAnalysis.isAlarmExceeded);
-  const overdueDays = dateAnalysis.overdueDays;
-  const isTimeNearExpiry = showDays && !isExpired && daysLeft > 0 && daysLeft <= 3;
+  const overdueDays = lifecycle.overdueDays;
+  const isTimeNearExpiry = lifecycle.isTimeNearExpiry;
 
-  const isQuantityDepleted = showQty && (remainedQty <= 0 || (data.usedQuantity || 0) >= totalQty);
-  const isQuantityNearDepletion = showQty && !isQuantityDepleted && (quantityPercent <= 5 || remainedQty <= Math.max(1, Math.ceil(totalQty * 0.05)));
+  const isQuantityDepleted = lifecycle.isQuantityDepleted;
+  const isQuantityNearDepletion = lifecycle.isQuantityNearDepletion;
 
-  // اگر سرویسی هنوز بسته داره و تموم نشده و تاریخشم نگذشته، وضعیت قطعی آن فعال است
-  const isServiceActive = !isExpired && remainedQty > 0 ? true : data.status === "ACTIVE";
+  const isServiceActive = lifecycle.isServiceActive;
   const displayStatus =
     data.paymentStatus === "UNPAID" || data.status === "SUSPENDED" || data.status === "INACTIVE" || !isServiceActive
       ? "SUSPENDED"
@@ -181,7 +192,7 @@ export function DashboardCard({ data }: DashboardCardProps) {
               </div>
 
               {/* Explicit Error Banner when expired */}
-              {isExpired && (
+              {isTimeExpired && !isQuantityDepleted && (
                 <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-rose-600 dark:text-rose-400 font-bold">⚠️ خطا:</span>

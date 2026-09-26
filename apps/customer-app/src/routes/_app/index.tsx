@@ -41,7 +41,14 @@ export function DashboardPage() {
   const servicesList = useMemo(() => {
     if (!apiServices?.items || apiServices.items.length === 0) return [];
 
-    return apiServices.items.map((item: any, idx: number) => {
+    const nonParentItems = apiServices.items.filter(
+      (item: any) =>
+        (!item.childServices || item.childServices.length === 0) &&
+        !item.isParent &&
+        Boolean(item.customerId),
+    );
+
+    return nonParentItems.map((item: any, idx: number) => {
       const matchedCategory = dynamicCategories.find(
         (c: any) =>
           c.id === item.serviceTypeId ||

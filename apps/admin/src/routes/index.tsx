@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
 import { AppShell } from "@/components/layout/app-shell";
 import { apiClient } from "@/utils/api-client";
+import { getJalaliMonthPeriods } from "@gecut-cloud/contracts";
 import {
   Card,
   CardContent,
@@ -12,6 +13,7 @@ import {
   CardDescription,
 } from "@gecut-cloud/ui/components/card";
 import { Button } from "@gecut-cloud/ui/components/button";
+import { Chip } from "@heroui/react";
 import {
   Users,
   Server,
@@ -119,32 +121,28 @@ function AdminDashboardPage() {
   // Supplier monthly commitment period selection (past 12 months + all time)
   const [selectedPeriodMonth, setSelectedPeriodMonth] = useState<number | "ALL">(0);
 
+  const jalaliPeriods = useMemo(() => getJalaliMonthPeriods(12), []);
+
   const monthOptions = useMemo(() => {
     const options: { value: number | "ALL"; label: string }[] = [
-      { value: 0, label: "دوره جاری (این ماه)" },
+      { value: 0, label: jalaliPeriods[0]?.label || "دوره جاری (این ماه)" },
     ];
-    const n = new Date();
-    for (let i = 1; i <= 12; i++) {
-      const target = new Date(n.getFullYear(), n.getMonth() - i, 15);
-      const label = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-        year: "numeric",
-        month: "long",
-      }).format(target);
-      options.push({ value: i, label });
+    for (let i = 1; i < jalaliPeriods.length; i++) {
+      const p = jalaliPeriods[i]!;
+      options.push({ value: p.offset, label: p.label });
     }
     options.push({ value: "ALL", label: "کل دوره‌ها (مجموع همیشگی)" });
     return options;
-  }, []);
+  }, [jalaliPeriods]);
 
   const [breakdownViewMode, setBreakdownViewMode] = useState<"BOTH" | "SUPPLIERS" | "SERVICES">("BOTH");
 
   const periodBreakdownData = useMemo(() => {
     const isAll = selectedPeriodMonth === "ALL";
     const offset = isAll ? 0 : Number(selectedPeriodMonth);
-    const n = new Date();
-    const targetDate = new Date(n.getFullYear(), n.getMonth() - offset, 15);
-    const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1).getTime();
-    const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59).getTime();
+    const targetPeriod = jalaliPeriods[offset] || jalaliPeriods[0]!;
+    const monthStart = targetPeriod.startDate.getTime();
+    const monthEnd = targetPeriod.endDate.getTime();
 
     // 1. Supplier Services in this period
     const matchingSupplierServices = isAll
@@ -152,7 +150,6 @@ function AdminDashboardPage() {
       : supplierServicesList.filter((s: any) => {
           const pDate = s.purchaseDate || s.createdAt ? new Date(s.purchaseDate || s.createdAt).getTime() : 0;
           const rDate = s.renewalDate ? new Date(s.renewalDate).getTime() : Infinity;
-          if (offset === 0) return true;
           return pDate <= monthEnd && rDate >= monthStart;
         });
 
@@ -177,7 +174,6 @@ function AdminDashboardPage() {
             ? new Date(s.purchaseDate || s.startDate || s.createdAt).getTime()
             : 0;
           const rDate = s.renewalDate ? new Date(s.renewalDate).getTime() : Infinity;
-          if (offset === 0) return s.status === "ACTIVE";
           return pDate <= monthEnd && rDate >= monthStart;
         });
 
@@ -190,12 +186,7 @@ function AdminDashboardPage() {
     // 3. Net Balance
     const netPeriodBalanceToman = customerServicesTotalToman - supplierTotalToman;
 
-    const monthLabel = isAll
-      ? "کل دوره‌ها"
-      : new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-          year: "numeric",
-          month: "long",
-        }).format(targetDate);
+    const monthLabel = isAll ? "کل دوره‌ها" : targetPeriod.shortLabel;
 
     return {
       supplierTotalToman,
@@ -211,6 +202,7 @@ function AdminDashboardPage() {
     allServices,
     selectedPeriodMonth,
     supplierMonthlyExpensesToman,
+    jalaliPeriods,
   ]);
 
   // Unpaid invoices
@@ -228,9 +220,9 @@ function AdminDashboardPage() {
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
                 مرکز عملیات و زیرساخت
               </h1>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <Chip size="sm" variant="soft" color="success" className="text-[11px] font-semibold">
                 وضعیت پایدار
-              </span>
+              </Chip>
             </div>
             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
               دید کلی و بی‌درنگ از مشترکین، سرویس‌های فعال، پیش‌بینی درآمدها و جریان مالی
@@ -238,14 +230,14 @@ function AdminDashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link to="/customers">
-              <Button size="sm" className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer">
-                <PlusCircle className="h-3.5 w-3.5" />
+              <Button size="sm" className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer">
+                <PlusCircle className="h-4 w-4" />
                 تعریف مشتری
               </Button>
             </Link>
             <Link to="/invoices">
-              <Button size="sm" variant="outline" className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer">
-                <FileText className="h-3.5 w-3.5" />
+              <Button size="sm" variant="outline" className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer">
+                <FileText className="h-4 w-4" />
                 صدور صورت‌حساب
               </Button>
             </Link>

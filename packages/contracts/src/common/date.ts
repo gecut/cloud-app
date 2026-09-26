@@ -403,3 +403,213 @@ export function analyzeDateRange(params: {
     alarmMessage,
   };
 }
+
+export interface JalaliMonthPeriod {
+  offset: number;
+  year: number;
+  month: number;
+  monthName: string;
+  shortLabel: string;
+  label: string;
+  startDate: Date;
+  endDate: Date;
+}
+
+/**
+ * Returns dynamic Jalali month periods (current month, past months)
+ * calculated purely using the Persian calendar.
+ */
+export function getJalaliMonthPeriods(count = 12, baseDate?: Date): JalaliMonthPeriod[] {
+  const now = baseDate || new Date();
+  const currentJalali = gregorianToJalali(now);
+  const periods: JalaliMonthPeriod[] = [];
+
+  for (let i = 0; i < count; i++) {
+    let targetYear = currentJalali.jy;
+    let targetMonth = currentJalali.jm - i;
+    while (targetMonth < 1) {
+      targetMonth += 12;
+      targetYear -= 1;
+    }
+
+    const monthName = JALALI_MONTH_NAMES[targetMonth - 1] ?? "";
+    const daysInMonth = getJalaliMonthDays(targetYear, targetMonth);
+    const startDate = jalaliToGregorian(targetYear, targetMonth, 1);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = jalaliToGregorian(targetYear, targetMonth, daysInMonth);
+    endDate.setHours(23, 59, 59, 999);
+
+    const shortLabel = `${toPersianDigits(targetYear)} ${monthName}`;
+    const label = i === 0 ? `ماه جاری (${shortLabel})` : `${toPersianDigits(i)} ماه قبل (${shortLabel})`;
+
+    periods.push({
+      offset: i,
+      year: targetYear,
+      month: targetMonth,
+      monthName,
+      shortLabel,
+      label,
+      startDate,
+      endDate,
+    });
+  }
+
+  return periods;
+}
+
+export interface ServiceLifecycleAnalysis {
+  trackingType: "TIME" | "QUANTITY" | "HYBRID";
+  isExpired: boolean;
+  isTimeExpired: boolean;
+  isQuantityDepleted: boolean;
+  isTimeNearExpiry: boolean;
+  isQuantityNearDepletion: boolean;
+  hasWarning: boolean;
+  warningMessage?: string;
+  expiredReason?: string;
+  daysLeft: number;
+  totalDays: number;
+  overdueDays: number;
+  remainingPercent: number;
+  totalQty: number;
+  usedQty: number;
+  remainingQty: number;
+  quantityPercent: number;
+  isServiceActive: boolean;
+  displayStatus: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+}
+
+/**
+ * Complete lifecycle and warning analysis for services (TIME, QUANTITY, HYBRID).
+ * Strictly applies the business rule: In HYBRID packages, quantity depletion takes precedence
+ * and expires the service immediately if exhausted before time.
+ */
+export function analyzeServiceLifecycle(params: {
+  trackingType?: string | null;
+  startDate?: Date | string | number | null;
+  renewalDate?: Date | string | number | null;
+  billingCycle?: string | number | null;
+  quantity?: number | null;
+  usedQuantity?: number | null;
+  status?: string | null;
+  paymentStatus?: string | null;
+  nowDate?: Date;
+}): ServiceLifecycleAnalysis {
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+  const now = params.nowDate || new Date();
+  const rawType = (params.trackingType || "HYBRID").toUpperCase();
+  const trackingType: "TIME" | "QUANTITY" | "HYBRID" =
+    rawType === "TIME" || rawType === "QUANTITY" ? rawType : "HYBRID";
+
+  // 1. Quantity analysis
+  const totalQty = Math.max(1, Number(params.quantity) || 1);
+  const usedQty = Math.max(0, Number(params.usedQuantity) || 0);
+  const remainingQty = Math.max(0, totalQty - usedQty);
+  const quantityPercent = Math.min(Math.max((remainingQty / totalQty) * 100, 0), 100);
+
+  const isQuantityDepleted =
+    (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+    (remainingQty <= 0 || usedQty >= totalQty);
+
+  const isQuantityNearDepletion =
+    (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+    !isQuantityDepleted &&
+    (quantityPercent <= 5 || remainingQty <= Math.max(1, Math.ceil(totalQty * 0.05)));
+
+  // 2. Date & Time analysis
+  const rawCycle = Number(params.billingCycle);
+  const configuredCycleDays = !isNaN(rawCycle) && rawCycle > 0 ? rawCycle : null;
+
+  const start = parseToDate(params.startDate) || now;
+  const end = parseToDate(params.renewalDate) || new Date(start.getTime() + (configuredCycleDays || 30) * MS_PER_DAY);
+
+  const dateAnalysis = analyzeDateRange({
+    startDate: start,
+    endDate: end,
+    configuredCycleDays,
+    nowDate: now,
+  });
+
+  const isTimeExpired = trackingType !== "QUANTITY" && dateAnalysis.isExpired;
+  const isTimeNearExpiry =
+    trackingType !== "QUANTITY" &&
+    !isTimeExpired &&
+    dateAnalysis.daysLeft > 0 &&
+    dateAnalysis.daysLeft <= 3;
+
+  // 3. Expiration logic with priority
+  // Rule: For HYBRID packages, priority is on quantity: if quantity ends first, service is expired!
+  let isExpired = false;
+  let expiredReason: string | undefined;
+
+  if (trackingType === "QUANTITY") {
+    isExpired = isQuantityDepleted;
+    if (isExpired) {
+      expiredReason = "سقف سهمیه بسته به پایان رسیده است";
+    }
+  } else if (trackingType === "TIME") {
+    isExpired = isTimeExpired;
+    if (isExpired) {
+      expiredReason = `موعد سررسید ${dateAnalysis.overdueDays.toLocaleString("fa-IR")} روز پیش منقضی شده است`;
+    }
+  } else {
+    // HYBRID: Priority to quantity depletion
+    if (isQuantityDepleted) {
+      isExpired = true;
+      expiredReason = "سهمیه بسته به پایان رسیده است";
+    } else if (isTimeExpired) {
+      isExpired = true;
+      expiredReason = `مهلت زمانی سرویس به پایان رسیده است (${dateAnalysis.overdueDays.toLocaleString("fa-IR")} روز گذشته)`;
+    }
+  }
+
+  // 4. Warning logic
+  const hasWarning = !isExpired && (isQuantityNearDepletion || isTimeNearExpiry);
+  let warningMessage: string | undefined;
+  if (hasWarning) {
+    if (isQuantityNearDepletion && isTimeNearExpiry) {
+      warningMessage = `هشدار: کمتر از ۵٪ سهمیه (${toPersianDigits(remainingQty)} عدد) و تنها ${toPersianDigits(dateAnalysis.daysLeft)} روز تا سررسید باقی است`;
+    } else if (isQuantityNearDepletion) {
+      warningMessage = `هشدار: کمتر از ۵٪ از سهمیه بسته باقی مانده است (${toPersianDigits(remainingQty)} عدد باقی‌مانده)`;
+    } else if (isTimeNearExpiry) {
+      warningMessage = `هشدار: تنها ${toPersianDigits(dateAnalysis.daysLeft)} روز تا پایان مهلت سرویس باقی مانده است`;
+    }
+  }
+
+  // 5. Active state calculation
+  const isDbActive = params.status === "ACTIVE";
+  const isServiceActive = !isExpired && isDbActive;
+
+  let displayStatus: "ACTIVE" | "INACTIVE" | "SUSPENDED" = "ACTIVE";
+  if (params.paymentStatus === "UNPAID" || params.status === "SUSPENDED") {
+    displayStatus = "SUSPENDED";
+  } else if (isExpired || params.status === "INACTIVE" || !isServiceActive) {
+    displayStatus = "INACTIVE";
+  } else {
+    displayStatus = "ACTIVE";
+  }
+
+  return {
+    trackingType,
+    isExpired,
+    isTimeExpired,
+    isQuantityDepleted,
+    isTimeNearExpiry,
+    isQuantityNearDepletion,
+    hasWarning,
+    warningMessage,
+    expiredReason,
+    daysLeft: dateAnalysis.daysLeft,
+    totalDays: dateAnalysis.totalDays,
+    overdueDays: dateAnalysis.overdueDays,
+    remainingPercent: dateAnalysis.remainingPercent,
+    totalQty,
+    usedQty,
+    remainingQty,
+    quantityPercent,
+    isServiceActive,
+    displayStatus,
+  };
+}
+
+

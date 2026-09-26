@@ -223,15 +223,15 @@ export function AdminHeader() {
             <Menu className="h-5 w-5" />
           </Button>
 
-          <Link to="/" className="flex items-center gap-2.5 sm:gap-3 group">
-            <div className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/5 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-all duration-300">
+          <Link to="/" className="flex items-center gap-2 sm:gap-4 group">
+            <div className="relative flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/5 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-all duration-300">
               <img src="/logo.png" alt="Gecut" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
               <div className="absolute inset-0 rounded-xl bg-emerald-500/10 blur-sm -z-10 group-hover:opacity-100 opacity-60 transition-opacity" />
             </div>
             <div className="flex flex-col">
-              <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-2">
                 <span className="text-sm font-black tracking-tight text-foreground">جیکات کلود</span>
-                <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">ادمین</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">ادمین</span>
               </div>
               <span className="hidden sm:inline text-[11px] text-muted-foreground font-normal">
                 مرکز فرماندهی زیرساخت و عملیات
@@ -240,7 +240,7 @@ export function AdminHeader() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Customer App Quick Link */}
           <a
             href="http://localhost:3002"
@@ -248,19 +248,19 @@ export function AdminHeader() {
             rel="noreferrer"
             className="hidden sm:inline-flex"
           >
-            <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg">
-              <ExternalLink className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="sm" className="gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg">
+              <ExternalLink className="h-4 w-4" />
               <span className="hidden lg:inline">پنل مشتریان</span>
             </Button>
           </a>
 
           {/* Admin User Info */}
-          <div className="hidden md:flex items-center gap-2 px-2.5 lg:px-3 py-1.5 rounded-xl border border-border/60 bg-card/60 backdrop-blur-md text-xs font-medium">
+          <div className="hidden md:flex items-center gap-2 px-3 lg:px-4 py-2 rounded-xl border border-border/60 bg-card/60 backdrop-blur-md text-xs font-medium">
             <div className="h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 animate-pulse" />
             <span className="max-w-[90px] lg:max-w-[140px] truncate text-foreground font-semibold">
               {currentUser.name || "مدیر سامانه"}
             </span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
+            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
               مدیر
             </span>
           </div>
@@ -273,10 +273,10 @@ export function AdminHeader() {
               setAdminsTab("list");
               setIsAdminsModalOpen(true);
             }}
-            className="gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 rounded-xl cursor-pointer shadow-xs"
+            className="gap-2 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 rounded-xl cursor-pointer shadow-xs"
             title="مدیریت مدیران و تغییر گذرواژه"
           >
-            <ShieldCheck className="h-3.5 w-3.5" />
+            <ShieldCheck className="h-4 w-4" />
             <span className="hidden md:inline">مدیریت مدیران</span>
           </Button>
 

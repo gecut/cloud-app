@@ -1,13 +1,17 @@
 import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
+import { RenewalsSchedulerService } from "../../../renewals/renewals-scheduler.service";
 import { UpdateServiceCommand } from "./update-service.command";
 
 @CommandHandler(UpdateServiceCommand)
 export class UpdateServiceHandler
   implements ICommandHandler<UpdateServiceCommand>
 {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly renewalsScheduler: RenewalsSchedulerService,
+  ) {}
 
   async execute(command: UpdateServiceCommand) {
     const { id, dto } = command;
@@ -259,6 +263,37 @@ export class UpdateServiceHandler
         },
       })
       .catch(() => {});
+
+    // Check if quota depletion or date passed triggers auto-renew or deactivation immediately
+    if (
+      dto.usedQuantity !== undefined ||
+      dto.quantity !== undefined ||
+      dto.renewalDate !== undefined ||
+      dto.autoRenew !== undefined
+    ) {
+      try {
+        const processed = await this.renewalsScheduler.processSingleServiceById(updated.id);
+        if (processed) {
+          const reloaded = await this.prisma.service.findUnique({
+            where: { id: updated.id },
+            include: {
+              customer: true,
+              serviceType: true,
+              serviceGroup: true,
+              server: true,
+              endpoints: true,
+              parentService: true,
+              childServices: {
+                include: { customer: true },
+              },
+            },
+          });
+          if (reloaded) return reloaded;
+        }
+      } catch {
+        // do not fail update
+      }
+    }
 
     return updated;
   }

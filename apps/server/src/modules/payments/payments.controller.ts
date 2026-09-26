@@ -7,18 +7,22 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UseGuards,
 } from "@nestjs/common";
 import { CommandBus, QueryBus } from "@nestjs/cqrs";
 import { ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import type { FastifyReply } from "fastify";
 import { CurrentUser, CurrentUserData } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { RecordPaymentCommand } from "./commands/record-payment/record-payment.command";
 import { RecordPaymentDto } from "./commands/record-payment/record-payment.dto";
+import { ZibalPaymentRequestDto } from "./dto/zibal-payment-request.dto";
 import { GetPaymentQuery } from "./queries/get-payment/get-payment.query";
 import { ListPaymentsQuery } from "./queries/list-payments/list-payments.query";
+import { ZibalService } from "./services/zibal.service";
 
 @ApiTags("payments")
 @Controller("payments")
@@ -28,11 +32,36 @@ export class PaymentsController {
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
     private readonly prisma: PrismaService,
+    private readonly zibalService: ZibalService,
   ) {}
 
-  @Post()
+  @Post("zibal/request")
   @Roles("ADMIN", "CUSTOMER")
-  @ApiOperation({ summary: "Record a successful payment for an invoice" })
+  @ApiOperation({ summary: "Request a Zibal payment session for an invoice" })
+  async requestZibal(
+    @CurrentUser() user: CurrentUserData,
+    @Body() dto: ZibalPaymentRequestDto,
+  ) {
+    return this.zibalService.requestInvoicePayment({
+      invoiceId: dto.invoiceId,
+      user,
+      callbackUrl: dto.callbackUrl,
+      returnUrl: dto.returnUrl,
+    });
+  }
+
+  @Get("zibal/callback")
+  @ApiOperation({ summary: "Handle Zibal payment gateway callback redirect" })
+  async zibalCallback(
+    @Query() query: Record<string, unknown>,
+    @Res() res: FastifyReply,
+  ) {
+    await this.zibalService.handleCallback(query, res);
+  }
+
+  @Post()
+  @Roles("ADMIN")
+  @ApiOperation({ summary: "Record a manual payment for an invoice (Admin only)" })
   async record(
     @CurrentUser() user: CurrentUserData,
     @Body() dto: RecordPaymentDto,

@@ -2,9 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
-  ForbiddenException,
   Get,
-  NotFoundException,
   Param,
   Patch,
   Post,
@@ -111,77 +109,21 @@ export class InvoicesController {
   }
 
   @Patch(":id/cancel")
-  @Roles("ADMIN", "CUSTOMER")
-  @ApiOperation({ summary: "Cancel an unpaid invoice" })
+  @Roles("ADMIN")
+  @ApiOperation({ summary: "Cancel an unpaid invoice (Admin only)" })
   async cancel(
-    @CurrentUser() user: CurrentUserData,
     @Param("id") id: string,
     @Body() dto?: CancelInvoiceDto,
   ) {
-    if (user && user.role === "CUSTOMER") {
-      const invoice = await this.prisma.invoice.findUnique({ where: { id } });
-      if (!invoice) throw new NotFoundException("فاکتور مورد نظر یافت نشد");
-
-      let isOwner = false;
-      const custId = user.customerId || user.id;
-
-      if (custId && invoice.customerId === custId) {
-        isOwner = true;
-      } else {
-        const customer = await this.prisma.customer.findFirst({
-          where: {
-            OR: [
-              ...(user.customerId ? [{ id: user.customerId }] : []),
-              ...(user.id ? [{ id: user.id }, { userId: user.id }] : []),
-            ],
-          },
-        });
-        if (customer && customer.id === invoice.customerId) {
-          isOwner = true;
-        }
-      }
-
-      if (!isOwner) {
-        throw new ForbiddenException("شما مجاز به لغو این فاکتور نیستید");
-      }
-    }
     return this.commandBus.execute(new CancelInvoiceCommand(id, dto?.reason));
   }
 
   @Patch(":id/reactivate")
-  @Roles("ADMIN", "CUSTOMER")
-  @ApiOperation({ summary: "Reactivate a cancelled invoice" })
+  @Roles("ADMIN")
+  @ApiOperation({ summary: "Reactivate a cancelled invoice (Admin only)" })
   async reactivate(
-    @CurrentUser() user: CurrentUserData,
     @Param("id") id: string,
   ) {
-    if (user && user.role === "CUSTOMER") {
-      const invoice = await this.prisma.invoice.findUnique({ where: { id } });
-      if (!invoice) throw new NotFoundException("فاکتور مورد نظر یافت نشد");
-
-      let isOwner = false;
-      const custId = user.customerId || user.id;
-
-      if (custId && invoice.customerId === custId) {
-        isOwner = true;
-      } else {
-        const customer = await this.prisma.customer.findFirst({
-          where: {
-            OR: [
-              ...(user.customerId ? [{ id: user.customerId }] : []),
-              ...(user.id ? [{ id: user.id }, { userId: user.id }] : []),
-            ],
-          },
-        });
-        if (customer && customer.id === invoice.customerId) {
-          isOwner = true;
-        }
-      }
-
-      if (!isOwner) {
-        throw new ForbiddenException("شما مجاز به فعال‌سازی مجدد این فاکتور نیستید");
-      }
-    }
     return this.commandBus.execute(new ReactivateInvoiceCommand(id));
   }
 }

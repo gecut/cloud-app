@@ -1,4 +1,5 @@
 import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
+import { BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
 import { CreateInvoiceCommand } from "./create-invoice.command";
 import { getNextUniqueInvoiceNumber } from "../../utils/invoice-number.util";
@@ -52,9 +53,19 @@ export class CreateInvoiceHandler
             } else {
               const service = await tx.service.findUnique({
                 where: { id: item.serviceId },
-                include: { serviceType: true },
+                include: { serviceType: true, childServices: true },
               });
               if (service) {
+                if (service.childServices && service.childServices.length > 0) {
+                  throw new BadRequestException(
+                    `سرویس مادر "${service.name}" فقط برای نظم‌دهی و گروه‌بندی سرویس‌ها است و نمی‌تواند در فاکتور یا پرداخت ثبت شود.`,
+                  );
+                }
+                if (!service.customerId) {
+                  throw new BadRequestException(
+                    `سرویس الگوی کاتالوگ "${service.name}" به هیچ مشترکی تخصیص داده نشده و نمی‌تواند در فاکتور ثبت شود.`,
+                  );
+                }
                 serviceSnapshot = {
                   serviceNameSnapshot: service.name,
                   serviceTypeSnapshot: service.serviceType?.name || service.serviceType?.slug || undefined,

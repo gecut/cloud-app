@@ -39,6 +39,8 @@ export class ListServicesHandler implements IQueryHandler<ListServicesQuery> {
         } else {
           where.customerId = customerId;
         }
+        // When querying for a customer, exclude parent organizational services
+        where.childServices = { none: {} };
       }
     }
     if (status) where.status = status;
@@ -64,12 +66,21 @@ export class ListServicesHandler implements IQueryHandler<ListServicesQuery> {
       this.prisma.service.count({ where }),
     ]);
 
+    const finalItems = customerId
+      ? items.filter((s: any) => (!s.childServices || s.childServices.length === 0) && Boolean(s.customerId))
+      : items;
+    const finalTotal = customerId && filteredItemsCount(items, finalItems) ? finalItems.length : total;
+
     return {
-      items,
-      total,
+      items: finalItems,
+      total: finalTotal,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(finalTotal / limit) || 1,
     };
   }
+}
+
+function filteredItemsCount(original: any[], filtered: any[]) {
+  return original.length !== filtered.length;
 }

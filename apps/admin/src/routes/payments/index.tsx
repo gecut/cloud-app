@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { apiClient } from "@/utils/api-client";
 import { Card, CardContent } from "@gecut-cloud/ui/components/card";
 import { Button } from "@gecut-cloud/ui/components/button";
+import { Chip } from "@heroui/react";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
@@ -112,6 +113,7 @@ function matchesCategory(p: any, catId: string): boolean {
     const prov = String(p.provider || p.invoice?.payment?.provider || "").toUpperCase();
     const gRef = String(p.gatewayRef || p.invoice?.payment?.gatewayRef || "");
     return (
+      prov === "ZIBAL" ||
       prov === "ZARINPAL" ||
       prov === "PAYPING" ||
       prov === "ONLINE" ||
@@ -123,7 +125,7 @@ function matchesCategory(p: any, catId: string): boolean {
   if (catId === "MANUAL") {
     const prov = String(p.provider || p.invoice?.payment?.provider || "").toUpperCase();
     const gRef = String(p.gatewayRef || p.invoice?.payment?.gatewayRef || "");
-    if (gRef.startsWith("TRX-") || gRef.startsWith("ZP_") || prov === "ONLINE" || prov === "ZARINPAL" || prov === "PAYPING") {
+    if (gRef.startsWith("TRX-") || gRef.startsWith("ZP_") || prov === "ONLINE" || prov === "ZIBAL" || prov === "ZARINPAL" || prov === "PAYPING") {
       return false;
     }
     return prov === "MANUAL_TRANSFER" || prov === "CASH" || prov === "CARD_TO_CARD" || prov === "MANUAL" || prov === "CART_TO_CART" || !prov;
@@ -139,7 +141,7 @@ function matchesCategory(p: any, catId: string): boolean {
 function isPaymentConfirmedByCustomer(pay: any): boolean {
   if (pay.confirmedBy === "CUSTOMER") return true;
   const prov = String(pay.provider || "").toUpperCase();
-  if (prov === "ZARINPAL" || prov === "PAYPING" || prov === "ONLINE") return true;
+  if (prov === "ZIBAL" || prov === "ZARINPAL" || prov === "PAYPING" || prov === "ONLINE") return true;
   const gRef = String(pay.gatewayRef || "");
   if (gRef.startsWith("TRX-") || gRef.startsWith("ZP_")) return true;
   return false;
@@ -1187,21 +1189,25 @@ function AdminPaymentsListPage() {
                           {/* 9. وضعیت پرداخت */}
                           <td className="py-4 px-6 whitespace-nowrap">
                             {isPending ? (
-                              <span
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium whitespace-nowrap border ${
-                                  isOverdue
-                                    ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30"
-                                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                                }`}
+                              <Chip
+                                size="sm"
+                                variant="soft"
+                                color={isOverdue ? "danger" : "warning"}
+                                className="gap-1 text-[10px] font-medium whitespace-nowrap"
                               >
                                 <Clock className="h-3 w-3 shrink-0" />
                                 {isOverdue ? "معلق (سررسید گذشته)" : "معلق / در انتظار پرداخت"}
-                              </span>
+                              </Chip>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 whitespace-nowrap border border-emerald-500/20">
+                              <Chip
+                                size="sm"
+                                variant="soft"
+                                color="success"
+                                className="gap-1 text-[10px] font-medium whitespace-nowrap"
+                              >
                                 <CheckCircle className="h-3 w-3 shrink-0" />
                                 تسویه شده
-                              </span>
+                              </Chip>
                             )}
                           </td>
 

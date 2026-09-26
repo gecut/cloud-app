@@ -1392,13 +1392,13 @@ function AdminServicesListPage() {
                                                 <span>هشدار: دوره تعیین‌شده ({details.configuredCycleDays?.toLocaleString("fa-IR")} روز) بیشتر از بازه ({details.daysTotal.toLocaleString("fa-IR")} روز)</span>
                                               </span>
                                             )}
-                                            {details.isTimeNearExpiry && (
+                                            {!details.isExpired && details.isTimeNearExpiry && (
                                               <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse">
                                                 <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
                                                 <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان اعتبار</span>
                                               </span>
                                             )}
-                                            {details.isTimeExpired && (
+                                            {details.isTimeExpired && !details.isQuantityDepleted && (
                                               <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 rounded-md font-medium mt-0.5">
                                                 <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
                                                 <span>خطا: موعد سررسید {details.overdueDays?.toLocaleString("fa-IR")} روز پیش منقضی شده است</span>
@@ -1410,8 +1410,8 @@ function AdminServicesListPage() {
                                                 <span>بسته تمام شده (نیازمند تمدید سهمیه)</span>
                                               </span>
                                             )}
-                                            {details.isQuantityNearDepletion && (
-                                              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md font-semibold mt-0.5">
+                                            {!details.isExpired && details.isQuantityNearDepletion && (
+                                              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse">
                                                 <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
                                                 <span>هشدار: کمتر از ۵٪ سهمیه بسته باقی‌مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
                                               </span>

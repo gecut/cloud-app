@@ -669,7 +669,7 @@ export class PrismaService
             (where.phone && matchPhone(c.phone, where.phone))
           ) {
           const services = Array.from(this.memServices.values())
-            .filter((s) => s.customerId === c.id)
+            .filter((s) => s.customerId === c.id && !Array.from(this.memServices.values()).some((ch) => ch.parentServiceId === s.id))
             .map((s) => {
               const parentService = s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null;
               const effTypeId = s.serviceTypeId || parentService?.serviceTypeId;
@@ -716,7 +716,7 @@ export class PrismaService
             if (!matchesOr) continue;
           }
           const services = Array.from(this.memServices.values())
-            .filter((s) => s.customerId === c.id)
+            .filter((s) => s.customerId === c.id && !Array.from(this.memServices.values()).some((ch) => ch.parentServiceId === s.id))
             .map((s) => {
               const parentService = s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null;
               const effTypeId = s.serviceTypeId || parentService?.serviceTypeId;
@@ -747,7 +747,8 @@ export class PrismaService
       },
       findMany: async (args: any) => {
         let items = Array.from(this.memCustomers.values()).map((c) => {
-          const services = Array.from(this.memServices.values()).filter((s) => s.customerId === c.id);
+          const services = Array.from(this.memServices.values())
+            .filter((s) => s.customerId === c.id && !Array.from(this.memServices.values()).some((ch) => ch.parentServiceId === s.id));
           const invoices = Array.from(this.memInvoices.values())
             .filter((i) => i.customerId === c.id || (c.userId && i.customerId === c.userId))
             .map((i) => ({
@@ -1068,6 +1069,12 @@ export class PrismaService
           return false;
         });
         if (!matchesAny) return false;
+      }
+
+      if (where.childServices) {
+        const hasChildren = Array.from(this.memServices.values()).some((c) => c.parentServiceId === s.id);
+        if (where.childServices.none && hasChildren) return false;
+        if (where.childServices.some && !hasChildren) return false;
       }
 
       return true;

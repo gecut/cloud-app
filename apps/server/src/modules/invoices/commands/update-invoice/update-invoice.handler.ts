@@ -50,10 +50,10 @@ export class UpdateInvoiceHandler
                 actorType: "USER",
                 actorRole: "ADMIN",
                 actorDisplayNameSnapshot: "مدیر مالی سیستم",
-                action: "payment.record",
+                action: "payment.manual_record",
                 entityType: "Payment",
                 entityId: newPayment.id,
-                reason: `تایید و تسویه دستی فاکتور ${invoice.invoiceNumber} به مبلغ ${paymentAmount.toLocaleString("fa-IR")} تومان توسط مدیر سیستم برای ${customerName}`,
+                reason: `پرداخت دستی فاکتور ${invoice.invoiceNumber} به مبلغ ${paymentAmount.toLocaleString("fa-IR")} تومان توسط مدیر سیستم برای ${customerName}`,
                 after: {
                   invoiceId: invoice.id,
                   invoiceNumber: invoice.invoiceNumber,

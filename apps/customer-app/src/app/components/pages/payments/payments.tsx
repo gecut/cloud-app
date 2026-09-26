@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Tabs, toast } from "@heroui/react";
 import { Factor } from "../dashboard/factor";
 import { Documents } from "@solar-icons/react-perf/category/notes/Linear";
@@ -25,11 +25,27 @@ export function Payments() {
   const activeUser = getActiveCustomerUser();
   const [selectedTab, setSelectedTab] = useState<string>("payments");
   const [payingId, setPayingId] = useState<string | null>(null);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "PAID" | "CANCELLED">("ALL");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "price-desc" | "price-asc" | "pending-first">("newest");
+
+  // Handle return from Zibal gateway callback
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get("status") || urlParams.get("payment");
+
+    if (status === "success") {
+      toast.success("پرداخت آنلاین با موفقیت انجام شد و صورت‌حساب تسویه گردید");
+      queryClient.invalidateQueries({ queryKey: ["customer", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["customer", "payments"] });
+      queryClient.invalidateQueries({ queryKey: ["customer", "services"] });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (status === "failed") {
+      toast.danger("پرداخت ناموفق بود یا توسط کاربر لغو گردید.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [queryClient]);
 
   const { data: invoicesData, isLoading: isLoadingInvoices } = useQuery({
     queryKey: ["customer", "invoices", activeUser?.id, activeUser?.customerId],
@@ -80,7 +96,9 @@ export function Payments() {
 
   const rawInvoicesList = Array.isArray(invoicesData) ? invoicesData : invoicesData?.items || [];
   const rawPaymentsList = Array.isArray(paymentsData) ? paymentsData : paymentsData?.items || [];
-  const rawServicesList = Array.isArray(servicesData) ? servicesData : servicesData?.items || [];
+  const rawServicesList = (Array.isArray(servicesData) ? servicesData : servicesData?.items || []).filter(
+    (s: any) => (!s.childServices || s.childServices.length === 0) && !s.isParent && Boolean(s.customerId),
+  );
 
   // Calculate real unpaid balance from unpaid invoices
   const unpaidTotal = rawInvoicesList
@@ -272,73 +290,33 @@ export function Payments() {
     return timeB - timeA;
   });
 
-  // Payment mutation using backend POST /payments
+  // Payment mutation using backend Zibal gateway
   const payMutation = useMutation({
     mutationFn: async (invoice: PaymentsType) => {
       if (!invoice.id) {
         throw new Error("شناسه فاکتور معتبر نیست");
       }
-      return apiClient("/payments", {
+      return apiClient<{ paymentUrl: string; trackId: number }>("/payments/zibal/request", {
         method: "POST",
         body: JSON.stringify({
           invoiceId: invoice.id,
-          amountToman: Number(invoice.price),
-          provider: "online",
-          gatewayRef: `TRX-${Math.floor(100000 + Math.random() * 900000)}`,
+          returnUrl: typeof window !== "undefined" ? `${window.location.origin}/payments` : undefined,
         }),
       });
     },
-    onSuccess: () => {
-      toast.success("پرداخت فاکتور با موفقیت انجام شد و رسید صادر گردید");
-      queryClient.invalidateQueries({ queryKey: ["customer", "invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["customer", "payments"] });
-      // Switch tab to transactions to show the new payment receipt
-      setSelectedTab("transactions");
+    onSuccess: (data) => {
+      if (data?.paymentUrl) {
+        toast.info("در حال اتصال و انتقال به درگاه پرداخت زیبال...");
+        window.location.href = data.paymentUrl;
+      } else {
+        toast.danger("آدرس درگاه پرداخت دریافت نشد.");
+      }
     },
     onError: (err: any) => {
-      toast.danger(err.message || "خطا در برقراری ارتباط با درگاه پرداخت");
+      toast.danger(err.message || "خطا در برقراری ارتباط با درگاه پرداخت زیبال");
     },
     onSettled: () => {
       setPayingId(null);
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: async (invoice: PaymentsType) => {
-      if (!invoice.id) throw new Error("شناسه فاکتور معتبر نیست");
-      return apiClient(`/invoices/${invoice.id}/cancel`, {
-        method: "PATCH",
-        body: JSON.stringify({ reason: "لغو توسط مشتری" }),
-      });
-    },
-    onSuccess: () => {
-      toast.success("فاکتور با موفقیت لغو شد");
-      queryClient.invalidateQueries({ queryKey: ["customer", "invoices"] });
-    },
-    onError: (err: any) => {
-      toast.danger(err.message || "خطا در لغو فاکتور");
-    },
-    onSettled: () => {
-      setCancellingId(null);
-    },
-  });
-
-  const reactivateMutation = useMutation({
-    mutationFn: async (invoice: PaymentsType) => {
-      if (!invoice.id) throw new Error("شناسه فاکتور معتبر نیست");
-      return apiClient(`/invoices/${invoice.id}/reactivate`, {
-        method: "PATCH",
-      });
-    },
-    onSuccess: () => {
-      toast.success("فاکتور مجدداً با موفقیت فعال شد و آماده پرداخت است");
-      queryClient.invalidateQueries({ queryKey: ["customer", "invoices"] });
-    },
-    onError: (err: any) => {
-      toast.danger(err.message || "خطا در فعال‌سازی مجدد فاکتور");
-    },
-    onSettled: () => {
-      setReactivatingId(null);
     },
   });
 
@@ -346,18 +324,6 @@ export function Payments() {
     if (payMutation.isPending) return;
     setPayingId(invoice.id || "current");
     payMutation.mutate(invoice);
-  };
-
-  const handleCancel = (invoice: PaymentsType) => {
-    if (cancelMutation.isPending || !invoice.id) return;
-    setCancellingId(invoice.id);
-    cancelMutation.mutate(invoice);
-  };
-
-  const handleReactivate = (invoice: PaymentsType) => {
-    if (reactivateMutation.isPending || !invoice.id) return;
-    setReactivatingId(invoice.id);
-    reactivateMutation.mutate(invoice);
   };
 
   const handlePayFirstUnpaid = () => {
@@ -585,10 +551,6 @@ export function Payments() {
                 data={filteredInvoices}
                 onPay={handlePay}
                 payingId={payingId}
-                onCancel={handleCancel}
-                cancellingId={cancellingId}
-                onReactivate={handleReactivate}
-                reactivatingId={reactivatingId}
               />
             </Tabs.Panel>
           </>

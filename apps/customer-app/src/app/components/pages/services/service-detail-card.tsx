@@ -4,7 +4,7 @@ import { cn } from "@heroui/styles";
 
 import { Service } from "@/app/data";
 import { apiClient } from "@/lib/api-client";
-import { analyzeDateRange } from "@gecut-cloud/contracts";
+import { analyzeDateRange, analyzeServiceLifecycle } from "@gecut-cloud/contracts";
 
 import { Link } from "@solar-icons/react-perf/category/text-formatting/LineDuotone";
 import { ServerSquareCloud, Server2 } from "@solar-icons/react-perf/category/devices/LineDuotone";
@@ -55,13 +55,24 @@ export function ServiceDetailCard({
       ? serviceDetail.renewalDate
       : new Date(serviceDetail.renewalDate || (startDate.getTime() + 30 * MS_PER_DAY));
 
-  const trackingType = (serviceDetail.trackingType || "HYBRID").toUpperCase();
+  const lifecycle = analyzeServiceLifecycle({
+    trackingType: serviceDetail.trackingType,
+    startDate,
+    renewalDate,
+    billingCycle: serviceDetail.billingCycle,
+    quantity: serviceDetail.quantity,
+    usedQuantity: serviceDetail.usedQuantity,
+    status: serviceDetail.status,
+    paymentStatus: serviceDetail.paymentStatus,
+  });
+
+  const trackingType = lifecycle.trackingType;
   const showDays = trackingType === "TIME" || trackingType === "HYBRID";
   const showQty = trackingType === "QUANTITY" || trackingType === "HYBRID";
 
-  const totalQty = serviceDetail.quantity || 1;
-  const remainedQty = serviceDetail.remainedQuantity ?? Math.max(0, totalQty - (serviceDetail.usedQuantity || 0));
-  const quantityPercent = Math.min(Math.max((remainedQty / totalQty) * 100, 0), 100);
+  const totalQty = lifecycle.totalQty;
+  const remainedQty = lifecycle.remainingQty;
+  const quantityPercent = lifecycle.quantityPercent;
 
   // تحلیل جامع و دقیق بازه زمانی با قرارداد یکپارچه سیستم
   const rawCycle = Number(serviceDetail.billingCycle);
@@ -73,25 +84,21 @@ export function ServiceDetailCard({
     configuredCycleDays,
   });
 
-  const totalDays = dateAnalysis.totalDays;
-  const daysLeft = dateAnalysis.daysLeft;
-  const remainingDaysPercent = dateAnalysis.remainingPercent;
+  const totalDays = lifecycle.totalDays;
+  const daysLeft = lifecycle.daysLeft;
+  const remainingDaysPercent = lifecycle.remainingPercent;
   const isAlarmExceeded = trackingType !== "QUANTITY" && dateAnalysis.isAlarmExceeded;
-  const isExpired = trackingType !== "QUANTITY" && dateAnalysis.isExpired;
-  const overdueDays = dateAnalysis.overdueDays;
-  const isTimeNearExpiry = trackingType !== "QUANTITY" && !isExpired && daysLeft > 0 && daysLeft <= 3;
+  const isExpired = lifecycle.isExpired;
+  const isTimeExpired = lifecycle.isTimeExpired;
+  const overdueDays = lifecycle.overdueDays;
+  const isTimeNearExpiry = lifecycle.isTimeNearExpiry;
   const isCritical = isTimeNearExpiry;
 
-  const isQuantityDepleted = (trackingType === "QUANTITY" || trackingType === "HYBRID") && (remainedQty <= 0 || (serviceDetail.usedQuantity || 0) >= totalQty);
-  const isQuantityNearDepletion = (trackingType === "QUANTITY" || trackingType === "HYBRID") && !isQuantityDepleted && (quantityPercent <= 5 || remainedQty <= Math.max(1, Math.ceil(totalQty * 0.05)));
+  const isQuantityDepleted = lifecycle.isQuantityDepleted;
+  const isQuantityNearDepletion = lifecycle.isQuantityNearDepletion;
 
-  const isServiceActive = !isExpired && remainedQty > 0 ? true : serviceDetail.status === "ACTIVE";
-  const displayStatus =
-    serviceDetail.paymentStatus === "UNPAID" || serviceDetail.status === "SUSPENDED"
-      ? "SUSPENDED"
-      : isServiceActive
-      ? "ACTIVE"
-      : "INACTIVE";
+  const isServiceActive = lifecycle.isServiceActive;
+  const displayStatus = lifecycle.displayStatus;
 
   const [isRenewing, setIsRenewing] = useState(false);
   const [autoRenew, setAutoRenew] = useState(Boolean((serviceDetail as any).autoRenew));
@@ -132,7 +139,7 @@ export function ServiceDetailCard({
 
   return (
     <div className="w-full">
-      <div className="flex w-full flex-col gap-5 rounded-3xl bg-surface p-6 sm:p-7 border border-border/40 shadow-xs">
+      <div className="flex w-full flex-col gap-6 rounded-3xl bg-surface p-6 sm:p-8 border border-border/40 shadow-xs">
         <div className="flex w-full items-start justify-between">
           <div className="flex items-center gap-4">
             {showIcon && (() => {
@@ -162,13 +169,13 @@ export function ServiceDetailCard({
               return <Widget5Linear size={48} className="*:stroke-1 text-purple-500" />;
             })()}
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="leading-none text-md font-bold">
                   {serviceDetail.name}
                 </span>
                 {serviceDetail.serviceType?.name && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
                     {serviceDetail.serviceType.name}
                   </span>
                 )}
@@ -226,7 +233,7 @@ export function ServiceDetailCard({
         </div>
 
         {/* Overdue/Expired Alarm Banner */}
-        {showDays && isExpired && (
+        {showDays && isTimeExpired && !isQuantityDepleted && (
           <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-medium">
             <svg className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
@@ -381,11 +388,11 @@ export function ServiceDetailCard({
           }}
         />
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1 w-full">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 w-full">
           <Button
             variant={isExpired ? "danger" : "primary"}
             size="md"
-            className="w-full sm:flex-1 rounded-xl font-medium cursor-pointer text-xs sm:text-sm py-2.5 px-3 min-w-0"
+            className="w-full sm:flex-1 rounded-xl font-medium cursor-pointer text-xs sm:text-sm py-2 px-4 min-w-0"
             isDisabled={isRenewing}
             onPress={handleRenew}
           >
@@ -399,7 +406,7 @@ export function ServiceDetailCard({
           <Button
             variant="outline"
             size="md"
-            className="w-full sm:w-auto rounded-xl font-medium cursor-pointer text-xs sm:text-sm py-2.5 px-4 shrink-0 whitespace-nowrap"
+            className="w-full sm:w-auto rounded-xl font-medium cursor-pointer text-xs sm:text-sm py-2 px-4 shrink-0 whitespace-nowrap"
             onPress={() => {
               window.location.href = "/payments";
             }}

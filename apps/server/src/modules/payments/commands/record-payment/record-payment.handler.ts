@@ -126,19 +126,28 @@ export class RecordPaymentHandler
         this.prisma.saveToDisk();
       }
 
-      const actorName = isSupplier ? "مدیر مالی سیستم" : customerName;
+      const isManual = isSupplier || dto.provider === "MANUAL_TRANSFER" || dto.provider === "CASH" || !dto.provider?.toLowerCase().includes("online");
+      const actorName = isManual ? "مدیر مالی سیستم" : customerName;
+      const paymentAction = isSupplier
+        ? "supplier_payment.record"
+        : isManual
+        ? "payment.manual_record"
+        : "payment.record";
+
       const paymentReason = isSupplier
         ? `ثبت سند تسویه/پرداخت فاکتور تامین‌کننده ${invoice.invoiceNumber} به مبلغ ${payment.amountToman.toLocaleString("fa-IR")} تومان به ${supplier?.name || "تامین‌کننده"} (کد پیگیری: ${dto.gatewayRef})`
+        : isManual
+        ? `پرداخت دستی فاکتور ${invoice.invoiceNumber} به مبلغ ${payment.amountToman.toLocaleString("fa-IR")} تومان توسط مدیر سیستم برای ${customerName} (کد پیگیری: ${dto.gatewayRef})`
         : `پرداخت آنلاین فاکتور ${invoice.invoiceNumber} به مبلغ ${payment.amountToman.toLocaleString("fa-IR")} تومان توسط ${customerName} (کد پیگیری: ${dto.gatewayRef})`;
 
       await tx.auditLog
         .create({
           data: {
-            actorType: "USER",
-            actorRole: isSupplier ? "ADMIN" : "CUSTOMER",
+            actorType: isManual ? "USER" : "CUSTOMER",
+            actorRole: isManual ? "ADMIN" : "CUSTOMER",
             actorDisplayNameSnapshot: actorName,
             userId: customer?.userId || customer?.id,
-            action: isSupplier ? "supplier_payment.record" : "payment.record",
+            action: paymentAction,
             entityType: "Payment",
             entityId: payment.id,
             reason: paymentReason,

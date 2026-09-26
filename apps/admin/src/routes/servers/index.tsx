@@ -6,10 +6,11 @@ import { AppShell } from "@/components/layout/app-shell";
 import { apiClient } from "@/utils/api-client";
 import { Card, CardContent } from "@gecut-cloud/ui/components/card";
 import { Button } from "@gecut-cloud/ui/components/button";
+import { Chip } from "@heroui/react";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
-import { formatJalaliDate } from "@gecut-cloud/contracts";
+import { formatJalaliDate, getJalaliMonthPeriods } from "@gecut-cloud/contracts";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
 import { ConfirmModal } from "@/components/common/confirm-modal";
 import {
@@ -592,25 +593,21 @@ function AdminSuppliersPage() {
     };
   }, [allSupplierServices]);
 
-  // Generate 12 past Jalali months options
+  // Generate dynamic Jalali months options
+  const jalaliPeriods = useMemo(() => getJalaliMonthPeriods(12), []);
+
   const monthOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [
       { value: "ALL", label: "همه دوره‌ها (کل تعهدات)" },
     ];
-    const now = new Date();
-    for (let i = 0; i <= 11; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 15);
-      const monthLabel = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-        year: "numeric",
-        month: "long",
-      }).format(d);
+    for (const p of jalaliPeriods) {
       options.push({
-        value: String(i),
-        label: i === 0 ? `ماه جاری (${monthLabel})` : `${i.toLocaleString("fa-IR")} ماه قبل (${monthLabel})`,
+        value: String(p.offset),
+        label: p.label,
       });
     }
     return options;
-  }, []);
+  }, [jalaliPeriods]);
 
   // Calculate expenses for the selected period
   const periodExpensesData = useMemo(() => {
@@ -623,30 +620,24 @@ function AdminSuppliersPage() {
     }
 
     const offset = Number(selectedPeriodMonth);
-    const now = new Date();
-    const targetDate = new Date(now.getFullYear(), now.getMonth() - offset, 15);
-    const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1).getTime();
-    const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59).getTime();
+    const targetPeriod = jalaliPeriods[offset] || jalaliPeriods[0];
+    const monthStart = targetPeriod.startDate.getTime();
+    const monthEnd = targetPeriod.endDate.getTime();
 
     const matchingServices = allSupplierServices.filter((s: any) => {
       const pDate = s.purchaseDate || s.createdAt ? new Date(s.purchaseDate || s.createdAt).getTime() : 0;
       const rDate = s.renewalDate ? new Date(s.renewalDate).getTime() : Infinity;
-      if (offset === 0) return true;
       return pDate <= monthEnd && rDate >= monthStart;
     });
 
     const total = matchingServices.reduce((sum, s) => sum + (Number(s.priceToman ?? s.monthlyExpenseToman) || 0), 0);
-    const monthLabel = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-      year: "numeric",
-      month: "long",
-    }).format(targetDate);
 
     return {
       totalToman: total,
       count: matchingServices.length,
-      label: monthLabel,
+      label: targetPeriod.shortLabel,
     };
-  }, [allSupplierServices, selectedPeriodMonth]);
+  }, [allSupplierServices, selectedPeriodMonth, jalaliPeriods]);
 
   // Dynamic category tabs for suppliers
   const supplierCategoryTabs = useMemo(() => {
@@ -784,26 +775,26 @@ function AdminSuppliersPage() {
         {/* Page Title & Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border/30">
           <div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
                 تامین‌کنندگان و زیرساخت
               </h1>
-              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+              <Chip size="sm" variant="soft" color="default" className="text-[11px] font-semibold">
                 مدیریت مخارج سرور و هاست
-              </span>
+              </Chip>
             </div>
             <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
               مدیریت دیتاسنترها، ماشین‌های ابری، خدمات دامنه و گزارش هزینه‌های زیرساخت
             </p>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <Link to="/categories">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+                className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
               >
-                <Layers className="h-3.5 w-3.5 text-purple-500" />
+                <Layers className="h-4 w-4 text-purple-500" />
                 <span>مدیریت دسته‌بندی‌ها</span>
               </Button>
             </Link>
@@ -811,9 +802,9 @@ function AdminSuppliersPage() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className="h-4 w-4" />
               بروزرسانی
             </Button>
             <Button

@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { apiClient } from "@/utils/api-client";
 import { Card, CardContent } from "@gecut-cloud/ui/components/card";
 import { Button } from "@gecut-cloud/ui/components/button";
+import { Chip } from "@heroui/react";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
@@ -312,8 +313,10 @@ function AdminInvoicesListPage() {
   });
 
   const services = useMemo(() => {
-    if (Array.isArray(servicesData)) return servicesData;
-    return servicesData?.items || [];
+    const list = Array.isArray(servicesData) ? servicesData : servicesData?.items || [];
+    return list.filter(
+      (s: any) => (!s.childServices || s.childServices.length === 0) && Boolean(s.customerId),
+    );
   }, [servicesData]);
 
   const { data: supplierServicesData } = useQuery({
@@ -654,14 +657,14 @@ function AdminInvoicesListPage() {
               صدور صورت‌حساب‌های دوره‌ای بر پایه اسنپ‌شات قطعی تومان و پیگیری مطالبات
             </p>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="gap-2 px-3.5 h-9"
+              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className="h-4 w-4" />
               بروزرسانی
             </Button>
             <Button
@@ -675,7 +678,7 @@ function AdminInvoicesListPage() {
                 }
                 setIsCreateOpen(true);
               }}
-              className="gap-2 px-4 h-9 cursor-pointer"
+              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               صدور فاکتور جدید
@@ -1218,9 +1221,9 @@ function AdminInvoicesListPage() {
         )}
 
         {/* Content-Based Category Tabs */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="text-xs text-muted-foreground font-semibold ml-1">دسته‌بندی موضوعی:</span>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            <span className="text-xs text-muted-foreground font-semibold ml-1 shrink-0">دسته‌بندی موضوعی:</span>
             {activeTabsList.map((cat: any) => {
               const Icon = cat.icon;
               return (
@@ -1235,11 +1238,11 @@ function AdminInvoicesListPage() {
                     }
                     setPage(1);
                   }}
-                  className={`text-xs gap-2 rounded-xl h-9 px-3.5 cursor-pointer ${
+                  className={`text-xs gap-2 rounded-xl h-9 px-3.5 cursor-pointer shrink-0 ${
                     selectedCategory === cat.id ? "bg-emerald-600 text-white hover:bg-emerald-500" : ""
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className="h-4 w-4 shrink-0" />
                   <span>{cat.label}</span>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
@@ -1254,9 +1257,9 @@ function AdminInvoicesListPage() {
           </div>
 
           {/* Counterparty Filter Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/30">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <span className="text-xs text-muted-foreground font-medium ml-1">نوع طرف‌حساب:</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/30">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-xs text-muted-foreground font-medium ml-1 shrink-0">نوع طرف‌حساب:</span>
               <Button
                 variant={counterpartyFilter === "ALL" ? "default" : "outline"}
                 size="sm"
@@ -1264,7 +1267,7 @@ function AdminInvoicesListPage() {
                   setCounterpartyFilter("ALL");
                   setPage(1);
                 }}
-                className={`text-xs rounded-xl h-8 px-3 cursor-pointer ${
+                className={`text-xs rounded-xl h-8 px-3 cursor-pointer shrink-0 ${
                   counterpartyFilter === "ALL" ? "bg-emerald-600 text-white shadow-xs" : ""
                 }`}
               >
@@ -1277,11 +1280,11 @@ function AdminInvoicesListPage() {
                   setCounterpartyFilter("CUSTOMER");
                   setPage(1);
                 }}
-                className={`text-xs rounded-xl h-8 px-3 cursor-pointer gap-1.5 ${
+                className={`text-xs rounded-xl h-8 px-3 cursor-pointer gap-1.5 shrink-0 ${
                   counterpartyFilter === "CUSTOMER" ? "bg-emerald-600 text-white shadow-xs" : ""
                 }`}
               >
-                <User className="h-3.5 w-3.5" />
+                <User className="h-4 w-4 shrink-0" />
                 فاکتورهای مشتریان (فروش)
               </Button>
               <Button
@@ -1291,20 +1294,20 @@ function AdminInvoicesListPage() {
                   setCounterpartyFilter("SUPPLIER");
                   setPage(1);
                 }}
-                className={`text-xs rounded-xl h-8 px-3 cursor-pointer gap-1.5 ${
+                className={`text-xs rounded-xl h-8 px-3 cursor-pointer gap-1.5 shrink-0 ${
                   counterpartyFilter === "SUPPLIER" ? "bg-purple-600 text-white shadow-xs" : ""
                 }`}
               >
-                <Building2 className="h-3.5 w-3.5" />
+                <Building2 className="h-4 w-4 shrink-0" />
                 فاکتورهای تامین‌کنندگان (خرید)
               </Button>
             </div>
           </div>
 
           {/* Status Sub-filter & Sorting Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <span className="text-xs text-muted-foreground font-medium ml-1">وضعیت پرداخت:</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-xs text-muted-foreground font-medium ml-1 shrink-0">وضعیت پرداخت:</span>
               {[
                 { id: "ALL", label: "همه وضعیت‌ها", count: nonCancelledInvoices.length },
                 { id: "UNPAID", label: "در انتظار پرداخت", count: unpaidCount },
@@ -1323,7 +1326,7 @@ function AdminInvoicesListPage() {
                     }
                     setPage(1);
                   }}
-                  className={`text-xs rounded-xl h-8.5 px-3 gap-2 cursor-pointer ${
+                  className={`text-xs rounded-xl h-8.5 px-3 gap-2 cursor-pointer shrink-0 ${
                     selectedStatus === tab.id ? "font-bold text-foreground bg-muted shadow-xs" : "text-muted-foreground"
                   }`}
                 >
@@ -1448,25 +1451,45 @@ function AdminInvoicesListPage() {
                       </td>
                       <td className="py-4 px-5 whitespace-nowrap">
                         {inv.status === "PAID" ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                            <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color="success"
+                            className="gap-1.5 text-[10px] font-medium whitespace-nowrap"
+                          >
+                            <CheckCircle className="h-3 w-3 shrink-0" />
                             پرداخت شده
-                          </span>
+                          </Chip>
                         ) : inv.status === "CANCELLED" ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
-                            <Ban className="h-3.5 w-3.5 shrink-0" />
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color="default"
+                            className="gap-1.5 text-[10px] font-medium whitespace-nowrap"
+                          >
+                            <Ban className="h-3 w-3 shrink-0" />
                             لغو شده
-                          </span>
+                          </Chip>
                         ) : inv.dueDate && new Date(inv.dueDate).getTime() < Date.now() ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 animate-pulse whitespace-nowrap">
-                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color="danger"
+                            className="gap-1.5 text-[10px] font-bold whitespace-nowrap"
+                          >
+                            <AlertCircle className="h-3 w-3 shrink-0" />
                             منقضی شده ({Math.max(1, Math.floor((Date.now() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24))).toLocaleString("fa-IR")} روز معوقه)
-                          </span>
+                          </Chip>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                            <Clock className="h-3.5 w-3.5 shrink-0" />
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color="warning"
+                            className="gap-1.5 text-[10px] font-medium whitespace-nowrap"
+                          >
+                            <Clock className="h-3 w-3 shrink-0" />
                             در انتظار پرداخت
-                          </span>
+                          </Chip>
                         )}
                       </td>
                       <td className="py-4 px-5 font-mono text-[11px] whitespace-nowrap">

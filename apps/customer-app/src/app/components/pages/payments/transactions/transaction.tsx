@@ -30,7 +30,7 @@ export function Transactions({ data, onPay, payingId }: TransactionProps) {
   }
 
   return (
-    <div className="w-full flex flex-col gap-2.5">
+    <div className="w-full flex flex-col gap-3">
       {data.map((x, idx) => {
         const isPending = x.status === "Awaiting payment";
 
@@ -42,7 +42,7 @@ export function Transactions({ data, onPay, payingId }: TransactionProps) {
             }`}
           >
             <div className="flex flex-col sm:flex-row w-full items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3.5 min-w-0 flex-1">
+              <div className="flex items-center gap-4 min-w-0 flex-1">
                 <div className="shrink-0 p-2 rounded-xl bg-accent-soft text-accent">
                   {x.type === "DOMAIN" ? (
                     <GalleryWide size={28} />

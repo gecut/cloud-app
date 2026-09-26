@@ -287,6 +287,12 @@ function AdminCustomerProfileDetailPage() {
     queryFn: () => apiClient<any>(`/customers/${id}`),
   });
 
+  // Fetch direct invoices for this customer to ensure fresh sync
+  const { data: customerInvoicesData } = useQuery({
+    queryKey: ["admin", "invoices", "customer", id],
+    queryFn: () => apiClient<{ items: any[]; total: number }>(`/invoices?customerId=${id}&limit=100`),
+  });
+
   // Fetch Audit Logs for this customer
   const { data: auditLogsData } = useQuery({
     queryKey: ["admin", "audit-logs", "customer", id],
@@ -883,12 +889,16 @@ function AdminCustomerProfileDetailPage() {
   };
 
   const invoicesList = useMemo(() => {
-    return [...(customer?.invoices || [])].sort((a: any, b: any) => {
+    const sourceInvoices =
+      customerInvoicesData?.items && customerInvoicesData.items.length > 0
+        ? customerInvoicesData.items
+        : customer?.invoices || [];
+    return [...sourceInvoices].sort((a: any, b: any) => {
       const timeA = new Date(a.createdAt || a.issuedAt || 0).getTime();
       const timeB = new Date(b.createdAt || b.issuedAt || 0).getTime();
       return timeB - timeA;
     });
-  }, [customer?.invoices]);
+  }, [customer?.invoices, customerInvoicesData?.items]);
 
   const activeCustomer = customer;
 
@@ -923,18 +933,24 @@ function AdminCustomerProfileDetailPage() {
   }
 
   const servicesList = useMemo(() => {
-    return [...(activeCustomer.services || [])].sort((a: any, b: any) => {
-      const timeA = new Date(a.createdAt || a.purchaseDate || a.startDate || 0).getTime();
-      const timeB = new Date(b.createdAt || b.purchaseDate || b.startDate || 0).getTime();
-      return timeB - timeA;
-    });
+    return [...(activeCustomer.services || [])]
+      .filter((s: any) => (!s.childServices || s.childServices.length === 0))
+      .sort((a: any, b: any) => {
+        const timeA = new Date(a.createdAt || a.purchaseDate || a.startDate || 0).getTime();
+        const timeB = new Date(b.createdAt || b.purchaseDate || b.startDate || 0).getTime();
+        return timeB - timeA;
+      });
   }, [activeCustomer?.services]);
   
   // Calculate summary metrics
+  const isInvoicePaid = (inv: any) => String(inv.status).toUpperCase() === "PAID" || Boolean(inv.payment);
+  const isInvoiceCancelled = (inv: any) => String(inv.status).toUpperCase() === "CANCELLED";
+  const isInvoiceUnpaid = (inv: any) => !isInvoicePaid(inv) && !isInvoiceCancelled(inv);
+
   const activeServicesCount = servicesList.filter((s: any) => s.status === "ACTIVE").length;
-  const unpaidInvoices = invoicesList.filter((inv: any) => inv.status === "UNPAID");
+  const unpaidInvoices = invoicesList.filter(isInvoiceUnpaid);
   const unpaidTotalToman = unpaidInvoices.reduce((acc: number, curr: any) => acc + (curr.totalToman || 0), 0);
-  const paidInvoices = invoicesList.filter((inv: any) => inv.status === "PAID");
+  const paidInvoices = invoicesList.filter(isInvoicePaid);
   const paidTotalToman = paidInvoices.reduce((acc: number, curr: any) => acc + (curr.totalToman || 0), 0);
 
   return (
@@ -1710,28 +1726,28 @@ function AdminCustomerProfileDetailPage() {
                                       <span>هشدار: دوره تعیین‌شده ({details.configuredCycleDays?.toLocaleString("fa-IR")} روز) بیشتر از بازه ({details.daysTotal.toLocaleString("fa-IR")} روز) است</span>
                                     </span>
                                   )}
-                                  {details.isTimeNearExpiry && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse w-fit">
-                                      <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
-                                      <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرویس</span>
-                                    </span>
-                                  )}
-                                  {details.isTimeExpired && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded-md font-medium mt-0.5 w-fit">
-                                      <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
-                                      <span>خطا: موعد سررسید {details.overdueDays?.toLocaleString("fa-IR")} روز پیش منقضی شده است</span>
-                                    </span>
-                                  )}
                                   {details.isQuantityDepleted && (
                                     <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded-md font-bold mt-0.5 w-fit">
                                       <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
                                       <span>بسته تمام شده (نیازمند تمدید سهمیه)</span>
                                     </span>
                                   )}
-                                  {details.isQuantityNearDepletion && (
+                                  {details.isTimeExpired && !details.isQuantityDepleted && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded-md font-medium mt-0.5 w-fit">
+                                      <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
+                                      <span>خطا: موعد سررسید {details.overdueDays?.toLocaleString("fa-IR")} روز پیش منقضی شده است</span>
+                                    </span>
+                                  )}
+                                  {!details.isExpired && details.isQuantityNearDepletion && (
                                     <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse w-fit">
                                       <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
                                       <span>هشدار: کمتر از ۵٪ سهمیه بسته باقی‌مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
+                                    </span>
+                                  )}
+                                  {!details.isExpired && details.isTimeNearExpiry && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse w-fit">
+                                      <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                      <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرویس</span>
                                     </span>
                                   )}
 
@@ -1948,16 +1964,16 @@ function AdminCustomerProfileDetailPage() {
                           <td className="py-4 px-5">
                             <span
                               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium ${
-                                inv.status === "PAID"
+                                isInvoicePaid(inv)
                                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                  : inv.status === "UNPAID"
+                                  : isInvoiceUnpaid(inv)
                                   ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                                   : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
                               }`}
                             >
-                              {inv.status === "PAID"
+                              {isInvoicePaid(inv)
                                 ? "پرداخت شده"
-                                : inv.status === "UNPAID"
+                                : isInvoiceUnpaid(inv)
                                 ? "پرداخت نشده"
                                 : "لغو شده"}
                             </span>

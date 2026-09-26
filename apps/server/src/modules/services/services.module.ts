@@ -7,11 +7,13 @@ import { ListServicesHandler } from "./queries/list-services/list-services.handl
 import { CategoriesController, ServiceTypesAliasController } from "./categories.controller";
 import { ServicesController } from "./services.controller";
 
+import { RenewalsModule } from "../renewals/renewals.module";
+
 const CommandHandlers = [CreateServiceHandler, UpdateServiceHandler];
 const QueryHandlers = [GetServiceHandler, ListServicesHandler];
 
 @Module({
-  imports: [CqrsModule],
+  imports: [CqrsModule, RenewalsModule],
   controllers: [ServicesController, CategoriesController, ServiceTypesAliasController],
   providers: [...CommandHandlers, ...QueryHandlers],
   exports: [...CommandHandlers, ...QueryHandlers],

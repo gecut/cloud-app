@@ -89,11 +89,11 @@ export function AppShell({ header, children }: AppShellProps) {
       {header}
       <div className="flex-1 flex relative">
         {/* Sleek Minimalist Sidebar (Responsive for Tablet & Desktop) */}
-        <aside className="w-52 lg:w-64 border-l border-border/40 bg-card/20 backdrop-blur-md p-3.5 lg:p-5 hidden md:flex flex-col gap-1 lg:gap-1.5 shrink-0 select-none transition-all duration-200">
-          <div className="px-3 py-1.5 lg:px-3.5 lg:py-2 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+        <aside className="w-52 lg:w-64 border-l border-border/40 bg-card/20 backdrop-blur-md p-4 lg:p-6 hidden md:flex flex-col gap-1 lg:gap-2 shrink-0 select-none transition-all duration-200">
+          <div className="px-3 py-2 lg:px-4 lg:py-2 text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
             مدیریت و نظارت
           </div>
-          <nav className="flex flex-col gap-1 lg:gap-1.5 mt-1.5">
+          <nav className="flex flex-col gap-1 lg:gap-2 mt-2">
             {navItems.map((item, idx) => {
               const Icon = item.icon;
               const isActive = item.exact
@@ -104,7 +104,7 @@ export function AppShell({ header, children }: AppShellProps) {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className={`group relative flex items-center gap-2.5 lg:gap-3 px-3 lg:px-4 py-2 lg:py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
+                  className={`group relative flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
                     isActive
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold shadow-xs"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
@@ -125,8 +125,8 @@ export function AppShell({ header, children }: AppShellProps) {
             })}
           </nav>
 
-          <div className="mt-auto pt-4 lg:pt-5 border-t border-border/30 flex flex-col gap-2 lg:gap-2.5">
-            <div className="p-2.5 lg:p-3.5 rounded-xl bg-card/40 border border-border/40 text-xs flex flex-col gap-1 lg:gap-1.5 backdrop-blur-xs">
+          <div className="mt-auto pt-4 lg:pt-6 border-t border-border/30 flex flex-col gap-2 lg:gap-3">
+            <div className="p-3 lg:p-4 rounded-xl bg-card/40 border border-border/40 text-xs flex flex-col gap-1 lg:gap-2 backdrop-blur-xs">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-foreground text-[11px]">جیکات کلود v1.0</span>
                 <span className="flex h-2 w-2 relative">
@@ -142,9 +142,9 @@ export function AppShell({ header, children }: AppShellProps) {
             <button
               type="button"
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 h-9 px-3 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-500/10 border border-rose-500/20 transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 h-8 px-4 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-500/10 border border-rose-500/20 transition-all cursor-pointer"
             >
-              <LogOut className="h-3.5 w-3.5" />
+              <LogOut className="h-4 w-4" />
               <span>خروج از حساب</span>
             </button>
           </div>

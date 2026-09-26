@@ -31,8 +31,8 @@ export function DashboardList({ data }: DashboardListProps) {
   const totalPrice = data.reduce((acc, s) => acc + (Number(s.priceToman) || 0), 0);
 
   return (
-    <div className="w-full flex flex-col gap-3">
-      <div className="w-full flex flex-col gap-2">
+    <div className="w-full flex flex-col gap-4">
+      <div className="w-full flex flex-col md:grid md:grid-cols-2 gap-3 md:gap-4">
         {data.map((service) => (
           <DashboardCard key={service.id} data={service} />
         ))}

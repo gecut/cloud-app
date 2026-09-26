@@ -114,12 +114,19 @@ export function Services() {
     return FALLBACK_CATEGORIES;
   }, [dynamicCategories]);
 
-  // Map real backend services without any fake mock fallbacks (newest first)
-  const sortedRawServices = [...(apiServices?.items || [])].sort((a: any, b: any) => {
-    const timeA = new Date(a.createdAt || a.purchaseDate || a.startDate || 0).getTime();
-    const timeB = new Date(b.createdAt || b.purchaseDate || b.startDate || 0).getTime();
-    return timeB - timeA;
-  });
+  // Map real backend services without any fake mock fallbacks (newest first, excluding parent organizational services)
+  const sortedRawServices = [...(apiServices?.items || [])]
+    .filter(
+      (s: any) =>
+        (!s.childServices || s.childServices.length === 0) &&
+        !s.isParent &&
+        Boolean(s.customerId),
+    )
+    .sort((a: any, b: any) => {
+      const timeA = new Date(a.createdAt || a.purchaseDate || a.startDate || 0).getTime();
+      const timeB = new Date(b.createdAt || b.purchaseDate || b.startDate || 0).getTime();
+      return timeB - timeA;
+    });
 
   const allServices: Service[] = sortedRawServices.map((item: any, idx: number) => {
     const matchedCategory = dynamicCategories.find(

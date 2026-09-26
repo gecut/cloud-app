@@ -25,15 +25,27 @@ export class RenewalsSchedulerService implements OnModuleInit {
   async checkAndProcessExpiredServices() {
     const now = new Date();
 
-    // 1. Auto-heal any services that were marked INACTIVE but are still valid
+    // 1. Auto-heal any services that were marked INACTIVE but are valid and autoRenew is ON
     try {
       const inactiveServices = await this.prisma.service.findMany({
         where: { status: "INACTIVE" },
       });
       for (const s of inactiveServices) {
-        const isDateValid = !s.renewalDate || new Date(s.renewalDate).getTime() >= now.getTime();
+        const trackingType = (s.trackingType || "HYBRID").toUpperCase();
+        const isTimeValid = !s.renewalDate || new Date(s.renewalDate).getTime() >= now.getTime();
         const hasRemainingQuota = s.quantity == null || Number(s.quantity) > Number(s.usedQuantity || 0);
-        if (isDateValid && hasRemainingQuota) {
+
+        let shouldHeal = false;
+        if (trackingType === "QUANTITY") {
+          shouldHeal = hasRemainingQuota;
+        } else if (trackingType === "TIME") {
+          shouldHeal = isTimeValid;
+        } else {
+          // HYBRID: Both must be valid (priority to quota)
+          shouldHeal = isTimeValid && hasRemainingQuota;
+        }
+
+        if (shouldHeal && s.autoRenew) {
           await this.prisma.service.update({
             where: { id: s.id },
             data: { status: "ACTIVE" },
@@ -57,16 +69,18 @@ export class RenewalsSchedulerService implements OnModuleInit {
     });
 
     const expiredServices = activeServices.filter((service) => {
+      const trackingType = (service.trackingType || "HYBRID").toUpperCase();
       const isTimeExpired =
-        service.trackingType !== "QUANTITY" &&
+        trackingType !== "QUANTITY" &&
         service.renewalDate &&
-        new Date(service.renewalDate).getTime() < now.getTime();
+        new Date(service.renewalDate).getTime() <= now.getTime();
 
       const isQuantityDepleted =
-        (service.trackingType === "QUANTITY" || service.trackingType === "HYBRID") &&
+        (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
         service.quantity != null &&
         Number(service.usedQuantity || 0) >= Number(service.quantity);
 
+      // In HYBRID: Quantity depletion takes precedence and finishes the service immediately
       return isTimeExpired || isQuantityDepleted;
     });
 
@@ -78,172 +92,7 @@ export class RenewalsSchedulerService implements OnModuleInit {
 
     for (const service of expiredServices) {
       try {
-        const isQuantityDepleted =
-          (service.trackingType === "QUANTITY" || service.trackingType === "HYBRID") &&
-          service.quantity != null &&
-          Number(service.usedQuantity || 0) >= Number(service.quantity);
-
-        const isAutoRenew = Boolean((service as any).autoRenew);
-
-        let cycleDays = 30;
-        const parsedCycle = Number((service as any).billingCycle);
-        if (!isNaN(parsedCycle) && parsedCycle > 0) {
-          cycleDays = parsedCycle;
-        } else if ((service as any).billingCycle === "ANNUAL") {
-          cycleDays = 365;
-        } else if ((service as any).billingCycle === "SEMI_ANNUAL") {
-          cycleDays = 180;
-        } else if ((service as any).billingCycle === "QUARTERLY") {
-          cycleDays = 90;
-        }
-
-        if (isAutoRenew) {
-          // --- AUTO RENEW ACTIVE: Advance dates, reset quota, keep ACTIVE, issue invoice and payment ---
-          const previousRenewalDate = service.renewalDate ? new Date(service.renewalDate) : now;
-          let targetRenewalDate = new Date(previousRenewalDate.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-          if (targetRenewalDate.getTime() <= now.getTime()) {
-            targetRenewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-          }
-
-          await this.prisma.service.update({
-            where: { id: service.id },
-            data: {
-              status: "ACTIVE",
-              purchaseDate: previousRenewalDate,
-              renewalDate: targetRenewalDate,
-              usedQuantity: 0,
-            },
-          });
-
-          // Issue renewal invoice & payment
-          const year = new Date().getFullYear();
-          const seq = await this.prisma.invoiceSequence.upsert({
-            where: { year },
-            create: { year, lastNumber: 1 },
-            update: { lastNumber: { increment: 1 } },
-          });
-          const invoiceNumber = (30000 + seq.lastNumber).toString();
-
-          const price = Number(service.priceToman) || 0;
-          const isFree = price === 0;
-          const isQty = service.trackingType === "QUANTITY";
-          const itemTitle = isQty
-            ? `تمدید خودکار بسته ${service.name} (ظرفیت: ${(service.quantity || 1).toLocaleString("fa-IR")})`
-            : `تمدید خودکار سرویس ${service.name} (${cycleDays.toLocaleString("fa-IR")} روزه)`;
-          const itemDesc = isQty
-            ? `تمدید و شارژ مجدد سهمیه ${service.quantity || 1} عددی ${service.name}`
-            : `تمدید دوره جدید برای سرویس ${service.name}`;
-          const dueDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-          const newInvoice = await this.prisma.invoice.create({
-            data: {
-              customerId: service.customerId,
-              invoiceNumber,
-              status: isFree ? "PAID" : "UNPAID",
-              subtotalToman: price,
-              totalToman: price,
-              paidAt: isFree ? now : null,
-              dueDate,
-              notes: isFree
-                ? `صورت‌حساب تمدید خودکار سرویس رایگان ${service.name} (تایید خودکار سیستمی)`
-                : `صورت‌حساب تمدید خودکار دوره جدید سرویس ${service.name}`,
-              items: {
-                create: [
-                  {
-                    serviceId: service.id,
-                    title: itemTitle,
-                    description: itemDesc,
-                    quantity: 1,
-                    unitPriceToman: price,
-                    totalToman: price,
-                    serviceNameSnapshot: service.name,
-                    servicePriceSnapshotToman: price,
-                    serviceRenewalDateSnapshot: targetRenewalDate,
-                  },
-                ],
-              },
-            },
-          });
-
-          let paymentRecord: any = null;
-          if (isFree) {
-            paymentRecord = await this.prisma.payment.create({
-              data: {
-                invoiceId: newInvoice.id,
-                amountToman: 0,
-                provider: "FREE_PLAN",
-                gatewayRef: `FREE_${newInvoice.id}_${Date.now()}`,
-                paidAt: now,
-              },
-            });
-          }
-
-          this.logger.log(
-            `[AutoRenew] Renewed service ${service.name} (${service.id}) to ${targetRenewalDate.toISOString().slice(0, 10)}. Issued invoice ${newInvoice.invoiceNumber} (${isFree ? "Free/PAID" : "UNPAID"}).`,
-          );
-
-          await this.prisma.auditLog
-            .create({
-              data: {
-                actorType: "SYSTEM",
-                actorRole: "ADMIN",
-                actorDisplayNameSnapshot: "سیستم تمدید خودکار",
-                action: "service.auto_renewed",
-                entityType: "Service",
-                entityId: service.id,
-                reason: `تمدید خودکار سرویس ${service.name}، پیشبرد سررسید به ${targetRenewalDate.toISOString().slice(0, 10)} و صدور صورت‌حساب ${newInvoice.invoiceNumber}`,
-                metadata: {
-                  customerId: service.customerId || null,
-                  invoiceId: newInvoice.id,
-                  invoiceNumber: newInvoice.invoiceNumber,
-                  isFree,
-                  paymentId: paymentRecord?.id || null,
-                },
-                after: {
-                  serviceId: service.id,
-                  status: "ACTIVE",
-                  renewalDate: targetRenewalDate.toISOString(),
-                  usedQuantity: 0,
-                  invoiceId: newInvoice.id,
-                  invoiceNumber: newInvoice.invoiceNumber,
-                  totalToman: price,
-                  isFree,
-                },
-              },
-            })
-            .catch(() => {});
-        } else {
-          // --- AUTO RENEW OFF: Deactivate service and record audit log ---
-          const reasonMsg = isQuantityDepleted
-            ? `سقف ظرفیت و سهمیه بسته ${service.name} به پایان رسید؛ تغییر وضعیت به غیرفعال توسط سیستم (عدم فعال بودن تمدید خودکار)`
-            : `تاریخ سررسید سرویس ${service.name} به پایان رسید؛ تغییر وضعیت به غیرفعال توسط سیستم (عدم فعال بودن تمدید خودکار)`;
-
-          await this.prisma.service.update({
-            where: { id: service.id },
-            data: { status: "INACTIVE" },
-          });
-
-          await this.prisma.auditLog
-            .create({
-              data: {
-                actorType: "SYSTEM",
-                actorRole: "ADMIN",
-                actorDisplayNameSnapshot: "سیستم هوشمند انقضا و تمدید",
-                action: "service.expired_deactivated",
-                entityType: "Service",
-                entityId: service.id,
-                reason: reasonMsg,
-                after: {
-                  serviceId: service.id,
-                  status: "INACTIVE",
-                  renewalDate: service.renewalDate ? new Date(service.renewalDate).toISOString() : null,
-                  usedQuantity: service.usedQuantity,
-                  quantity: service.quantity,
-                },
-              },
-            })
-            .catch(() => {});
-        }
+        await this.processServiceExpiration(service, now);
       } catch (err) {
         this.logger.error(`Failed to process expired service ${service.id}`, err);
       }
@@ -327,6 +176,226 @@ export class RenewalsSchedulerService implements OnModuleInit {
       }
     } catch (supErr) {
       this.logger.error("Failed to process expired supplier services", supErr);
+    }
+  }
+
+  async processSingleServiceById(serviceId: string): Promise<boolean> {
+    const service = await this.prisma.service.findUnique({
+      where: { id: serviceId },
+      include: { customer: true },
+    });
+    if (!service) return false;
+    return this.processServiceExpiration(service);
+  }
+
+  async processServiceExpiration(service: any, now = new Date()): Promise<boolean> {
+    const trackingType = (service.trackingType || "HYBRID").toUpperCase();
+
+    const isTimeExpired =
+      trackingType !== "QUANTITY" &&
+      service.renewalDate &&
+      new Date(service.renewalDate).getTime() <= now.getTime();
+
+    const isQuantityDepleted =
+      (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+      service.quantity != null &&
+      Number(service.usedQuantity || 0) >= Number(service.quantity);
+
+    // Business rule: For HYBRID packages, priority is on quantity:
+    // If quantity ends first, service is expired immediately!
+    const isExpired =
+      trackingType === "QUANTITY"
+        ? isQuantityDepleted
+        : trackingType === "TIME"
+        ? isTimeExpired
+        : isQuantityDepleted || isTimeExpired;
+
+    if (!isExpired) {
+      return false;
+    }
+
+    const isAutoRenew = Boolean(service.autoRenew);
+
+    let cycleDays = 30;
+    const parsedCycle = Number(service.billingCycle);
+    if (!isNaN(parsedCycle) && parsedCycle > 0) {
+      cycleDays = parsedCycle;
+    } else if (service.billingCycle === "ANNUAL") {
+      cycleDays = 365;
+    } else if (service.billingCycle === "SEMI_ANNUAL") {
+      cycleDays = 180;
+    } else if (service.billingCycle === "QUARTERLY") {
+      cycleDays = 90;
+    }
+
+    if (isAutoRenew) {
+      // --- AUTO RENEW ACTIVE ---
+      let newStartDate: Date;
+      let targetRenewalDate: Date;
+
+      if (trackingType === "QUANTITY") {
+        newStartDate = now;
+        targetRenewalDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+      } else if (trackingType === "HYBRID" && isQuantityDepleted) {
+        // Quota finished early! New cycle begins NOW
+        newStartDate = now;
+        targetRenewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+      } else {
+        // Time-based renewal
+        const previousRenewalDate = service.renewalDate ? new Date(service.renewalDate) : now;
+        newStartDate = previousRenewalDate.getTime() > now.getTime() ? now : previousRenewalDate;
+        targetRenewalDate = new Date(previousRenewalDate.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+        if (targetRenewalDate.getTime() <= now.getTime()) {
+          targetRenewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+        }
+      }
+
+      await this.prisma.service.update({
+        where: { id: service.id },
+        data: {
+          status: "ACTIVE",
+          purchaseDate: newStartDate,
+          renewalDate: targetRenewalDate,
+          usedQuantity: 0,
+        },
+      });
+
+      const year = now.getFullYear();
+      const seq = await this.prisma.invoiceSequence.upsert({
+        where: { year },
+        create: { year, lastNumber: 1 },
+        update: { lastNumber: { increment: 1 } },
+      });
+      const invoiceNumber = (30000 + seq.lastNumber).toString();
+
+      const price = Number(service.priceToman) || 0;
+      const isFree = price === 0;
+
+      let itemTitle = `تمدید خودکار سرویس ${service.name} (${cycleDays.toLocaleString("fa-IR")} روزه)`;
+      let itemDesc = `تمدید دوره جدید برای سرویس ${service.name}`;
+
+      if (trackingType === "QUANTITY") {
+        itemTitle = `تمدید خودکار بسته ${service.name} (شارژ مجدد سهمیه ${(service.quantity || 1).toLocaleString("fa-IR")} عددی)`;
+        itemDesc = `شارژ مجدد سهمیه ${service.quantity || 1} عددی ${service.name}`;
+      } else if (trackingType === "HYBRID" && isQuantityDepleted) {
+        itemTitle = `تمدید خودکار بسته ترکیبی ${service.name} (به دلیل اتمام سهمیه عددی)`;
+        itemDesc = `تمدید دوره و شارژ مجدد سهمیه ${(service.quantity || 1).toLocaleString("fa-IR")} عددی ${service.name} (${cycleDays.toLocaleString("fa-IR")} روزه)`;
+      }
+
+      const dueDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      const newInvoice = await this.prisma.invoice.create({
+        data: {
+          customerId: service.customerId,
+          invoiceNumber,
+          status: isFree ? "PAID" : "UNPAID",
+          subtotalToman: price,
+          totalToman: price,
+          paidAt: isFree ? now : null,
+          dueDate,
+          notes: isFree
+            ? `صورت‌حساب تمدید خودکار سرویس رایگان ${service.name} (تایید خودکار سیستمی)`
+            : `صورت‌حساب تمدید خودکار دوره جدید سرویس ${service.name}`,
+          items: {
+            create: [
+              {
+                serviceId: service.id,
+                title: itemTitle,
+                description: itemDesc,
+                quantity: 1,
+                unitPriceToman: price,
+                totalToman: price,
+                serviceNameSnapshot: service.name,
+                servicePriceSnapshotToman: price,
+                serviceRenewalDateSnapshot: targetRenewalDate,
+              },
+            ],
+          },
+        },
+      });
+
+      let paymentRecord: any = null;
+      if (isFree) {
+        paymentRecord = await this.prisma.payment.create({
+          data: {
+            invoiceId: newInvoice.id,
+            amountToman: 0,
+            provider: "FREE_PLAN",
+            gatewayRef: `FREE_${newInvoice.id}_${Date.now()}`,
+            paidAt: now,
+          },
+        });
+      }
+
+      this.logger.log(
+        `[AutoRenew] Renewed service ${service.name} (${service.id}) to ${targetRenewalDate.toISOString().slice(0, 10)}. Issued invoice ${newInvoice.invoiceNumber} (${isFree ? "Free/PAID" : "UNPAID"}).`,
+      );
+
+      await this.prisma.auditLog
+        .create({
+          data: {
+            actorType: "SYSTEM",
+            actorRole: "ADMIN",
+            actorDisplayNameSnapshot: "سیستم تمدید خودکار",
+            action: "service.auto_renewed",
+            entityType: "Service",
+            entityId: service.id,
+            reason: `تمدید خودکار سرویس ${service.name}، پیشبرد سررسید به ${targetRenewalDate.toISOString().slice(0, 10)} و صدور صورت‌حساب ${newInvoice.invoiceNumber}`,
+            metadata: {
+              customerId: service.customerId || null,
+              invoiceId: newInvoice.id,
+              invoiceNumber: newInvoice.invoiceNumber,
+              isFree,
+              paymentId: paymentRecord?.id || null,
+            },
+            after: {
+              serviceId: service.id,
+              status: "ACTIVE",
+              renewalDate: targetRenewalDate.toISOString(),
+              usedQuantity: 0,
+              invoiceId: newInvoice.id,
+              invoiceNumber: newInvoice.invoiceNumber,
+              totalToman: price,
+              isFree,
+            },
+          },
+        })
+        .catch(() => {});
+
+      return true;
+    } else {
+      // --- AUTO RENEW OFF: Deactivate service and record audit log ---
+      const reasonMsg = isQuantityDepleted
+        ? `سقف ظرفیت و سهمیه بسته ${service.name} به پایان رسید؛ تغییر وضعیت به غیرفعال توسط سیستم (عدم فعال بودن تمدید خودکار)`
+        : `تاریخ سررسید سرویس ${service.name} به پایان رسید؛ تغییر وضعیت به غیرفعال توسط سیستم (عدم فعال بودن تمدید خودکار)`;
+
+      await this.prisma.service.update({
+        where: { id: service.id },
+        data: { status: "INACTIVE" },
+      });
+
+      await this.prisma.auditLog
+        .create({
+          data: {
+            actorType: "SYSTEM",
+            actorRole: "ADMIN",
+            actorDisplayNameSnapshot: "سیستم هوشمند انقضا و تمدید",
+            action: "service.expired_deactivated",
+            entityType: "Service",
+            entityId: service.id,
+            reason: reasonMsg,
+            after: {
+              serviceId: service.id,
+              status: "INACTIVE",
+              renewalDate: service.renewalDate ? new Date(service.renewalDate).toISOString() : null,
+              usedQuantity: service.usedQuantity,
+              quantity: service.quantity,
+            },
+          },
+        })
+        .catch(() => {});
+
+      return true;
     }
   }
 }

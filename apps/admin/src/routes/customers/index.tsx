@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { apiClient } from "@/utils/api-client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@gecut-cloud/ui/components/card";
 import { Button } from "@gecut-cloud/ui/components/button";
+import { Chip } from "@heroui/react";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
@@ -221,14 +222,14 @@ function AdminCustomersListPage() {
               مشاهده پرونده، سرویس‌های زیرساخت و دسترسی مشترکین حقیقی و حقوقی
             </p>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className="h-4 w-4" />
               بروزرسانی
             </Button>
             <Button
@@ -499,26 +500,29 @@ function AdminCustomersListPage() {
                           </span>
                         )}
                       </div>
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-bold border shrink-0 ${
+                      <Chip
+                        size="sm"
+                        variant="soft"
+                        color={
                           customer.status === "ACTIVE"
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                            ? "success"
                             : customer.status === "INACTIVE"
-                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
-                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                        }`}
+                            ? "danger"
+                            : "warning"
+                        }
+                        className="gap-1 text-[11px] font-bold shrink-0"
                       >
                         {customer.status === "ACTIVE" ? (
-                          <CheckCircle className="h-3.5 w-3.5" />
+                          <CheckCircle className="h-3 w-3" />
                         ) : (
-                          <Ban className="h-3.5 w-3.5" />
+                          <Ban className="h-3 w-3" />
                         )}
                         {customer.status === "ACTIVE"
                           ? "فعال"
                           : customer.status === "INACTIVE"
                           ? "غیرفعال"
                           : "معلق"}
-                      </span>
+                      </Chip>
                     </div>
 
                     {/* Contact details */}
@@ -593,19 +597,22 @@ function AdminCustomersListPage() {
                           <span className="font-semibold text-xs text-foreground truncate">
                             {nearestService.name}
                           </span>
-                          <span
-                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold shrink-0 border ${
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color={
                               nearestService.daysLeft <= 7
-                                ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                                ? "danger"
                                 : nearestService.daysLeft <= 15
-                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                            }`}
+                                ? "warning"
+                                : "success"
+                            }
+                            className="text-[10px] font-bold shrink-0"
                           >
                             {nearestService.daysLeft <= 0
                               ? "منقضی شده"
                               : `${nearestService.daysLeft} روز تا سررسید`}
-                          </span>
+                          </Chip>
                         </div>
                       ) : (
                         <span className="text-[11px] text-muted-foreground italic">
@@ -626,7 +633,7 @@ function AdminCustomersListPage() {
                   )}
 
                   {/* Action Buttons: Profile + Deactivate/Activate */}
-                  <div className="relative z-30 mt-4 pt-3.5 border-t border-border/30 flex items-center gap-2.5">
+                  <div className="relative z-30 mt-4 pt-4 border-t border-border/30 flex items-center gap-2">
                     <Link
                       to="/customers/$id"
                       params={{ id: customer.id }}
@@ -636,7 +643,7 @@ function AdminCustomersListPage() {
                         variant="outline"
                         className="w-full h-9 rounded-xl text-xs font-semibold gap-2 border-border/60 hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all cursor-pointer"
                       >
-                        <User className="h-3.5 w-3.5" />
+                        <User className="h-4 w-4" />
                         پروفایل
                       </Button>
                     </Link>
@@ -656,7 +663,7 @@ function AdminCustomersListPage() {
                         className="h-9 px-3 rounded-xl text-xs font-semibold gap-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-300 dark:border-rose-900/50 cursor-pointer"
                         title="غیرفعال کردن مشتری"
                       >
-                        <Ban className="h-3.5 w-3.5" />
+                        <Ban className="h-4 w-4" />
                         <span className="hidden sm:inline">غیرفعال</span>
                       </Button>
                     ) : (
@@ -674,7 +681,7 @@ function AdminCustomersListPage() {
                         className="h-9 px-3 rounded-xl text-xs font-semibold gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 cursor-pointer"
                         title="فعال کردن مشتری"
                       >
-                        <CheckCircle className="h-3.5 w-3.5" />
+                        <CheckCircle className="h-4 w-4" />
                         <span className="hidden sm:inline">فعال</span>
                       </Button>
                     )}
@@ -684,10 +691,10 @@ function AdminCustomersListPage() {
                       size="sm"
                       onClick={() => setCustomerToDelete(customer)}
                       disabled={deleteCustomerMutation.isPending}
-                      className="h-9 px-2.5 rounded-xl text-xs font-semibold gap-1 text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:border-rose-900/40 cursor-pointer transition-colors"
+                      className="h-9 px-3 rounded-xl text-xs font-semibold gap-1 text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:border-rose-900/40 cursor-pointer transition-colors"
                       title="حذف پرونده مشتری"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

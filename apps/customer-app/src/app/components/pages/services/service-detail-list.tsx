@@ -35,7 +35,7 @@ export function ServiceDetailList({
   }
 
   return (
-    <div className="flex w-full flex-col items-center gap-5 mt-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mt-6 w-full">
       {data.map((service) => (
         <ServiceDetailCard
           key={service.id}

@@ -10,19 +10,11 @@ export function InvoiceCard({
   className,
   onPay,
   isPaying = false,
-  onCancel,
-  isCancelling = false,
-  onReactivate,
-  isReactivating = false,
 }: {
   data: Payments;
   className?: string;
   onPay?: (invoice: Payments) => void;
   isPaying?: boolean;
-  onCancel?: (invoice: Payments) => void;
-  isCancelling?: boolean;
-  onReactivate?: (invoice: Payments) => void;
-  isReactivating?: boolean;
 }) {
   const deadlineDate = data.paymentDeadline ? new Date(data.paymentDeadline) : null;
   const isOverdue =
@@ -56,6 +48,14 @@ export function InvoiceCard({
         {isOverdue && (
           <span className="text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full">
             منقضی شده ({overdueDays.toLocaleString("fa-IR")} روز معوقه)
+          </span>
+        )}
+        {data.status === "paid" && (
+          <span className="text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+            <svg className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            پرداخت شده
           </span>
         )}
       </div>
@@ -93,46 +93,38 @@ export function InvoiceCard({
 
       <Table payments={data} />
 
+      {data.status === "paid" && (
+        <div className="flex items-center justify-between w-full p-4 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl text-xs">
+          <span className="text-emerald-800 dark:text-emerald-300 font-medium flex items-center gap-1.5">
+            <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            وضعیت فاکتور:
+          </span>
+          <span className="text-emerald-700 dark:text-emerald-300 font-semibold px-2.5 py-1 bg-emerald-500/15 rounded-lg flex items-center gap-1">
+            پرداخت شده و تسویه گردید
+          </span>
+        </div>
+      )}
+
       {data.status === "Awaiting payment" && (
         <div className="flex flex-col gap-2.5 w-full">
           <Button
             variant={isOverdue ? "danger" : "primary"}
             className="w-full rounded-xl font-medium py-2.5 cursor-pointer shadow-xs transition-opacity"
-            isDisabled={isPaying || isCancelling}
+            isDisabled={isPaying}
             onPress={() => onPay?.(data)}
           >
             {isPaying ? "در حال اتصال به درگاه و ثبت پرداخت..." : isOverdue ? "پرداخت فوری فاکتور معوقه" : "پرداخت آنلاین"}
           </Button>
-
-          {onCancel && (
-            <Button
-              variant="outline"
-              className="w-full rounded-xl font-medium py-2 text-xs text-rose-500 border border-rose-500/30 hover:bg-rose-500/10 cursor-pointer transition-colors"
-              isDisabled={isPaying || isCancelling}
-              onPress={() => onCancel(data)}
-            >
-              {isCancelling ? "در حال لغو فاکتور..." : "لغو این فاکتور"}
-            </Button>
-          )}
         </div>
       )}
 
       {data.status === "cancelled" && (
-        <div className="flex flex-col gap-3 w-full p-4 bg-muted/20 border border-border/40 rounded-2xl">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground font-medium">وضعیت فاکتور:</span>
-            <span className="text-rose-500 font-semibold">لغو شده</span>
-          </div>
-          {onReactivate && (
-            <Button
-              variant="outline"
-              className="w-full rounded-xl font-medium py-2.5 text-xs text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer transition-colors"
-              isDisabled={isReactivating}
-              onPress={() => onReactivate(data)}
-            >
-              {isReactivating ? "در حال فعال‌سازی..." : "فعال‌سازی مجدد فاکتور"}
-            </Button>
-          )}
+        <div className="flex items-center justify-between w-full p-4 bg-muted/20 border border-border/40 rounded-2xl text-xs">
+          <span className="text-muted-foreground font-medium">وضعیت فاکتور:</span>
+          <span className="text-rose-500 font-semibold px-2.5 py-1 bg-rose-500/10 rounded-lg">لغو شده توسط مدیریت</span>
         </div>
       )}
     </div>

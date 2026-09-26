@@ -118,7 +118,6 @@ function getSupplierItemCategory(item: any, categories: any[]): string {
 
 function AdminAccountingPage() {
   const [activeTab, setActiveTab] = useState<"sales" | "procurement">("sales");
-  const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "amount-desc" | "amount-asc">("newest");
   const [page, setPage] = useState(1);
   const PAGE_LIMIT = 30;
@@ -134,7 +133,6 @@ function AdminAccountingPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(true);
 
   // Procurement Filter States
-  const [selectedSupplierCategory, setSelectedSupplierCategory] = useState("ALL");
   const [filterSupplierId, setFilterSupplierId] = useState<string>("ALL");
   const [filterSupplierStatus, setFilterSupplierStatus] = useState<string>("ALL");
   const [filterSupplierFromDate, setFilterSupplierFromDate] = useState<string>("");
@@ -231,16 +229,13 @@ function AdminAccountingPage() {
   // Multi-Criteria Filtering
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv: any) => {
-      // 1. Content category
-      if (selectedCategory !== "ALL" && getAccountingItemCategory(inv, dynamicCategories) !== selectedCategory) return false;
-
-      // 2. Customer
+      // 1. Customer
       if (filterCustomerId !== "ALL" && String(inv.customerId) !== String(filterCustomerId)) return false;
 
-      // 3. Status
+      // 2. Status
       if (filterStatus !== "ALL" && inv.status !== filterStatus) return false;
 
-      // 4. Amount Range
+      // 3. Amount Range
       const amount = Number(inv.totalToman || 0);
       if (minAmount && !isNaN(Number(minAmount)) && amount < Number(minAmount)) return false;
       if (maxAmount && !isNaN(Number(maxAmount)) && amount > Number(maxAmount)) return false;
@@ -263,7 +258,7 @@ function AdminAccountingPage() {
 
       return true;
     });
-  }, [invoices, dynamicCategories, selectedCategory, filterCustomerId, filterStatus, minAmount, maxAmount, filterFromDate, filterToDate, filterDateType]);
+  }, [invoices, filterCustomerId, filterStatus, minAmount, maxAmount, filterFromDate, filterToDate, filterDateType]);
 
 
   const hasActiveFilters = Boolean(
@@ -272,12 +267,10 @@ function AdminAccountingPage() {
     filterFromDate ||
     filterToDate ||
     minAmount ||
-    maxAmount ||
-    selectedCategory !== "ALL"
+    maxAmount
   );
 
   const resetAllFilters = () => {
-    setSelectedCategory("ALL");
     setFilterCustomerId("ALL");
     setFilterStatus("ALL");
     setFilterFromDate("");
@@ -326,21 +319,18 @@ function AdminAccountingPage() {
   // Filtered Supplier Services
   const filteredSupplierServices = useMemo(() => {
     return allSupplierServices.filter((svc: any) => {
-      // 1. Content Category
-      if (selectedSupplierCategory !== "ALL" && getSupplierItemCategory(svc, dynamicCategories) !== selectedSupplierCategory) return false;
-
-      // 2. Specific Supplier
+      // 1. Specific Supplier
       if (filterSupplierId !== "ALL" && String(svc.supplierId) !== String(filterSupplierId)) return false;
 
-      // 3. Status
+      // 2. Status
       if (filterSupplierStatus !== "ALL" && svc.status !== filterSupplierStatus) return false;
 
-      // 4. Amount Range
+      // 3. Amount Range
       const amount = Number(svc.monthlyExpenseToman || svc.priceToman || 0);
       if (minSupplierAmount && !isNaN(Number(minSupplierAmount)) && amount < Number(minSupplierAmount)) return false;
       if (maxSupplierAmount && !isNaN(Number(maxSupplierAmount)) && amount > Number(maxSupplierAmount)) return false;
 
-      // 5. Date Range
+      // 4. Date Range
       const targetDateStr = filterSupplierDateType === "purchaseDate" ? (svc.purchaseDate || svc.createdAt) : svc.renewalDate;
       if (targetDateStr) {
         const targetTime = new Date(targetDateStr).getTime();
@@ -358,7 +348,7 @@ function AdminAccountingPage() {
 
       return true;
     });
-  }, [allSupplierServices, dynamicCategories, selectedSupplierCategory, filterSupplierId, filterSupplierStatus, minSupplierAmount, maxSupplierAmount, filterSupplierFromDate, filterSupplierToDate, filterSupplierDateType]);
+  }, [allSupplierServices, filterSupplierId, filterSupplierStatus, minSupplierAmount, maxSupplierAmount, filterSupplierFromDate, filterSupplierToDate, filterSupplierDateType]);
 
   const hasActiveSupplierFilters = Boolean(
     filterSupplierId !== "ALL" ||
@@ -366,12 +356,10 @@ function AdminAccountingPage() {
     filterSupplierFromDate ||
     filterSupplierToDate ||
     minSupplierAmount ||
-    maxSupplierAmount ||
-    selectedSupplierCategory !== "ALL"
+    maxSupplierAmount
   );
 
   const resetAllSupplierFilters = () => {
-    setSelectedSupplierCategory("ALL");
     setFilterSupplierId("ALL");
     setFilterSupplierStatus("ALL");
     setFilterSupplierFromDate("");
@@ -403,15 +391,9 @@ function AdminAccountingPage() {
     return suppliers.filter((sup: any) => {
       if (filterSupplierId !== "ALL" && String(sup.id) !== String(filterSupplierId)) return false;
       if (filterSupplierStatus !== "ALL" && sup.status !== filterSupplierStatus) return false;
-      if (selectedSupplierCategory !== "ALL") {
-        const hasMatchingSvc = (sup.services || []).some(
-          (s: any) => getSupplierItemCategory(s, dynamicCategories) === selectedSupplierCategory
-        );
-        if (!hasMatchingSvc) return false;
-      }
       return true;
     });
-  }, [suppliers, dynamicCategories, filterSupplierId, filterSupplierStatus, selectedSupplierCategory]);
+  }, [suppliers, filterSupplierId, filterSupplierStatus]);
 
   const handleRefresh = () => {
     refetchInvoices();
@@ -431,20 +413,20 @@ function AdminAccountingPage() {
               بررسی همزمان درآمدها و وصولی‌های فروش در برابر هزینه‌ها و بدهی‌های تامین‌کنندگان زیرساخت
             </p>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={handleRefresh}
-              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className="h-4 w-4" />
               بروزرسانی
             </Button>
             <Link to="/invoices">
               <Button
                 size="sm"
-                className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
+                className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
               >
                 <FileText className="h-4 w-4" />
                 مدیریت فاکتورها
@@ -454,9 +436,9 @@ function AdminAccountingPage() {
         </div>
 
         {/* Top KPI Metrics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* 1. Collected Revenue */}
-          <div className="rounded-2xl border border-border/50 bg-card/50 p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all">
+          <div className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground">وصول‌شده ماه (فروش)</span>
               <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
@@ -473,7 +455,7 @@ function AdminAccountingPage() {
           </div>
 
           {/* 2. Supplier Expenses */}
-          <div className="rounded-2xl border border-border/50 bg-card/50 p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-rose-500/30 transition-all">
+          <div className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-rose-500/30 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground">هزینه‌های تامین‌کنندگان</span>
               <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">
@@ -490,7 +472,7 @@ function AdminAccountingPage() {
           </div>
 
           {/* 3. Net Margin */}
-          <div className="rounded-2xl border border-border/50 bg-card/50 p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-indigo-500/30 transition-all">
+          <div className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-indigo-500/30 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground">تراز مالی (سود عملیاتی)</span>
               <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">
@@ -511,7 +493,7 @@ function AdminAccountingPage() {
           </div>
 
           {/* 4. Customer Receivables */}
-          <div className="rounded-2xl border border-border/50 bg-card/50 p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-amber-500/30 transition-all">
+          <div className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-amber-500/30 transition-all">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground">مطالبات معوق از مشتریان</span>
               <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
@@ -529,12 +511,12 @@ function AdminAccountingPage() {
         </div>
 
         {/* Two-Tabs Navigation: Sales vs Procurement */}
-        <div className="flex items-center gap-3 border-b border-border/40 pb-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 border-b border-border/40 pb-2">
           <Button
             variant={activeTab === "sales" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("sales")}
-            className={`rounded-xl text-xs gap-2 cursor-pointer h-9 px-4 font-semibold ${
+            className={`rounded-xl text-xs gap-2 cursor-pointer h-9 px-4 font-semibold justify-center sm:justify-start ${
               activeTab === "sales" ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : "text-muted-foreground"
             }`}
           >
@@ -546,7 +528,7 @@ function AdminAccountingPage() {
             variant={activeTab === "procurement" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("procurement")}
-            className={`rounded-xl text-xs gap-2 cursor-pointer h-9 px-4 font-semibold ${
+            className={`rounded-xl text-xs gap-2 cursor-pointer h-9 px-4 font-semibold justify-center sm:justify-start ${
               activeTab === "procurement" ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : "text-muted-foreground"
             }`}
           >
@@ -558,58 +540,17 @@ function AdminAccountingPage() {
         {/* TAB 1: SALES & RECEIVABLES */}
         {activeTab === "sales" && (
           <div className="flex flex-col gap-4">
-            {/* Content-Based Category Tabs */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-xs text-muted-foreground font-semibold ml-1">دسته‌بندی موضوعی اسناد:</span>
-              <Button
-                key="ALL"
-                variant={selectedCategory === "ALL" ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setSelectedCategory("ALL");
-                  setPage(1);
-                }}
-                className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
-                  selectedCategory === "ALL" ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
-                }`}
-              >
-                <Layers className="h-4 w-4" />
-                همه خدمات
-              </Button>
-              {dynamicCategories.map((cat: any) => {
-                const Icon = getCategoryIcon(cat.slug, cat.name);
-                return (
-                  <Button
-                    key={cat.id}
-                    variant={selectedCategory === cat.slug ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedCategory(cat.slug);
-                      setPage(1);
-                    }}
-                    className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
-                      selectedCategory === cat.slug ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {cat.name}
-                  </Button>
-                );
-              })}
-            </div>
-
-
             {/* Comprehensive Multi-Filter Bar */}
-            <div className="relative z-20 rounded-2xl border border-border/60 bg-card/50 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
-              <div className="flex items-center justify-between pb-3 border-b border-border/30">
-                <div className="flex items-center gap-2.5">
+            <div className="relative z-20 rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/30">
+                <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
                     <Filter className="h-4 w-4" />
                   </div>
-                  <span className="text-xs font-bold text-foreground">فیلترهای پیشرفته اسناد مالی و فاکتورها</span>
+                  <span className="text-xs font-bold text-foreground">فیلترهای اسناد مالی و فاکتورها</span>
                 </div>
 
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-between sm:justify-end gap-2.5">
                   {hasActiveFilters && (
                     <Button
                       variant="ghost"
@@ -617,7 +558,7 @@ function AdminAccountingPage() {
                       onClick={resetAllFilters}
                       className="h-8 px-3 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 text-xs gap-1.5 cursor-pointer rounded-xl"
                     >
-                      <RotateCcw className="h-3.5 w-3.5" />
+                      <RotateCcw className="h-4 w-4" />
                       پاکسازی فیلترها
                     </Button>
                   )}
@@ -897,58 +838,17 @@ function AdminAccountingPage() {
         {/* TAB 2: PROCUREMENT & EXPENSES */}
         {activeTab === "procurement" && (
           <div className="flex flex-col gap-4">
-            {/* Content-Based Category Tabs for Procurement */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-xs text-muted-foreground font-semibold ml-1">دسته‌بندی موضوعی اسناد تامین:</span>
-              <Button
-                key="ALL"
-                variant={selectedSupplierCategory === "ALL" ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setSelectedSupplierCategory("ALL");
-                  setSupplierPage(1);
-                }}
-                className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
-                  selectedSupplierCategory === "ALL" ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
-                }`}
-              >
-                <Layers className="h-4 w-4" />
-                همه خدمات
-              </Button>
-              {dynamicCategories.map((cat: any) => {
-                const Icon = getCategoryIcon(cat.slug, cat.name);
-                return (
-                  <Button
-                    key={cat.id}
-                    variant={selectedSupplierCategory === cat.slug ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedSupplierCategory(cat.slug);
-                      setSupplierPage(1);
-                    }}
-                    className={`text-xs gap-2 rounded-xl h-8.5 px-3.5 cursor-pointer font-medium ${
-                      selectedSupplierCategory === cat.slug ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : ""
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {cat.name}
-                  </Button>
-                );
-              })}
-            </div>
-
-
             {/* Comprehensive Multi-Filter Bar for Procurement */}
-            <div className="relative z-20 rounded-2xl border border-border/60 bg-card/50 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
-              <div className="flex items-center justify-between pb-3 border-b border-border/30">
-                <div className="flex items-center gap-2.5">
+            <div className="relative z-20 rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/30">
+                <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
                     <Filter className="h-4 w-4" />
                   </div>
-                  <span className="text-xs font-bold text-foreground">فیلترهای پیشرفته هزینه‌ها و تامین‌کنندگان</span>
+                  <span className="text-xs font-bold text-foreground">فیلترهای هزینه‌ها و تامین‌کنندگان</span>
                 </div>
 
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-between sm:justify-end gap-2.5">
                   {hasActiveSupplierFilters && (
                     <Button
                       variant="ghost"
@@ -1088,19 +988,19 @@ function AdminAccountingPage() {
 
             {/* Procurement View Selector & Table Card */}
             <div className="relative z-10 rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs">
-              <div className="p-4.5 px-6 border-b border-border/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-2.5">
+              <div className="p-4 sm:p-5 sm:px-6 border-b border-border/30 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-rose-500" />
                   <h3 className="font-bold text-sm text-foreground">هزینه‌ها و اسناد تامین زیرساخت</h3>
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  <div className="flex items-center rounded-xl bg-muted/40 p-1 border border-border/30 text-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                  <div className="flex items-center rounded-xl bg-muted/40 p-1 border border-border/30 text-xs w-full sm:w-auto">
                     <Button
                       variant={procurementView === "services" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setProcurementView("services")}
-                      className={`h-7.5 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
+                      className={`flex-1 sm:flex-initial h-8 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
                         procurementView === "services" ? "bg-emerald-600 text-white" : "text-muted-foreground"
                       }`}
                     >
@@ -1110,7 +1010,7 @@ function AdminAccountingPage() {
                       variant={procurementView === "suppliers" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setProcurementView("suppliers")}
-                      className={`h-7.5 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
+                      className={`flex-1 sm:flex-initial h-8 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
                         procurementView === "suppliers" ? "bg-emerald-600 text-white" : "text-muted-foreground"
                       }`}
                     >
@@ -1122,14 +1022,14 @@ function AdminAccountingPage() {
                     <Button
                       size="sm"
                       onClick={() => setIsAddSupplierOpen(true)}
-                      className="h-8.5 px-3 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 cursor-pointer"
+                      className="flex-1 sm:flex-initial h-9 px-3 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 cursor-pointer"
                     >
                       <Plus className="h-4 w-4" />
                       تعریف تامین‌کننده جدید
                     </Button>
-                    <Link to="/servers">
-                      <Button size="sm" variant="outline" className="h-8.5 px-3 rounded-xl text-xs font-medium cursor-pointer">
-                        مدیریت زیرساخت و سرورها
+                    <Link to="/servers" className="flex-1 sm:flex-initial">
+                      <Button size="sm" variant="outline" className="w-full h-9 px-3 rounded-xl text-xs font-medium cursor-pointer">
+                        مدیریت سرورها
                       </Button>
                     </Link>
                   </div>
