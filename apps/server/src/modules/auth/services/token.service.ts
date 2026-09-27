@@ -10,14 +10,26 @@ import {
 export class TokenService {
   private readonly jwtSecret: string =
     process.env.JWT_SECRET || "gecut-cloud-super-secure-production-jwt-secret-key-2026";
+
+  // Standard Admin token expiration: 24h access (86400s), 7d refresh (604800s)
+  private readonly adminAccessTokenTtlSeconds: number = parseInt(
+    process.env.ADMIN_JWT_ACCESS_EXPIRATION || "86400",
+    10,
+  );
+  private readonly adminRefreshTokenTtlSeconds: number = parseInt(
+    process.env.ADMIN_JWT_REFRESH_EXPIRATION || "604800",
+    10,
+  );
+
+  // Standard Customer / User token expiration
   private readonly accessTokenTtlSeconds: number = parseInt(
     process.env.JWT_ACCESS_EXPIRATION || "2592000",
     10,
-  ); // 30 days (1 month)
+  ); // 30 days
   private readonly refreshTokenTtlSeconds: number = parseInt(
     process.env.JWT_REFRESH_EXPIRATION || "7776000",
     10,
-  ); // 90 days (3 months)
+  ); // 90 days
 
   private base64UrlEncode(str: string): string {
     return Buffer.from(str)
@@ -123,8 +135,16 @@ export class TokenService {
             ? (user.tokenVersion as any).increment
             : 0);
 
-    const accessTtl = customAccessTtlSeconds ?? this.accessTokenTtlSeconds;
-    const refreshTtl = customRefreshTtlSeconds ?? this.refreshTokenTtlSeconds;
+    const isAdmin = user.role === "ADMIN";
+    const defaultAccessTtl = isAdmin
+      ? this.adminAccessTokenTtlSeconds
+      : this.accessTokenTtlSeconds;
+    const defaultRefreshTtl = isAdmin
+      ? this.adminRefreshTokenTtlSeconds
+      : this.refreshTokenTtlSeconds;
+
+    const accessTtl = customAccessTtlSeconds ?? defaultAccessTtl;
+    const refreshTtl = customRefreshTtlSeconds ?? defaultRefreshTtl;
 
     const accessPayload: JwtPayload = {
       sub: user.id,

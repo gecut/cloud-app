@@ -96,9 +96,9 @@ export function setActiveUser(user: DemoUser) {
   localStorage.setItem("gecut_demo_role", user.role);
   localStorage.setItem("gecut_demo_user_id", user.id);
 
-  // Generate demo session tokens so protected routes allow immediate access in demo mode
+  // Generate demo session tokens so protected routes allow immediate access in demo mode (24h standard admin token)
   const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const exp = Math.floor(Date.now() / 1000) + 86400 * 7;
+  const exp = Math.floor(Date.now() / 1000) + 86400;
   const payload = btoa(
     JSON.stringify({
       sub: user.id,
@@ -119,7 +119,7 @@ export function setActiveUser(user: DemoUser) {
 /**
  * Checks if a JWT token has expired or will expire within bufferSeconds.
  */
-export function isTokenExpired(token: string, bufferSeconds = 15): boolean {
+export function isTokenExpired(token: string, bufferSeconds = 30): boolean {
   try {
     const parts = token.split(".");
     if (parts.length !== 3 || !parts[1]) return true;

@@ -100,7 +100,8 @@ export class LoginPasswordHandler implements ICommandHandler<LoginPasswordComman
     };
 
     const tokens = this.tokenService.generateAuthTokens(authUser);
-    const refreshTokenExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    const refreshDays = authUser.role === "ADMIN" ? 7 : 90;
+    const refreshTokenExpiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000);
     await this.sessionService
       .createSession(user.id, tokens.refreshToken, refreshTokenExpiresAt)
       .catch((err) => {

@@ -2169,6 +2169,15 @@ export class PrismaService
         this.isDbConnected = true;
         this.logger.log("✅ [PrismaService] Connected to PostgreSQL database and schema verified.");
 
+        // Ensure billingCycle column exists on Service table in PostgreSQL
+        try {
+          await this.$executeRawUnsafe(
+            `ALTER TABLE "Service" ADD COLUMN IF NOT EXISTS "billingCycle" TEXT DEFAULT 'MONTHLY';`,
+          );
+        } catch (colErr: any) {
+          this.logger.warn(`Could not ensure billingCycle column on Service: ${colErr?.message}`);
+        }
+
         // Ensure default admin users exist in PostgreSQL
         try {
           await this.$executeRawUnsafe(`
@@ -2221,10 +2230,12 @@ export class PrismaService
     this.memSupplierServices.clear();
     this.memInvoiceSequences.clear();
 
-    // Retain only admin users
+    // Retain only admin users and reset customerId
     for (const [id, user] of Array.from(this.memUsers.entries())) {
       if (user.role !== "ADMIN") {
         this.memUsers.delete(id);
+      } else {
+        user.customerId = null;
       }
     }
 
@@ -2254,29 +2265,57 @@ export class PrismaService
       this.logger.error("Failed to write purged database to disk", err);
     }
 
-    // 2. If Postgres is connected, purge database tables
+    // 2. If Postgres is connected, purge database tables with CASCADE
     if (this.isDbConnected) {
       try {
         await this.$executeRawUnsafe(`
-          DELETE FROM "PaymentAttempt";
-          DELETE FROM "Payment";
-          DELETE FROM "InvoiceItem";
-          DELETE FROM "Invoice";
-          DELETE FROM "Endpoint";
-          DELETE FROM "Service";
-          DELETE FROM "ServiceGroup";
-          DELETE FROM "Server";
-          DELETE FROM "Customer";
-          DELETE FROM "AuditLog";
-          DELETE FROM "SupplierService";
-          DELETE FROM "Supplier";
-          DELETE FROM "Session";
+          TRUNCATE TABLE 
+            "PaymentAttempt", 
+            "Payment", 
+            "InvoiceItem", 
+            "Invoice", 
+            "Endpoint", 
+            "Service", 
+            "ServiceGroup", 
+            "Server", 
+            "Customer", 
+            "Session", 
+            "AuditLog", 
+            "InvoiceSequence" 
+          CASCADE;
           DELETE FROM "User" WHERE "role" != 'ADMIN';
         `);
-      } catch (err) {
-        this.logger.error("Failed to purge PostgreSQL database tables", err);
+        this.logger.log("✅ Successfully truncated PostgreSQL database tables.");
+      } catch (err: any) {
+        this.logger.warn(`TRUNCATE CASCADE failed (${err?.message}), falling back to individual table deletes...`);
+        const fallbackQueries = [
+          'UPDATE "Service" SET "parentServiceId" = NULL',
+          'DELETE FROM "PaymentAttempt"',
+          'DELETE FROM "Payment"',
+          'DELETE FROM "InvoiceItem"',
+          'DELETE FROM "Invoice"',
+          'DELETE FROM "Endpoint"',
+          'DELETE FROM "Service"',
+          'DELETE FROM "ServiceGroup"',
+          'DELETE FROM "Server"',
+          'DELETE FROM "Customer"',
+          'DELETE FROM "AuditLog"',
+          'DELETE FROM "Session"',
+          'DELETE FROM "InvoiceSequence"',
+          'DELETE FROM "User" WHERE "role" != \'ADMIN\'',
+        ];
+        for (const query of fallbackQueries) {
+          try {
+            await this.$executeRawUnsafe(query);
+          } catch (e: any) {
+            this.logger.warn(`Failed executing [${query}]: ${e?.message}`);
+          }
+        }
       }
     }
+
+    // Ensure default admin user is fully intact
+    this.initFallbackData();
 
     return { success: true, message: "تمامی محتوا و رکوردهای دیتابیس با موفقیت پاکسازی شدند" };
   }

@@ -185,6 +185,7 @@ model Service {
   description           String?
   status                ServiceStatus         @default(ACTIVE)
   priceToman            Int
+  billingCycle          String?               @default("MONTHLY")
   quantity              Int                   @default(1)
   usedQuantity          Int                   @default(0)
   trackingType          String                @default("HYBRID")

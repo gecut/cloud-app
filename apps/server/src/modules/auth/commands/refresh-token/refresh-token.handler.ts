@@ -41,7 +41,8 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand,
     );
 
     // Persist new session
-    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const refreshDays = user.role === "ADMIN" ? 7 : 30;
+    const refreshTokenExpiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000);
     await this.sessionService
       .createSession(user.id, tokens.refreshToken, refreshTokenExpiresAt)
       .catch((err) => {
