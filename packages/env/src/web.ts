@@ -4,8 +4,10 @@ import { z } from "zod";
 export const env = createEnv({
   clientPrefix: "VITE_",
   client: {
-    VITE_SERVER_URL: z.string().url().default("http://localhost:3000"),
+    VITE_SERVER_URL: z.string().url().default("https://api.app.gecut.ir"),
   },
-  runtimeEnv: (import.meta as any).env,
+  runtimeEnv: {
+    VITE_SERVER_URL: import.meta.env.VITE_SERVER_URL,
+  },
   emptyStringAsUndefined: true,
 });

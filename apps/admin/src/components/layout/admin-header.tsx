@@ -243,7 +243,7 @@ export function AdminHeader() {
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Customer App Quick Link */}
           <a
-            href="http://localhost:3002"
+            href="https://app.gecut.ir"
             target="_blank"
             rel="noreferrer"
             className="hidden sm:inline-flex"
@@ -384,7 +384,7 @@ export function AdminHeader() {
             {/* Drawer Footer */}
             <div className="pt-3 border-t border-border/40 flex flex-col gap-2">
               <a
-                href="http://localhost:3002"
+                href="https://app.gecut.ir"
                 target="_blank"
                 rel="noreferrer"
                 className="w-full flex items-center justify-center gap-2 h-9 px-3 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-all"
