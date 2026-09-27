@@ -15,6 +15,7 @@
     "db:studio": "turbo -F @gecut-cloud/db db:studio",
     "db:generate": "turbo -F @gecut-cloud/db db:generate",
     "db:migrate": "turbo -F @gecut-cloud/db db:migrate",
+    "db:migrate:deploy": "turbo -F @gecut-cloud/db db:migrate:deploy",
     "db:seed": "turbo -F @gecut-cloud/db db:seed",
     "dev:admin": "turbo -F admin dev",
     "dev:customer-app": "turbo -F customer-app dev"
