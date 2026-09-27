@@ -4,17 +4,13 @@ import {
   X,
   Printer,
   Edit2,
-  CheckCircle,
-  Clock,
   Ban,
-  Building2,
-  User,
-  ShieldCheck,
-  Server,
+  Clock,
+  CheckCircle,
 } from "lucide-react";
 import { formatInvoiceNumber } from "@/utils/format";
 import { Button } from "@gecut-cloud/ui/components/button";
-import { formatJalaliDate, formatJalaliDateTime } from "@gecut-cloud/contracts";
+import { formatJalaliDateWords, toPersianDigits } from "@gecut-cloud/contracts";
 
 interface InvoiceDetailModalProps {
   invoice: any | null;
@@ -42,7 +38,8 @@ export function InvoiceDetailModal({
       ? invoice.items
       : [
           {
-            title: invoice.title || (isSupplier ? "صورت‌حساب خدمات تامین‌کننده" : "صورت‌حساب خدمات ابری و زیرساخت"),
+            title: invoice.title || (isSupplier ? "صورت‌حساب خدمات تامین‌کننده" : "خدمات میزبانی سرور (خارج)"),
+            description: invoice.description || "مهر ماه",
             quantity: 1,
             unitPriceToman: invoice.totalToman || 0,
           },
@@ -52,56 +49,239 @@ export function InvoiceDetailModal({
     (sum: number, it: any) => sum + (it.unitPriceToman || 0) * (it.quantity || 1),
     0,
   );
-  const total = invoice.totalToman || subtotal;
+  const discountVal =
+    invoice.discountToman ||
+    (invoice.totalToman && subtotal > invoice.totalToman ? subtotal - invoice.totalToman : 0);
+  const total = invoice.totalToman || subtotal - discountVal;
+
+  const formatPrice = (n: number) => Number(n || 0).toLocaleString("fa-IR");
+
+  const customerName =
+    invoice.customer?.name ||
+    invoice.customer?.displayName ||
+    (isSupplier ? invoice.supplier?.name || "تامین‌کننده" : "جناب آقای طباطبایی");
+
+  const projectName =
+    invoice.customer?.displayName ||
+    invoice.customer?.company ||
+    items[0]?.serviceNameSnapshot ||
+    items[0]?.service?.name ||
+    (isSupplier ? "تامین زیرساخت" : "rasta-company.com");
+
+  const customerPhone = toPersianDigits(
+    invoice.customer?.phone ||
+      invoice.customer?.user?.phone ||
+      (isSupplier ? invoice.supplier?.phone : "090136891759") ||
+      "۰۹۰۱۳۶۸۹۱۷۵۹",
+  );
+
+  const invoiceNum = toPersianDigits(invoice.invoiceNumber || invoice.id || "753");
+  const jalaliDateStr = formatJalaliDateWords(invoice.issuedAt || invoice.createdAt || new Date());
 
   const handlePrint = () => {
-    const printContent = document.getElementById("isolated-invoice-printable");
-    if (!printContent) {
-      window.print();
-      return;
-    }
     const printWindow = window.open("", "_blank", "width=850,height=950");
-    if (!printWindow) {
-      window.print();
-      return;
-    }
-    printWindow.document.write(`
+    const logoUrl = `${window.location.origin}/logo.png`;
+
+    const rowsHtml = items
+      .map((it: any, idx: number) => {
+        const qty = it.quantity || 1;
+        const unit = it.unitPriceToman || 0;
+        const lineTotal = qty * unit;
+        const title = it.title || it.serviceNameSnapshot || it.service?.name || "خدمات میزبانی سرور";
+        const desc = it.description || it.period || "";
+        return `
+          <tr>
+            <td style="border: 1px solid #e5e7eb; padding: 12px 6px; text-align: center; font-weight: 700; font-size: 13px; color: #1f2937;">
+              ${toPersianDigits(idx + 1)}
+            </td>
+            <td style="border: 1px solid #e5e7eb; padding: 12px 14px; text-align: center; font-size: 12.5px; color: #1f2937;">
+              <div style="font-weight: 600;">${title}</div>
+              ${desc ? `<div style="color: #6b7280; font-size: 11px; margin-top: 3px;">${desc}</div>` : ""}
+            </td>
+            <td style="border: 1px solid #e5e7eb; padding: 12px 6px; text-align: center; font-size: 13px; color: #1f2937;">
+              ${toPersianDigits(qty)}
+            </td>
+            <td style="border: 1px solid #e5e7eb; padding: 12px 8px; text-align: center; font-size: 13px; color: #1f2937;">
+              ${formatPrice(unit)}
+            </td>
+            <td style="border: 1px solid #e5e7eb; padding: 12px 8px; text-align: center; font-size: 13px; font-weight: 600; color: #1f2937;">
+              ${formatPrice(lineTotal)}
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const fullHtml = `
       <!DOCTYPE html>
       <html dir="rtl" lang="fa">
         <head>
           <meta charset="utf-8">
-          <title>فاکتور ${formatInvoiceNumber(invoice.invoiceNumber || invoice.id)}</title>
+          <title>فاکتور ${invoiceNum}</title>
           <style>
-            @page { size: A4 portrait; margin: 12mm; }
-            * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-            body { background: white; color: #0f172a; direction: rtl; padding: 24px; font-size: 12px; line-height: 1.5; }
-            .print\\:hidden, .print-hidden { display: none !important; }
-            table { width: 100%; border-collapse: collapse; margin-top: 12px; margin-bottom: 12px; }
-            th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: right; }
-            th { background-color: #f1f5f9; font-weight: 700; color: #334155; }
-            .border { border: 1px solid #e2e8f0; }
-            .rounded-xl { border-radius: 12px; }
-            .rounded-lg { border-radius: 8px; }
-            .p-4 { padding: 16px; }
-            .p-5 { padding: 20px; }
-            .mb-4 { margin-bottom: 16px; }
-            .grid { display: grid; }
-            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-            .gap-3 { gap: 12px; }
-            .gap-4 { gap: 16px; }
-            .font-bold { font-weight: bold; }
-            .font-semibold { font-weight: 600; }
-            .text-sm { font-size: 13px; }
-            .text-xs { font-size: 11px; }
-            .text-muted-foreground { color: #64748b; }
-            .bg-muted\\/20, .bg-muted\\/10 { background-color: #f8fafc; }
+            @page { size: A4 portrait; margin: 12mm 15mm; }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+              font-family: system-ui, -apple-system, 'Vazirmatn', 'Peyda', sans-serif;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body {
+              background: #ffffff;
+              color: #111827;
+              direction: rtl;
+              padding: 24px;
+              font-size: 12px;
+              line-height: 1.6;
+            }
+            .invoice-wrapper {
+              max-width: 760px;
+              margin: 0 auto;
+            }
           </style>
         </head>
         <body>
-          <div style="max-width: 800px; margin: 0 auto;">
-            ${printContent.innerHTML}
+          <div class="invoice-wrapper">
+            <!-- 1. Header Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px; padding-top: 8px;">
+              <div style="font-size: 12.5px; font-weight: 500; color: #1f2937;">
+                شماره فاکتور: <span style="font-weight: 700;">${invoiceNum}</span>
+              </div>
+              <div style="font-size: 18px; font-weight: 800; color: #0f172a; text-align: center;">
+                فاکتور فروش خدمات
+              </div>
+              <div style="font-size: 12.5px; font-weight: 500; color: #1f2937;">
+                تاریخ: <span>${jalaliDateStr}</span>
+              </div>
+            </div>
+
+            <!-- 2. Parties Info (Seller on Right, Customer on Left) -->
+            <div style="display: grid; grid-template-columns: 1fr 1px 1fr; gap: 24px; align-items: stretch; margin-bottom: 32px;">
+              <!-- Right: Seller -->
+              <div style="text-align: right; line-height: 1.8;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                  <div style="text-align: left; line-height: 1.1;">
+                    <div style="color: #059669; font-weight: 800; font-size: 11px;">جیکات وب</div>
+                    <div style="color: #1f2937; font-weight: 900; font-size: 10px; letter-spacing: 0.5px;">GECUT WEB</div>
+                  </div>
+                  <img src="${logoUrl}" alt="Gecut" style="width: 26px; height: 26px; object-fit: contain;" onerror="this.style.display='none'" />
+                </div>
+                <div style="font-weight: 800; font-size: 13.5px; color: #111827; margin-bottom: 4px;">مشخصات فروشنده</div>
+                <div style="font-size: 12px; color: #374151;">شرکت طراحی سایت جیکات وب</div>
+                <div style="font-size: 12px; color: #374151;">
+                  <span>شماره تماس : </span>
+                  <span style="font-weight: 600; color: #111827;">۰۹۳۰۴۷۱۳۰۵۸</span>
+                </div>
+              </div>
+
+              <!-- Center Divider -->
+              <div style="border-left: 1px dashed #d1d5db; height: 100%;"></div>
+
+              <!-- Left: Customer -->
+              <div style="text-align: right; line-height: 1.8;">
+                <div style="font-weight: 800; font-size: 13.5px; color: #111827; margin-bottom: 6px; padding-top: 4px;">مشخصات مشتری</div>
+                <div style="font-size: 12px; color: #374151;">
+                  <span>نام و نام خانوادگی:</span>
+                  <span style="font-weight: 600; color: #111827; margin-right: 4px;">${customerName}</span>
+                </div>
+                <div style="font-size: 12px; color: #374151;">
+                  <span>پروژه:</span>
+                  <span style="font-weight: 600; color: #111827; margin-right: 4px;">${projectName}</span>
+                </div>
+                <div style="font-size: 12px; color: #374151;">
+                  <span>شماره تماس :</span>
+                  <span style="font-weight: 600; color: #111827; margin-right: 4px;">${customerPhone}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Items Table -->
+            <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 24px;">
+              <thead>
+                <tr>
+                  <th style="padding: 0 3px 10px 3px; width: 50px;">
+                    <div style="background: #f1f3f5; border-radius: 8px; padding: 10px 4px; text-align: center; font-weight: 700; font-size: 12.5px; color: #1e293b;">
+                      ردیف
+                    </div>
+                  </th>
+                  <th style="padding: 0 3px 10px 3px;">
+                    <div style="background: #f1f3f5; border-radius: 8px; padding: 10px 14px; text-align: center; font-weight: 700; font-size: 12.5px; color: #1e293b;">
+                      شرح کالا یا خدمات
+                    </div>
+                  </th>
+                  <th style="padding: 0 3px 10px 3px; width: 65px;">
+                    <div style="background: #f1f3f5; border-radius: 8px; padding: 10px 4px; text-align: center; font-weight: 700; font-size: 12.5px; color: #1e293b;">
+                      تعداد
+                    </div>
+                  </th>
+                  <th style="padding: 0 3px 10px 3px; width: 140px;">
+                    <div style="background: #f1f3f5; border-radius: 8px; padding: 10px 8px; text-align: center; font-weight: 700; font-size: 12.5px; color: #1e293b;">
+                      قیمت واحد (تومان)
+                    </div>
+                  </th>
+                  <th style="padding: 0 3px 10px 3px; width: 140px;">
+                    <div style="background: #f1f3f5; border-radius: 8px; padding: 10px 8px; text-align: center; font-weight: 700; font-size: 12.5px; color: #1e293b;">
+                      قیمت کل (تومان)
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+
+            <!-- 4. Totals Block -->
+            <div style="display: flex; justify-content: center; margin-top: 18px; margin-bottom: 24px;">
+              <div style="display: flex; flex-direction: column; gap: 8px; width: 330px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="background: #c3eccd; color: #166534; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
+                    مبلغ کل
+                  </div>
+                  <div style="font-size: 13px; font-weight: 600; color: #111827; text-align: left;">
+                    ${formatPrice(subtotal)} تومان
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="background: #c3eccd; color: #166534; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
+                    تخفیف
+                  </div>
+                  <div style="font-size: 13px; font-weight: 600; color: #111827; text-align: left;">
+                    ${discountVal > 0 ? `${formatPrice(discountVal)} تومان` : "-"}
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="background: #c3eccd; color: #166534; font-size: 12px; font-weight: 800; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
+                    مبلغ قابل پرداخت
+                  </div>
+                  <div style="font-size: 13.5px; font-weight: 800; color: #111827; text-align: left;">
+                    ${formatPrice(total)} تومان
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. Horizontal Dashed Separator -->
+            <div style="border-top: 1px dashed #d1d5db; width: 100%; margin: 24px 0;"></div>
+
+            <!-- 6. Bank Information -->
+            <div style="text-align: right; line-height: 1.9; font-size: 12.5px; color: #1f2937;">
+              <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">اطلاعات بانکی</div>
+              <div style="font-size: 14px; font-weight: 800; color: #0f172a;">
+                شماره کارت: ${toPersianDigits("6219861073760684")}
+              </div>
+              <div style="color: #374151;">بانک: سامان</div>
+              <div style="color: #374151;">نام صاحب حساب: مهدیار صهبائی احمدی</div>
+              <div style="color: #374151;">
+                لینک کارت آنلاین: <a href="https://k32.ir/sahbaee" target="_blank" style="color: #1f2937; text-decoration: underline; font-weight: 500;">k32.ir/sahbaee</a>
+              </div>
+            </div>
           </div>
+
           <script>
             window.onload = () => {
               window.focus();
@@ -111,8 +291,14 @@ export function InvoiceDetailModal({
           </script>
         </body>
       </html>
-    `);
-    printWindow.document.close();
+    `;
+
+    if (printWindow) {
+      printWindow.document.write(fullHtml);
+      printWindow.document.close();
+    } else {
+      window.print();
+    }
   };
 
   return (
@@ -155,7 +341,7 @@ export function InvoiceDetailModal({
             <div>
               <h3 className="font-bold text-base text-foreground">جزئیات صورت‌حساب</h3>
               <p className="text-xs text-muted-foreground">
-                شماره فاکتور: {formatInvoiceNumber(invoice.invoiceNumber || invoice.id)}
+                شماره فاکتور: {invoiceNum}
               </p>
             </div>
           </div>
@@ -164,7 +350,7 @@ export function InvoiceDetailModal({
               variant="outline"
               size="sm"
               onClick={handlePrint}
-              className="gap-1.5 text-xs h-8"
+              className="gap-1.5 text-xs h-8 cursor-pointer"
             >
               <Printer className="h-4 w-4" />
               چاپ فاکتور
@@ -177,7 +363,7 @@ export function InvoiceDetailModal({
                   onClose();
                   onEdit(invoice);
                 }}
-                className="gap-1.5 text-xs h-8 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/50"
+                className="gap-1.5 text-xs h-8 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 cursor-pointer"
               >
                 <Edit2 className="h-3.5 w-3.5" />
                 ویرایش
@@ -187,364 +373,236 @@ export function InvoiceDetailModal({
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Official Printable Invoice Sheet */}
-        <div className="space-y-6">
-          {/* Invoice Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border bg-muted/20 print:bg-gray-50 print:border-gray-300">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg shadow-sm">
-                JC
+        {/* Exact Printable Invoice Sheet */}
+        <div className="bg-white text-gray-900 rounded-xl p-6 sm:p-10 shadow-xs border border-gray-200 print:border-none print:shadow-none print:p-0 my-2">
+          {/* 1. Header Bar: Date (Right) | Title (Center) | Invoice Number (Left) in RTL */}
+          <div className="flex items-center justify-between w-full mb-8 pt-1">
+            <div className="text-xs font-medium text-gray-800">
+              شماره فاکتور <span className="font-bold">{invoiceNum}</span>
+            </div>
+            <div className="text-lg font-bold text-gray-900 text-center">
+              فاکتور فروش خدمات
+            </div>
+            <div className="text-xs font-medium text-gray-800">
+              تاریخ: <span>{jalaliDateStr}</span>
+            </div>
+          </div>
+
+          {/* 2. Parties Info: Seller (Right) | Divider | Customer (Left) */}
+          <div className="grid grid-cols-[1fr_1px_1fr] gap-6 items-stretch mb-8">
+            {/* Right: Seller */}
+            <div className="text-right leading-relaxed space-y-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="text-left leading-none">
+                  <div className="text-[#059669] font-bold text-[11px]">جیکات وب</div>
+                  <div className="text-gray-900 font-extrabold text-[10px] tracking-wider">GECUT WEB</div>
+                </div>
+                <img
+                  src="/logo.png"
+                  alt="Gecut"
+                  className="w-6 h-6 object-contain"
+                  onError={(e) => {
+                    (e.target as any).style.display = "none";
+                  }}
+                />
               </div>
-              <div>
-                <h2 className="font-bold text-lg text-foreground">جیکات کلود | Gecut Cloud</h2>
-                <p className="text-xs text-muted-foreground">
-                  صورت‌حساب رسمی خدمات ابری، هاستینگ و زیرساخت
-                </p>
+              <div className="font-bold text-sm text-gray-900">مشخصات فروشنده</div>
+              <div className="text-xs text-gray-800">شرکت طراحی سایت جیکات وب</div>
+              <div className="text-xs text-gray-800">
+                <span>شماره تماس : </span>
+                <span className="font-semibold text-gray-900">{toPersianDigits("09304713058")}</span>
               </div>
             </div>
 
-            <div className="flex flex-col sm:items-end gap-1.5 text-xs">
-              <div className="flex items-center gap-1.5 font-mono">
-                <span className="text-muted-foreground">شماره صورت‌حساب:</span>
-                <span className="font-bold text-foreground text-sm">
-                  {formatInvoiceNumber(invoice.invoiceNumber || invoice.id)}
-                </span>
+            {/* Center Divider */}
+            <div className="border-l border-dashed border-gray-300 h-full" />
+
+            {/* Left: Customer */}
+            <div className="text-right leading-relaxed space-y-1 pt-1">
+              <div className="font-bold text-sm text-gray-900 mb-2">مشخصات مشتری</div>
+              <div className="text-xs text-gray-800">
+                <span className="text-gray-600">نام و نام خانوادگی: </span>
+                <span className="font-semibold text-gray-900">{customerName}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                    invoice.status === "PAID"
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-                      : invoice.status === "UNPAID"
-                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-                      : "bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20"
-                  }`}
-                >
-                  {invoice.status === "PAID" ? (
-                    <>
-                      <CheckCircle className="h-3 w-3" />
-                      تسویه‌شده (پرداخت موفق)
-                    </>
-                  ) : invoice.status === "UNPAID" ? (
-                    <>
-                      <Clock className="h-3 w-3" />
-                      در انتظار پرداخت
-                    </>
-                  ) : (
-                    <>
-                      <Ban className="h-3 w-3" />
-                      لغو شده
-                    </>
-                  )}
-                </span>
+              <div className="text-xs text-gray-800">
+                <span className="text-gray-600">پروژه: </span>
+                <span className="font-semibold text-gray-900 font-mono">{projectName}</span>
+              </div>
+              <div className="text-xs text-gray-800">
+                <span className="text-gray-600">شماره تماس : </span>
+                <span className="font-semibold text-gray-900 font-mono">{customerPhone}</span>
               </div>
             </div>
           </div>
 
-          {/* Issue & Due Dates */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 rounded-lg border bg-card">
-              <span className="text-muted-foreground block text-[11px] mb-1">تاریخ صدور:</span>
-              <span className="font-medium font-mono">
-                {formatJalaliDate(invoice.issuedAt || invoice.createdAt)}
-              </span>
-            </div>
-            <div className="p-3 rounded-lg border bg-card">
-              <span className="text-muted-foreground block text-[11px] mb-1">مهلت پرداخت:</span>
-              <span className="font-medium font-mono text-amber-600 dark:text-amber-400">
-                {formatJalaliDate(invoice.dueDate)}
-              </span>
-            </div>
-            <div className="p-3 rounded-lg border bg-card">
-              <span className="text-muted-foreground block text-[11px] mb-1">نوع تسویه:</span>
-              <span className="font-medium">درگاه پرداخت شتابی</span>
-            </div>
-            <div className="p-3 rounded-lg border bg-card">
-              <span className="text-muted-foreground block text-[11px] mb-1">واحد مالی:</span>
-              <span className="font-medium">تومان ایران</span>
+          {/* 3. Items Table */}
+          <table className="w-full border-collapse separate [border-spacing:0] mb-6">
+            <thead>
+              <tr>
+                <th className="p-0.5 w-12 font-bold text-xs text-gray-800">
+                  <div className="bg-[#f1f3f5] rounded-md py-2.5 px-1 text-center">ردیف</div>
+                </th>
+                <th className="p-0.5 font-bold text-xs text-gray-800">
+                  <div className="bg-[#f1f3f5] rounded-md py-2.5 px-3 text-center">شرح کالا یا خدمات</div>
+                </th>
+                <th className="p-0.5 w-16 font-bold text-xs text-gray-800">
+                  <div className="bg-[#f1f3f5] rounded-md py-2.5 px-1 text-center">تعداد</div>
+                </th>
+                <th className="p-0.5 w-36 font-bold text-xs text-gray-800">
+                  <div className="bg-[#f1f3f5] rounded-md py-2.5 px-2 text-center">قیمت واحد (تومان)</div>
+                </th>
+                <th className="p-0.5 w-36 font-bold text-xs text-gray-800">
+                  <div className="bg-[#f1f3f5] rounded-md py-2.5 px-2 text-center">قیمت کل (تومان)</div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it: any, idx: number) => {
+                const qty = it.quantity || 1;
+                const unit = it.unitPriceToman || 0;
+                const lineTotal = qty * unit;
+                const title = it.title || it.serviceNameSnapshot || it.service?.name || "خدمات میزبانی سرور";
+                const desc = it.description || it.period || "";
+                return (
+                  <tr key={idx}>
+                    <td className="border border-gray-200 py-3 px-1.5 text-center text-xs font-bold text-gray-800">
+                      {toPersianDigits(idx + 1)}
+                    </td>
+                    <td className="border border-gray-200 py-3 px-3 text-center text-xs text-gray-800">
+                      <div className="font-semibold text-gray-900">{title}</div>
+                      {desc && <div className="text-[11px] text-gray-500 mt-0.5">{desc}</div>}
+                    </td>
+                    <td className="border border-gray-200 py-3 px-1.5 text-center text-xs text-gray-800">
+                      {toPersianDigits(qty)}
+                    </td>
+                    <td className="border border-gray-200 py-3 px-2 text-center text-xs text-gray-800">
+                      {formatPrice(unit)}
+                    </td>
+                    <td className="border border-gray-200 py-3 px-2 text-center text-xs font-semibold text-gray-900">
+                      {formatPrice(lineTotal)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* 4. Financial Totals Section */}
+          <div className="flex justify-center my-6">
+            <div className="flex flex-col gap-2 w-80">
+              <div className="flex items-center justify-between">
+                <div className="bg-[#c3eccd] text-[#166534] text-xs font-bold rounded-lg py-1.5 px-5 text-center w-32">
+                  مبلغ کل
+                </div>
+                <div className="text-xs font-semibold text-gray-900 text-left">
+                  {formatPrice(subtotal)} تومان
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="bg-[#c3eccd] text-[#166534] text-xs font-bold rounded-lg py-1.5 px-5 text-center w-32">
+                  تخفیف
+                </div>
+                <div className="text-xs font-semibold text-gray-900 text-left">
+                  {discountVal > 0 ? `${formatPrice(discountVal)} تومان` : "-"}
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="bg-[#c3eccd] text-[#166534] text-xs font-extrabold rounded-lg py-1.5 px-5 text-center w-32">
+                  مبلغ قابل پرداخت
+                </div>
+                <div className="text-sm font-bold text-gray-900 text-left">
+                  {formatPrice(total)} تومان
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Seller & Counterparty Information Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-            {isSupplier ? (
-              <>
-                {/* Supplier is the Seller/Provider */}
-                <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
-                  <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
-                    <Building2 className="h-4 w-4 text-purple-600" />
-                    <span>مشخصات تامین‌کننده (بستانکار)</span>
-                  </div>
-                  <div className="space-y-1.5 text-muted-foreground">
-                    <p>
-                      <strong className="text-foreground">نام تامین‌کننده:</strong>{" "}
-                      {invoice.supplier?.name || invoice.supplierName || "تامین‌کننده زیرساخت"}
-                    </p>
-                    <p>
-                      <strong className="text-foreground">شخص رابط:</strong>{" "}
-                      {invoice.supplier?.contactName || "---"}
-                    </p>
-                    <p>
-                      <strong className="text-foreground">شماره تماس:</strong>{" "}
-                      <span className="font-mono">{invoice.supplier?.phone || "---"}</span>
-                    </p>
-                    <p>
-                      <strong className="text-foreground">ایمیل / شناسه:</strong>{" "}
-                      <span className="font-mono text-[11px]">
-                        {invoice.supplier?.email || invoice.supplierId || "---"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
+          {/* 5. Horizontal Dashed Divider */}
+          <div className="border-t border-dashed border-gray-300 w-full my-6" />
 
-                {/* Gecut Cloud is the Buyer/Payer */}
-                <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
-                  <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    <span>مشخصات پرداخت‌کننده (جیکات کلود)</span>
-                  </div>
-                  <div className="space-y-1.5 text-muted-foreground">
-                    <p>
-                      <strong className="text-foreground">نام:</strong> شرکت جیکات کلود (Gecut Cloud)
-                    </p>
-                    <p>
-                      <strong className="text-foreground">واحد ثبت هزینه:</strong> زیرساخت ابری و سرورها
-                    </p>
-                    <p>
-                      <strong className="text-foreground">بخش مالی:</strong> finance@gecut.local
-                    </p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Seller is Gecut */}
-                <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
-                  <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    <span>مشخصات فروشنده (ارائه‌دهنده خدمت)</span>
-                  </div>
-                  <div className="space-y-1.5 text-muted-foreground">
-                    <p>
-                      <strong className="text-foreground">نام:</strong> شرکت جیکات کلود (Gecut Cloud)
-                    </p>
-                    <p>
-                      <strong className="text-foreground">موضوع فعالیت:</strong> خدمات زیرساخت ابری،
-                      هاستینگ سازمانی و سرور اختصاصی
-                    </p>
-                    <p>
-                      <strong className="text-foreground">پشتیبانی و مالی:</strong> support@gecut.local
-                    </p>
-                  </div>
-                </div>
+          {/* 6. Bank Information Section */}
+          <div className="text-right leading-relaxed text-xs text-gray-800 space-y-1">
+            <div className="text-sm font-bold text-gray-900 mb-1">اطلاعات بانکی</div>
+            <div className="text-sm font-bold text-gray-900 font-mono">
+              شماره کارت: {toPersianDigits("6219861073760684")}
+            </div>
+            <div className="text-gray-700">بانک: سامان</div>
+            <div className="text-gray-700">نام صاحب حساب: مهدیار صهبائی احمدی</div>
+            <div className="text-gray-700">
+              <span>لینک کارت آنلاین: </span>
+              <a
+                href="https://k32.ir/sahbaee"
+                target="_blank"
+                rel="noreferrer"
+                className="text-gray-900 underline font-medium"
+              >
+                k32.ir/sahbaee
+              </a>
+            </div>
+          </div>
+        </div>
 
-                {/* Customer is the Buyer */}
-                <div className="p-5 rounded-2xl border bg-muted/10 space-y-3">
-                  <div className="flex items-center gap-2.5 font-semibold text-foreground pb-2.5 border-b">
-                    <User className="h-4 w-4 text-primary" />
-                    <span>مشخصات خریدار (مشتری)</span>
-                  </div>
-                  <div className="space-y-1.5 text-muted-foreground">
-                    <p>
-                      <strong className="text-foreground">نام مشترک:</strong>{" "}
-                      {invoice.customer?.name || "نامشخص"}
-                    </p>
-                    <p>
-                      <strong className="text-foreground">عنوان سازمانی:</strong>{" "}
-                      {invoice.customer?.displayName || invoice.customer?.company || "حقیقی / سازمانی"}
-                    </p>
-                    <p>
-                      <strong className="text-foreground">شماره تماس:</strong>{" "}
-                      <span className="font-mono">{invoice.customer?.phone || "---"}</span>
-                    </p>
-                    <p>
-                      <strong className="text-foreground">شناسه کاربری:</strong>{" "}
-                      <span className="font-mono text-[11px]">
-                        {invoice.customerId || invoice.customer?.id || "---"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </>
+        {/* Status notice if Unpaid / Cancelled / Paid (Hidden on Print) */}
+        {invoice.status === "UNPAID" ? (
+          <div className="mt-4 p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between print:hidden">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>این صورت‌حساب در انتظار پرداخت است و مشتری می‌تواند آن را به صورت آنلاین تسویه کند.</span>
+            </div>
+            {onCancel && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onClose();
+                  onCancel(invoice.id);
+                }}
+                className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900/50 dark:hover:bg-rose-950/50 h-7 text-[11px] shrink-0 font-medium cursor-pointer"
+              >
+                لغو این فاکتور
+              </Button>
             )}
           </div>
-
-          {/* Invoice Items Table */}
-          <div className="rounded-2xl border overflow-hidden">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
-                <tr>
-                  <th className="py-3.5 px-5 w-12 text-center">ردیف</th>
-                  <th className="py-3.5 px-5">شرح خدمات / بسته</th>
-                  <th className="py-3.5 px-5 text-center w-24">تعداد / دوره</th>
-                  <th className="py-3.5 px-5 text-left w-36">قیمت واحد (تومان)</th>
-                  <th className="py-3.5 px-5 text-left w-36">مبلغ کل (تومان)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {items.map((item: any, idx: number) => {
-                  const qty = item.quantity || 1;
-                  const unitPrice = item.unitPriceToman || 0;
-                  const itemTotal = unitPrice * qty;
-                  return (
-                    <tr key={idx} className="hover:bg-muted/10">
-                      <td className="py-3.5 px-5 text-center font-mono text-muted-foreground">
-                        {idx + 1}
-                      </td>
-                      <td className="py-3.5 px-5 font-medium text-foreground">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span>{item.title || "خدمات زیرساخت جیکات کلود"}</span>
-                          {(item.service?.serviceType?.name || item.serviceTypeSnapshot) && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-primary/5 text-primary border-primary/20">
-                              {item.service?.serviceType?.name || item.serviceTypeSnapshot}
-                            </span>
-                          )}
-                          {(item.serviceNameSnapshot || item.service?.name) && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                              <Server className="h-3 w-3" />
-                              سرویس: {item.serviceNameSnapshot || item.service?.name}
-                            </span>
-                          )}
-                        </div>
-                        {item.description && (
-                          <p className="text-[11px] text-muted-foreground mt-0.5">{item.description}</p>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-5 text-center font-mono">{qty}</td>
-                      <td className="py-3.5 px-5 text-left font-mono">
-                        {unitPrice.toLocaleString("fa-IR")}
-                      </td>
-                      <td className="py-3.5 px-5 text-left font-mono font-semibold text-foreground">
-                        {itemTotal.toLocaleString("fa-IR")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        ) : invoice.status === "CANCELLED" ? (
+          <div className="mt-4 p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between print:hidden">
+            <div className="flex items-center gap-2">
+              <Ban className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+              <span>این صورت‌حساب لغو شده است.</span>
+            </div>
+            {onReactivate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onClose();
+                  onReactivate(invoice.id);
+                }}
+                className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-900/50 dark:hover:bg-emerald-950/50 h-7 text-[11px] shrink-0 font-medium cursor-pointer"
+              >
+                فعال‌سازی مجدد این فاکتور
+              </Button>
+            )}
           </div>
-
-          {/* Financial Totals */}
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-5 p-5 rounded-2xl border bg-muted/20">
-            <div className="text-xs text-muted-foreground max-w-sm space-y-1">
-              <p className="font-medium text-foreground">توضیحات و شرایط:</p>
-              <p>
-                کلیه مبالغ صورت‌حساب به تومان محاسبه گردیده است. خدمات پس از تایید تراکنش به صورت
-                آنی فعال یا تمدید می‌گردد.
-              </p>
-              {invoice.notes && (
-                <p className="text-primary font-medium mt-1">
-                  یادداشت: {invoice.notes}
-                </p>
-              )}
-            </div>
-
-            <div className="w-full sm:w-64 space-y-2 text-xs">
-              <div className="flex justify-between items-center text-muted-foreground">
-                <span>جمع ردیف‌ها:</span>
-                <span className="font-mono">{subtotal.toLocaleString("fa-IR")} تومان</span>
-              </div>
-              <div className="flex justify-between items-center text-muted-foreground">
-                <span>تخفیف / مالیات:</span>
-                <span className="font-mono text-emerald-600 dark:text-emerald-400">0 تومان</span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t font-bold text-sm text-foreground">
-                <span>مبلغ قابل پرداخت:</span>
-                <span className="font-mono text-primary text-base">
-                  {total === 0 ? (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">رایگان (تسویه شده)</span>
-                  ) : (
-                    `${total.toLocaleString("fa-IR")} تومان`
-                  )}
-                </span>
-              </div>
-            </div>
+        ) : invoice.status === "PAID" ? (
+          <div className="mt-4 p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2 print:hidden">
+            <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>این صورت‌حساب تسویه و پرداخت گردیده است.</span>
           </div>
-
-          {/* Payment Receipt / Online Gateway Info (if available or paid) */}
-          {invoice.payment ? (
-            <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-2 text-xs">
-              <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-400 pb-1.5 border-b border-emerald-500/20">
-                <ShieldCheck className="h-4 w-4" />
-                <span>رسید پرداخت آنلاین موفق (شاپرک)</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-muted-foreground pt-1">
-                <div>
-                  <span className="block text-[11px]">درگاه پرداخت:</span>
-                  <span className="font-medium text-foreground">
-                    {invoice.payment.provider || "درگاه اینترنتی بانک"}
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-[11px]">شماره پیگیری / مرجع بانکی:</span>
-                  <span className="font-mono font-semibold text-foreground">
-                    {invoice.payment.gatewayRef || "---"}
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-[11px]">زمان تایید تراکنش:</span>
-                  <span className="font-mono text-foreground">
-                    {formatJalaliDateTime(invoice.payment.paidAt || invoice.paidAt)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : invoice.status === "UNPAID" ? (
-            <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span>این صورت‌حساب در انتظار پرداخت است و مشتری می‌تواند آن را به صورت آنلاین تسویه کند.</span>
-              </div>
-              {onCancel && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onClose();
-                    onCancel(invoice.id);
-                  }}
-                  className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900/50 dark:hover:bg-rose-950/50 h-7 text-[11px] shrink-0 print:hidden"
-                >
-                  لغو این فاکتور
-                </Button>
-              )}
-            </div>
-          ) : invoice.status === "CANCELLED" ? (
-            <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Ban className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                <span>این صورت‌حساب لغو شده است.</span>
-              </div>
-              {onReactivate && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onClose();
-                    onReactivate(invoice.id);
-                  }}
-                  className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-900/50 dark:hover:bg-emerald-950/50 h-7 text-[11px] shrink-0 print:hidden font-medium cursor-pointer"
-                >
-                  فعال‌سازی مجدد این فاکتور
-                </Button>
-              )}
-            </div>
-          ) : null}
-        </div>
+        ) : null}
 
         {/* Footer Actions (Hidden on Print) */}
         <div className="flex items-center justify-end gap-3 pt-6 border-t mt-6 print:hidden">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} className="cursor-pointer">
             بستن
           </Button>
-          <Button onClick={handlePrint} className="gap-1.5">
+          <Button onClick={handlePrint} className="gap-1.5 cursor-pointer">
             <Printer className="h-4 w-4" />
             چاپ / دریافت پرینت
           </Button>
@@ -553,3 +611,4 @@ export function InvoiceDetailModal({
     </div>
   );
 }
+
