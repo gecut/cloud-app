@@ -10,6 +10,9 @@ services:
 
   server:
     image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-latest}}
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
     restart: unless-stopped
     command: ["sh", "-c", "pnpm --filter @gecut-cloud/db db:migrate:deploy || true && node dist/src/main.js"]
     expose:
@@ -38,6 +41,9 @@ services:
 
   admin:
     image: ghcr.io/gecut/cloud-app/admin:${ADMIN_TAG:-${TAG:-latest}}
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
     restart: unless-stopped
     expose:
       - "80"
@@ -48,6 +54,9 @@ services:
 
   customer-app:
     image: ghcr.io/gecut/cloud-app/customer-app:${CUSTOMER_APP_TAG:-${TAG:-latest}}
+    build:
+      context: .
+      dockerfile: apps/customer-app/Dockerfile
     restart: unless-stopped
     expose:
       - "80"
