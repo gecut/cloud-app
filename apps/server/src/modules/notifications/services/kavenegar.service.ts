@@ -8,17 +8,28 @@ export interface SendOtpResult {
   errorMessage?: string;
 }
 
+const DEFAULT_KAVENEGAR_KEY =
+  "46437751615871547A59364B75376339706E72384266734A596F3476644B653641356171462F557A5747383D";
+const DEFAULT_KAVENEGAR_TEMPLATE = "gcotp";
+
 @Injectable()
 export class KavenegarService {
   private readonly logger = new Logger(KavenegarService.name);
-  private readonly defaultTemplate =
-    process.env.KAVENEGAR_OTP_TEMPLATE?.trim() || "gcotp";
 
-  private getApiKey(): string | undefined {
-    return (
-      process.env.KAVENEGAR_API_KEY?.trim() ||
-      "46437751615871547A59364B75376339706E72384266734A596F3476644B653641356171462F557A5747383D"
-    );
+  private getApiKey(): string {
+    const key = process.env.KAVENEGAR_API_KEY?.trim();
+    if (key && key !== "undefined" && key !== "null" && key.length > 10) {
+      return key;
+    }
+    return DEFAULT_KAVENEGAR_KEY;
+  }
+
+  private getTemplate(): string {
+    const template = process.env.KAVENEGAR_OTP_TEMPLATE?.trim();
+    if (template && template !== "undefined" && template !== "null" && template.length > 0) {
+      return template;
+    }
+    return DEFAULT_KAVENEGAR_TEMPLATE;
   }
 
   /**
@@ -30,9 +41,10 @@ export class KavenegarService {
   async sendOtp(
     phone: string,
     otp: string,
-    template: string = this.defaultTemplate,
+    template?: string,
   ): Promise<SendOtpResult> {
     const apiKey = this.getApiKey();
+    const finalTemplate = template || this.getTemplate();
     const cleanPhone = normalizePhoneNumber(phone);
 
     if (!apiKey) {
@@ -53,7 +65,7 @@ export class KavenegarService {
       const body = new URLSearchParams({
         receptor: cleanPhone,
         token: otp,
-        template,
+        template: finalTemplate,
       });
 
       const response = await fetch(endpoint, {
@@ -87,7 +99,7 @@ export class KavenegarService {
           : cleanPhone;
 
       this.logger.log(
-        `Kavenegar OTP successfully dispatched to ${maskedPhone} (Template: ${template}, MessageID: ${entry?.messageid || "N/A"})`,
+        `Kavenegar OTP successfully dispatched to ${maskedPhone} (Template: ${finalTemplate}, MessageID: ${entry?.messageid || "N/A"})`,
       );
 
       return {

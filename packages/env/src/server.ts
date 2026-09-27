@@ -10,7 +10,7 @@ export const env = createEnv({
     SESSION_SECRET: z.string().min(32),
     SESSION_COOKIE_NAME: z.string().min(1).default("gecut_session"),
     SESSION_TTL_SECONDS: z.coerce.number().int().min(300).default(604800),
-    KAVENEGAR_API_KEY: z.string().optional(),
+    KAVENEGAR_API_KEY: z.string().default("46437751615871547A59364B75376339706E72384266734A596F3476644B653641356171462F557A5747383D"),
     KAVENEGAR_OTP_TEMPLATE: z.string().default("gcotp"),
     ZIBAL_MERCHANT: z.string().default("zibal"),
     ZIBAL_CALLBACK_URL: z.string().optional(),
