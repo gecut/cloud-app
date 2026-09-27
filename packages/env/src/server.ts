@@ -11,6 +11,7 @@ export const env = createEnv({
     SESSION_COOKIE_NAME: z.string().min(1).default("gecut_session"),
     SESSION_TTL_SECONDS: z.coerce.number().int().min(300).default(604800),
     KAVENEGAR_API_KEY: z.string().optional(),
+    KAVENEGAR_OTP_TEMPLATE: z.string().default("gcotp"),
     ZIBAL_MERCHANT: z.string().default("zibal"),
     ZIBAL_CALLBACK_URL: z.string().optional(),
     SERVER_URL: z.string().default("https://api.app.gecut.ir"),

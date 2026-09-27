@@ -228,7 +228,7 @@ export function AdminHeader() {
               <img src="/logo.png" alt="Gecut" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
               <div className="absolute inset-0 rounded-xl bg-emerald-500/10 blur-sm -z-10 group-hover:opacity-100 opacity-60 transition-opacity" />
             </div>
-            <div className="flex flex-col">
+            <div className="hidden sm:flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black tracking-tight text-foreground">جیکات کلود</span>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">ادمین</span>
@@ -246,7 +246,7 @@ export function AdminHeader() {
             href="https://app.gecut.ir"
             target="_blank"
             rel="noreferrer"
-            className="hidden sm:inline-flex"
+            className="hidden md:inline-flex"
           >
             <Button variant="ghost" size="sm" className="gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg">
               <ExternalLink className="h-4 w-4" />
@@ -273,7 +273,7 @@ export function AdminHeader() {
               setAdminsTab("list");
               setIsAdminsModalOpen(true);
             }}
-            className="gap-2 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 rounded-xl cursor-pointer shadow-xs"
+            className="hidden md:inline-flex gap-2 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 rounded-xl cursor-pointer shadow-xs"
             title="مدیریت مدیران و تغییر گذرواژه"
           >
             <ShieldCheck className="h-4 w-4" />
@@ -288,7 +288,7 @@ export function AdminHeader() {
               setConfirmKeyword("");
               setIsPurgeModalOpen(true);
             }}
-            className="gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-300 dark:border-rose-900/50 rounded-xl cursor-pointer shadow-xs"
+            className="hidden md:inline-flex gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-300 dark:border-rose-900/50 rounded-xl cursor-pointer shadow-xs"
             title="پاکسازی تمام داده‌ها و رکوردهای دیتابیس"
           >
             <Database className="h-3.5 w-3.5" />
@@ -300,7 +300,7 @@ export function AdminHeader() {
             variant="outline"
             size="sm"
             onClick={handleLogout}
-            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border-border rounded-xl cursor-pointer shadow-xs"
+            className="hidden md:inline-flex gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border-border rounded-xl cursor-pointer shadow-xs"
             title="خروج از سامانه مدیریت"
           >
             <LogOut className="h-3.5 w-3.5" />
@@ -383,6 +383,20 @@ export function AdminHeader() {
 
             {/* Drawer Footer */}
             <div className="pt-3 border-t border-border/40 flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setAdminsTab("list");
+                  setIsAdminsModalOpen(true);
+                }}
+                className="w-full gap-2 rounded-xl text-xs font-semibold h-9 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-900/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>مدیریت مدیران و گذرواژه‌ها</span>
+              </Button>
+
               <a
                 href="https://app.gecut.ir"
                 target="_blank"

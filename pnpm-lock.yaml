@@ -71,13 +71,16 @@ importers:
         version: 3.0.3(@react-spectrum/provider@3.11.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(tailwindcss@4.2.4)
       '@heroui/styles':
         specifier: ^3.0.3
-        version: 3.0.3(tailwind-merge@3.5.0)(tailwindcss@4.2.4)
+        version: 3.0.3(tailwind-merge@3.4.0)(tailwindcss@4.2.4)
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.74.0(react@19.2.5))
       '@prisma/client':
         specifier: 'catalog:'
         version: 7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.3))(typescript@6.0.3)
+      '@solar-icons/react-perf':
+        specifier: ^2.1.0
+        version: 2.1.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tailwindcss/vite':
         specifier: ^4.2.2
         version: 4.2.4(vite@8.0.10(@types/node@22.19.17)(jiti@2.6.1)(terser@5.51.2))
@@ -156,7 +159,7 @@ importers:
         version: 3.0.3(@react-spectrum/provider@3.11.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(tailwindcss@4.2.4)
       '@heroui/styles':
         specifier: ^3.0.3
-        version: 3.0.3(tailwind-merge@3.4.0)(tailwindcss@4.2.4)
+        version: 3.0.3(tailwind-merge@3.5.0)(tailwindcss@4.2.4)
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.74.0(react@19.2.5))
@@ -189,7 +192,7 @@ importers:
         version: 19.2.5(react@19.2.5)
       tailwind-variants:
         specifier: ^3.1.1
-        version: 3.2.2(tailwind-merge@3.4.0)(tailwindcss@4.2.4)
+        version: 3.2.2(tailwind-merge@3.5.0)(tailwindcss@4.2.4)
       zod:
         specifier: 'catalog:'
         version: 4.3.6
