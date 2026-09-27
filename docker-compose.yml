@@ -41,7 +41,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/gcloud?schema=public}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://${ADMIN_DOMAIN:-admin.cloud.gecut.ir},https://${CUSTOMER_APP_DOMAIN:-app.cloud.gecut.ir}}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://${ADMIN_DOMAIN:-admin.app.gecut.ir},https://${CUSTOMER_APP_DOMAIN:-app.gecut.ir},https://admin.cloud.gecut.ir,https://app.cloud.gecut.ir,https://${SERVER_DOMAIN:-api.app.gecut.ir}}
       SESSION_SECRET: ${SESSION_SECRET:-super-secret-development-session-key-must-be-32-chars-long}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-gecut_session}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-604800}
@@ -58,7 +58,7 @@ services:
       - dokploy-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.gecut-server.rule=Host(`${SERVER_DOMAIN:-api.cloud.gecut.ir}`)"
+      - "traefik.http.routers.gecut-server.rule=Host(`${SERVER_DOMAIN:-api.app.gecut.ir}`)"
       - "traefik.http.routers.gecut-server.entrypoints=websecure"
       - "traefik.http.routers.gecut-server.tls.certResolver=letsencrypt"
       - "traefik.http.services.gecut-server.loadbalancer.server.port=3000"
@@ -72,6 +72,12 @@ services:
       - server
     networks:
       - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gecut-admin.rule=Host(`${ADMIN_DOMAIN:-admin.app.gecut.ir}`)"
+      - "traefik.http.routers.gecut-admin.entrypoints=websecure"
+      - "traefik.http.routers.gecut-admin.tls.certResolver=letsencrypt"
+      - "traefik.http.services.gecut-admin.loadbalancer.server.port=80"
 
   customer-app:
     image: ghcr.io/gecut/cloud-app/customer-app:${CUSTOMER_APP_TAG:-${TAG:-0.4.23}}
@@ -82,6 +88,12 @@ services:
       - server
     networks:
       - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gecut-customer.rule=Host(`${CUSTOMER_APP_DOMAIN:-app.gecut.ir}`)"
+      - "traefik.http.routers.gecut-customer.entrypoints=websecure"
+      - "traefik.http.routers.gecut-customer.tls.certResolver=letsencrypt"
+      - "traefik.http.services.gecut-customer.loadbalancer.server.port=80"
 
 volumes:
   postgres_data:

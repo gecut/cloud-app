@@ -112,6 +112,8 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+          build-args: |
+            VITE_SERVER_URL=https://api.app.gecut.ir
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: ${{ github.event_name == 'push' && 'mode=max' || 'false' }}

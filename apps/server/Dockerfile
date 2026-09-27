@@ -36,4 +36,4 @@ WORKDIR /app/apps/server
 
 EXPOSE 3000
 
-CMD ["node", "dist/src/main.js"]
+CMD ["sh", "-c", "pnpm --filter @gecut-cloud/db db:push --accept-data-loss || true && node dist/src/main.js"]

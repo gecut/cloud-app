@@ -400,14 +400,18 @@ export class PrismaService
       try {
         return await super.$transaction(arg, options);
       } catch (err: any) {
-        const isConnErr =
+        const isFallbackableErr =
           err.message?.includes("Can't reach database server") ||
           err.message?.includes("P1001") ||
           err.message?.includes("ECONNREFUSED") ||
-          err.code === "P1001";
-        if (!isConnErr) throw err;
+          err.code === "P1001" ||
+          err.code === "P2021" ||
+          err.code === "42P01" ||
+          err.message?.includes("does not exist") ||
+          err.message?.includes("relation");
+        if (!isFallbackableErr) throw err;
         this.isDbConnected = false;
-        this.logger.warn("Database connection unavailable during $transaction. Serving from in-memory fallback.");
+        this.logger.warn("Database connection or schema unavailable during $transaction. Serving from in-memory fallback.");
       }
     }
 
@@ -435,15 +439,20 @@ export class PrismaService
               try {
                 return await origFn.apply(target, args);
               } catch (err: any) {
-                const isConnErr =
+                const isFallbackableErr =
                   err.message?.includes("Can't reach database server") ||
                   err.message?.includes("P1001") ||
                   err.message?.includes("ECONNREFUSED") ||
-                  err.code === "P1001";
-                if (!isConnErr) throw err;
+                  err.code === "P1001" ||
+                  err.code === "P2021" ||
+                  err.code === "42P01" ||
+                  err.message?.includes("does not exist") ||
+                  err.message?.includes("relation") ||
+                  err.message?.includes("column");
+                if (!isFallbackableErr) throw err;
                 self.isDbConnected = false;
                 self.logger.warn(
-                  `Database connection unavailable during ${modelKey}.${String(prop)}. Serving from resilient memory repository.`
+                  `Database query failed (${err.code || err.message}) during ${modelKey}.${String(prop)}. Serving from resilient memory repository.`
                 );
               }
             }
@@ -2153,12 +2162,22 @@ export class PrismaService
       await this.$connect();
       // Test actual TCP connectivity
       await this.$queryRaw`SELECT 1`;
-      this.isDbConnected = true;
-      this.logger.log("✅ [PrismaService] Connected to PostgreSQL database successfully.");
+
+      // Verify that schema tables exist
+      try {
+        await this.$queryRaw`SELECT 1 FROM "Service" LIMIT 1`;
+        this.isDbConnected = true;
+        this.logger.log("✅ [PrismaService] Connected to PostgreSQL database and schema verified.");
+      } catch (tableErr: any) {
+        this.isDbConnected = false;
+        this.logger.warn(
+          `⚠️ [PrismaService] PostgreSQL is connected, but schema tables (e.g. Service) do not exist yet (${tableErr?.message || "Undefined table"}). Serving from resilient in-memory store until migrations are pushed.`,
+        );
+      }
     } catch (err: any) {
       this.isDbConnected = false;
       this.logger.warn(
-        "⚠️ [PrismaService] PostgreSQL database on localhost:5432 is not reachable. Resilient in-memory repository activated.",
+        `⚠️ [PrismaService] PostgreSQL database is not reachable (${err?.message || "connection error"}). Resilient in-memory repository activated.`,
       );
     }
   }

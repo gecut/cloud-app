@@ -321,7 +321,21 @@ export const queryClient = new QueryClient({
   }),
 });
 
-export const API_BASE_URL = env.VITE_SERVER_URL;
+export const API_BASE_URL = (() => {
+  const configured = env.VITE_SERVER_URL;
+  if (typeof window !== "undefined") {
+    const isLocalhost =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+    if (
+      !isLocalhost &&
+      (configured.includes("localhost") || configured.includes("127.0.0.1"))
+    ) {
+      return "https://api.app.gecut.ir";
+    }
+  }
+  return configured;
+})();
 
 export async function apiClient<T>(
   endpoint: string,

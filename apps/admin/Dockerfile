@@ -15,7 +15,7 @@ COPY packages ./packages
 COPY apps/admin ./apps/admin
 
 # Build arguments for Vite client environment
-ARG VITE_SERVER_URL=http://localhost:3000
+ARG VITE_SERVER_URL=https://api.app.gecut.ir
 ENV VITE_SERVER_URL=$VITE_SERVER_URL
 
 # Install dependencies and build static assets
