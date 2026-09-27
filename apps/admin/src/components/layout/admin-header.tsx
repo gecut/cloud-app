@@ -237,12 +237,12 @@ export function AdminHeader() {
           >
             <Menu className="h-5 w-5" />
           </Button>
-
-          <Link to="/" className="flex items-center gap-2 sm:gap-4 group">
-            <div className="relative flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/5 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-all duration-300">
+  <div className="relative sm:flex h-8 w-8 sm:h-10 sm:w-10 mx-2 hidden items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/5 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-all duration-300">
               <img src="/logo.png" alt="Gecut" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
               <div className="absolute inset-0 rounded-xl bg-emerald-500/10 blur-sm -z-10 group-hover:opacity-100 opacity-60 transition-opacity" />
             </div>
+          <Link to="/" className="flex items-center gap-2 sm:gap-4 group">
+            
             <div className="hidden sm:flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black tracking-tight text-foreground">جیکات کلود</span>
@@ -323,7 +323,12 @@ export function AdminHeader() {
           </Button>
 
           {/* Mode Toggle */}
+          <div className="relative flex h-8 w-8 sm:h-10 sm:w-10 mx-2 sm:hidden items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/5 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-all duration-300">
+              <img src="/logo.png" alt="Gecut" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
+              <div className="absolute inset-0 rounded-xl bg-emerald-500/10 blur-sm -z-10 group-hover:opacity-100 opacity-60 transition-opacity" />
+            </div>
           <ModeToggle />
+          
         </div>
       </header>
 
