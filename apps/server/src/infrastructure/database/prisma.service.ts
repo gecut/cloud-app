@@ -435,26 +435,9 @@ export class PrismaService
           const origFn = Reflect.get(target, prop, receiver);
 
           return async (...args: any[]) => {
-            let extractedBillingCycle: any;
-            if (modelKey === "service" && args[0]?.data && "billingCycle" in args[0].data) {
-              extractedBillingCycle = args[0].data.billingCycle;
-              delete args[0].data.billingCycle;
-            }
-
             if (self.isDbConnected && typeof origFn === "function") {
               try {
-                const res = await origFn.apply(target, args);
-                if (extractedBillingCycle !== undefined && res?.id) {
-                  res.billingCycle = extractedBillingCycle;
-                  try {
-                    await (self as any).$executeRawUnsafe(
-                      `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
-                      String(extractedBillingCycle),
-                      res.id,
-                    );
-                  } catch {}
-                }
-                return res;
+                return await origFn.apply(target, args);
               } catch (err: any) {
                 const isFallbackableErr =
                   err.message?.includes("Can't reach database server") ||
@@ -475,9 +458,6 @@ export class PrismaService
             }
 
             if (fallback && typeof fallback[prop] === "function") {
-              if (extractedBillingCycle !== undefined && args[0]?.data) {
-                args[0].data.billingCycle = extractedBillingCycle;
-              }
               const res = await fallback[prop](...args);
               if (["create", "update", "delete", "upsert", "deleteMany"].includes(prop as string)) {
                 self.saveToDisk();

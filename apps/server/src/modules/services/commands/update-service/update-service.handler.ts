@@ -91,9 +91,6 @@ export class UpdateServiceHandler
       throw new BadRequestException("تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
     }
 
-    const cycleToUpdate = updateData.billingCycle;
-    delete updateData.billingCycle;
-
     const updated = await this.prisma.service.update({
       where: { id },
       data: updateData,
@@ -109,17 +106,6 @@ export class UpdateServiceHandler
         },
       },
     });
-
-    if (cycleToUpdate !== undefined) {
-      try {
-        await (this.prisma as any).$executeRawUnsafe(
-          `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
-          String(cycleToUpdate),
-          id,
-        );
-      } catch {}
-      updated.billingCycle = cycleToUpdate;
-    }
 
     // Synchronize all invoices and payments for this service when service details are edited
     try {

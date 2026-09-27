@@ -11,7 +11,7 @@ import {
   ServiceGroupStatus,
   ServiceStatus,
   type PrismaClient,
-} from "../prisma/generated/client";
+} from "@prisma/client";
 
 import { createPrismaClient } from "./index";
 

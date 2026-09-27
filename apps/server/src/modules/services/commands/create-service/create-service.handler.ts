@@ -138,19 +138,12 @@ export class CreateServiceHandler
       };
 
       const service = await this.prisma.service.create({
-        data: baseData,
+        data: {
+          ...baseData,
+          billingCycle: dto.billingCycle || "MONTHLY",
+        },
         include: includes,
       });
-
-      const cycle = dto.billingCycle || "MONTHLY";
-      try {
-        await (this.prisma as any).$executeRawUnsafe(
-          `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
-          cycle,
-          service.id,
-        );
-      } catch {}
-      service.billingCycle = cycle;
 
       // Automatically create initial invoice whenever allocated to a customer
       if (customerId) {
