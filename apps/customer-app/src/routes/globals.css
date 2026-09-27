@@ -147,15 +147,39 @@ select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a1a1aa' stroke-width='2.2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
 }
 
-/* Universal input/select/textarea focus styling */
-input:focus,
-input:focus-visible,
-select:focus,
-select:focus-visible,
-textarea:focus,
-textarea:focus-visible {
-  outline: none !important;
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22) !important;
+/* Universal input/select/textarea focus styling on desktop */
+@media (min-width: 769px) {
+  input:focus,
+  input:focus-visible,
+  select:focus,
+  select:focus-visible,
+  textarea:focus,
+  textarea:focus-visible {
+    outline: none !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22) !important;
+  }
+}
+
+/* Disable input focus ring, box-shadow and auto-zoom on mobile */
+@media (max-width: 768px) {
+  input:focus,
+  input:focus-visible,
+  select:focus,
+  select:focus-visible,
+  textarea:focus,
+  textarea:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: var(--border, #27272a) !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents auto-zoom on iOS */
+    -webkit-tap-highlight-color: transparent !important;
+  }
 }
 

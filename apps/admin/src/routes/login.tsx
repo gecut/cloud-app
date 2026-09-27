@@ -24,9 +24,9 @@ export const Route = createFileRoute("/login")({
 function AdminLoginPage() {
   const navigate = useNavigate();
 
-  // Login form state (Configured for primary admin)
-  const [phone, setPhone] = useState("09363528608");
-  const [password, setPassword] = useState("admin@Gecut-cloud");
+  // Login form state
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
@@ -126,7 +126,7 @@ function AdminLoginPage() {
                     id="admin-phone"
                     type="tel"
                     dir="ltr"
-                    placeholder="09363528608"
+                    placeholder="09120000000"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="text-center pl-9 rounded-xl border-border/70 bg-background/50 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-xs h-11 font-mono"

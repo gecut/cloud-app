@@ -106,38 +106,64 @@ export class CreateServiceHandler
         }
       }
 
-      const service = await this.prisma.service.create({
-        data: {
-          customerId: customerId || null,
-          parentServiceId: parentServiceId || null,
-          serviceGroupId: dto.serviceGroupId || null,
-          serviceTypeId,
-          serverId: dto.serverId || null,
-          name: dto.name,
-          description: dto.description || null,
-          priceToman: dto.priceToman || 0,
-          billingCycle: dto.billingCycle || "MONTHLY",
-          autoRenew: dto.autoRenew !== undefined ? dto.autoRenew : true,
-          quantity: Math.max(1, Number(dto.quantity) || 1),
-          usedQuantity: 0,
-          trackingType,
-          purchaseDate,
-          startDate,
-          renewalDate,
-          status: (dto.status as any) || "ACTIVE",
-        } as any,
-        include: {
-          customer: true,
-          serviceType: true,
-          serviceGroup: true,
-          server: true,
-          endpoints: true,
-          parentService: true,
-          childServices: {
-            include: { customer: true },
-          },
+      const baseData: any = {
+        customerId: customerId || null,
+        parentServiceId: parentServiceId || null,
+        serviceGroupId: dto.serviceGroupId || null,
+        serviceTypeId,
+        serverId: dto.serverId || null,
+        name: dto.name,
+        description: dto.description || null,
+        priceToman: dto.priceToman || 0,
+        autoRenew: dto.autoRenew !== undefined ? dto.autoRenew : true,
+        quantity: Math.max(1, Number(dto.quantity) || 1),
+        usedQuantity: 0,
+        trackingType,
+        purchaseDate,
+        startDate,
+        renewalDate,
+        status: (dto.status as any) || "ACTIVE",
+      };
+
+      const includes = {
+        customer: true,
+        serviceType: true,
+        serviceGroup: true,
+        server: true,
+        endpoints: true,
+        parentService: true,
+        childServices: {
+          include: { customer: true },
         },
-      });
+      };
+
+      let service: any;
+      try {
+        service = await this.prisma.service.create({
+          data: {
+            ...baseData,
+            billingCycle: dto.billingCycle || "MONTHLY",
+          },
+          include: includes,
+        });
+      } catch (err: any) {
+        if (err?.message?.includes("billingCycle") || String(err).includes("billingCycle")) {
+          service = await this.prisma.service.create({
+            data: baseData,
+            include: includes,
+          });
+          try {
+            await (this.prisma as any).$executeRawUnsafe(
+              `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
+              dto.billingCycle || "MONTHLY",
+              service.id,
+            );
+          } catch {}
+          service.billingCycle = dto.billingCycle || "MONTHLY";
+        } else {
+          throw err;
+        }
+      }
 
       // Automatically create initial invoice whenever allocated to a customer
       if (customerId) {

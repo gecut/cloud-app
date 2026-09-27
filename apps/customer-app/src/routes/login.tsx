@@ -188,7 +188,6 @@ export function CustomerLoginPage() {
                       onChange={(e) => setPhone(toEnglishDigits(e.target.value))}
                       className="w-full h-11 pl-9 pr-3 rounded-xl border border-border/70 bg-background/50 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-xs font-mono text-center placeholder:text-muted-foreground/40 transition-all outline-hidden"
                       required
-                      autoFocus
                     />
                     <svg className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -246,7 +245,6 @@ export function CustomerLoginPage() {
                     onChange={(e) => setOtpCode(toEnglishDigits(e.target.value))}
                     className="w-full h-12 rounded-xl bg-background/50 border border-border/70 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-center text-lg font-mono tracking-widest outline-hidden transition-all"
                     required
-                    autoFocus
                   />
                 </div>
 
