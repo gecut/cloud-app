@@ -91,55 +91,34 @@ export class UpdateServiceHandler
       throw new BadRequestException("تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
     }
 
-    let updated: any;
-    try {
-      updated = await this.prisma.service.update({
-        where: { id },
-        data: updateData,
-        include: {
-          customer: true,
-          serviceType: true,
-          serviceGroup: true,
-          server: true,
-          endpoints: true,
-          parentService: true,
-          childServices: {
-            include: { customer: true },
-          },
+    const cycleToUpdate = updateData.billingCycle;
+    delete updateData.billingCycle;
+
+    const updated = await this.prisma.service.update({
+      where: { id },
+      data: updateData,
+      include: {
+        customer: true,
+        serviceType: true,
+        serviceGroup: true,
+        server: true,
+        endpoints: true,
+        parentService: true,
+        childServices: {
+          include: { customer: true },
         },
-      });
-    } catch (err: any) {
-      if (err?.message?.includes("billingCycle") || String(err).includes("billingCycle")) {
-        const cycle = updateData.billingCycle;
-        delete updateData.billingCycle;
-        updated = await this.prisma.service.update({
-          where: { id },
-          data: updateData,
-          include: {
-            customer: true,
-            serviceType: true,
-            serviceGroup: true,
-            server: true,
-            endpoints: true,
-            parentService: true,
-            childServices: {
-              include: { customer: true },
-            },
-          },
-        });
-        if (cycle !== undefined) {
-          try {
-            await (this.prisma as any).$executeRawUnsafe(
-              `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
-              cycle,
-              id,
-            );
-          } catch {}
-          updated.billingCycle = cycle;
-        }
-      } else {
-        throw err;
-      }
+      },
+    });
+
+    if (cycleToUpdate !== undefined) {
+      try {
+        await (this.prisma as any).$executeRawUnsafe(
+          `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
+          String(cycleToUpdate),
+          id,
+        );
+      } catch {}
+      updated.billingCycle = cycleToUpdate;
     }
 
     // Synchronize all invoices and payments for this service when service details are edited

@@ -137,33 +137,20 @@ export class CreateServiceHandler
         },
       };
 
-      let service: any;
+      const service = await this.prisma.service.create({
+        data: baseData,
+        include: includes,
+      });
+
+      const cycle = dto.billingCycle || "MONTHLY";
       try {
-        service = await this.prisma.service.create({
-          data: {
-            ...baseData,
-            billingCycle: dto.billingCycle || "MONTHLY",
-          },
-          include: includes,
-        });
-      } catch (err: any) {
-        if (err?.message?.includes("billingCycle") || String(err).includes("billingCycle")) {
-          service = await this.prisma.service.create({
-            data: baseData,
-            include: includes,
-          });
-          try {
-            await (this.prisma as any).$executeRawUnsafe(
-              `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
-              dto.billingCycle || "MONTHLY",
-              service.id,
-            );
-          } catch {}
-          service.billingCycle = dto.billingCycle || "MONTHLY";
-        } else {
-          throw err;
-        }
-      }
+        await (this.prisma as any).$executeRawUnsafe(
+          `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
+          cycle,
+          service.id,
+        );
+      } catch {}
+      service.billingCycle = cycle;
 
       // Automatically create initial invoice whenever allocated to a customer
       if (customerId) {
