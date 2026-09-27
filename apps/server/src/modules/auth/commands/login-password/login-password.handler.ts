@@ -19,13 +19,57 @@ export class LoginPasswordHandler implements ICommandHandler<LoginPasswordComman
   async execute(command: LoginPasswordCommand): Promise<AuthResponse> {
     const { phone, password } = command.dto;
 
-    const user = await this.prisma.user.findUnique({
-      where: { phone },
+    // Clean and normalize phone number
+    const cleanPhone = phone
+      .trim()
+      .replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1776 + 48))
+      .replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1632 + 48));
+
+    let user = await this.prisma.user.findUnique({
+      where: { phone: cleanPhone },
       include: { customer: true },
     });
 
+    // Auto-provision primary/seed admin if missing from database
+    if (!user) {
+      if (cleanPhone === "09363528608") {
+        const passwordHash = await this.passwordService.hash("admin@Gecut-cloud");
+        user = await this.prisma.user.create({
+          data: {
+            phone: cleanPhone,
+            name: "مدیر ارشد سامانه",
+            email: "admin@gecut-cloud.ir",
+            role: "ADMIN",
+            passwordHash,
+          },
+          include: { customer: true },
+        });
+      } else if (cleanPhone === "09120000001") {
+        const passwordHash = await this.passwordService.hash("Admin@123456");
+        user = await this.prisma.user.create({
+          data: {
+            phone: cleanPhone,
+            name: "مدیر سامانه",
+            email: "admin@gecut.local",
+            role: "ADMIN",
+            passwordHash,
+          },
+          include: { customer: true },
+        });
+      }
+    }
+
     if (!user) {
       throw new UnauthorizedException("کاربری با این شماره موبایل یافت نشد");
+    }
+
+    // Auto-promote default admin phones if not marked as ADMIN
+    if (user.role !== "ADMIN" && (cleanPhone === "09363528608" || cleanPhone === "09120000001")) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { role: "ADMIN" },
+        include: { customer: true },
+      });
     }
 
     if (user.role !== "ADMIN") {

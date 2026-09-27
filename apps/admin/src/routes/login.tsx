@@ -36,6 +36,11 @@ function AdminLoginPage() {
       return;
     }
 
+    const cleanPhone = phone
+      .trim()
+      .replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1776 + 48))
+      .replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1632 + 48));
+
     setLoading(true);
     try {
       const res = await apiClient<{
@@ -44,7 +49,7 @@ function AdminLoginPage() {
         user: { id: string; name: string; phone: string; role: "ADMIN" | "CUSTOMER" };
       }>("/auth/login/password", {
         method: "POST",
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ phone: cleanPhone, password }),
       }).catch(async () => {
         return apiClient<{
           success: boolean;
@@ -52,7 +57,7 @@ function AdminLoginPage() {
           user: { id: string; name: string; phone: string; role: "ADMIN" | "CUSTOMER" };
         }>("/auth/login-password", {
           method: "POST",
-          body: JSON.stringify({ phone, password }),
+          body: JSON.stringify({ phone: cleanPhone, password }),
         });
       });
 

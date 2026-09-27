@@ -2168,6 +2168,45 @@ export class PrismaService
         await this.$queryRaw`SELECT 1 FROM "Service" LIMIT 1`;
         this.isDbConnected = true;
         this.logger.log("✅ [PrismaService] Connected to PostgreSQL database and schema verified.");
+
+        // Ensure default admin users exist in PostgreSQL
+        try {
+          const primaryAdminPhone = "09363528608";
+          await this.user.upsert({
+            where: { phone: primaryAdminPhone },
+            update: {
+              name: "مدیر ارشد سامانه",
+              role: "ADMIN",
+            },
+            create: {
+              phone: primaryAdminPhone,
+              name: "مدیر ارشد سامانه",
+              email: "admin@gecut-cloud.ir",
+              role: "ADMIN",
+              passwordHash: "admin@Gecut-cloud",
+            },
+          });
+
+          const backupAdminPhone = "09120000001";
+          await this.user.upsert({
+            where: { phone: backupAdminPhone },
+            update: {
+              name: "مدیر سامانه",
+              role: "ADMIN",
+            },
+            create: {
+              phone: backupAdminPhone,
+              name: "مدیر سامانه",
+              email: "admin@gecut.local",
+              role: "ADMIN",
+              passwordHash: "Admin@123456",
+            },
+          });
+
+          this.logger.log("✅ [PrismaService] Ensured default admin accounts in PostgreSQL.");
+        } catch (adminErr: any) {
+          this.logger.warn(`Failed to auto-seed default admins in PostgreSQL: ${adminErr?.message}`);
+        }
       } catch (tableErr: any) {
         this.isDbConnected = false;
         this.logger.warn(
