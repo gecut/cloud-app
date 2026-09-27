@@ -1,6 +1,6 @@
 services:
   migration:
-    image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-0.4.23}}
+    image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-latest}}
     restart: "no"
     command: ["pnpm", "--filter", "@gecut-cloud/db", "db:migrate:deploy"]
     environment:
@@ -9,7 +9,7 @@ services:
       - dokploy-network
 
   server:
-    image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-0.4.23}}
+    image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-latest}}
     restart: unless-stopped
     command: ["sh", "-c", "pnpm --filter @gecut-cloud/db db:migrate:deploy || true && node dist/src/main.js"]
     expose:
@@ -36,7 +36,7 @@ services:
       - dokploy-network
 
   admin:
-    image: ghcr.io/gecut/cloud-app/admin:${ADMIN_TAG:-${TAG:-0.4.23}}
+    image: ghcr.io/gecut/cloud-app/admin:${ADMIN_TAG:-${TAG:-latest}}
     restart: unless-stopped
     expose:
       - "80"
@@ -46,7 +46,7 @@ services:
       - dokploy-network
 
   customer-app:
-    image: ghcr.io/gecut/cloud-app/customer-app:${CUSTOMER_APP_TAG:-${TAG:-0.4.23}}
+    image: ghcr.io/gecut/cloud-app/customer-app:${CUSTOMER_APP_TAG:-${TAG:-latest}}
     restart: unless-stopped
     expose:
       - "80"
