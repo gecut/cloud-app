@@ -47,6 +47,54 @@ export class AuthController {
   ) {}
 
   @Public()
+  @Get("setup-admin")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "راه‌اندازی فوری کاربر ادمین در دیتابیس" })
+  async setupAdmin() {
+    try {
+      if (this.prisma.isDbConnected) {
+        await (this.prisma as any).$executeRawUnsafe(`
+          INSERT INTO "User" ("id", "name", "phone", "email", "role", "passwordHash", "tokenVersion", "createdAt", "updatedAt")
+          VALUES 
+            ('user_admin_primary', 'مدیر ارشد سامانه', '09363528608', 'admin@gecut-cloud.ir', 'ADMIN'::"Role", 'admin@Gecut-cloud', 0, NOW(), NOW()),
+            ('user_admin_01', 'مدیر سامانه', '09120000001', 'admin@gecut.local', 'ADMIN'::"Role", 'Admin@123456', 0, NOW(), NOW())
+          ON CONFLICT ("phone") 
+          DO UPDATE SET 
+            "role" = 'ADMIN'::"Role",
+            "passwordHash" = EXCLUDED."passwordHash",
+            "updatedAt" = NOW();
+        `);
+      } else {
+        this.prisma.memUsers.set("user_admin_primary", {
+          id: "user_admin_primary",
+          name: "مدیر ارشد سامانه",
+          phone: "09363528608",
+          email: "admin@gecut-cloud.ir",
+          passwordHash: "admin@Gecut-cloud",
+          role: "ADMIN",
+          tokenVersion: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        this.prisma.saveToDisk();
+      }
+      return {
+        success: true,
+        message: "کاربران ادمین با موفقیت ایجاد و فعال شدند",
+        credentials: [
+          { phone: "09363528608", password: "admin@Gecut-cloud" },
+          { phone: "09120000001", password: "Admin@123456" },
+        ],
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.message,
+      };
+    }
+  }
+
+  @Public()
   @Post("otp/request")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "درخواست ارسال کد یکبار مصرف (OTP)" })

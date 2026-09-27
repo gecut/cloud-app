@@ -2171,38 +2171,17 @@ export class PrismaService
 
         // Ensure default admin users exist in PostgreSQL
         try {
-          const primaryAdminPhone = "09363528608";
-          await this.user.upsert({
-            where: { phone: primaryAdminPhone },
-            update: {
-              name: "مدیر ارشد سامانه",
-              role: "ADMIN",
-            },
-            create: {
-              phone: primaryAdminPhone,
-              name: "مدیر ارشد سامانه",
-              email: "admin@gecut-cloud.ir",
-              role: "ADMIN",
-              passwordHash: "admin@Gecut-cloud",
-            },
-          });
-
-          const backupAdminPhone = "09120000001";
-          await this.user.upsert({
-            where: { phone: backupAdminPhone },
-            update: {
-              name: "مدیر سامانه",
-              role: "ADMIN",
-            },
-            create: {
-              phone: backupAdminPhone,
-              name: "مدیر سامانه",
-              email: "admin@gecut.local",
-              role: "ADMIN",
-              passwordHash: "Admin@123456",
-            },
-          });
-
+          await this.$executeRawUnsafe(`
+            INSERT INTO "User" ("id", "name", "phone", "email", "role", "passwordHash", "tokenVersion", "createdAt", "updatedAt")
+            VALUES 
+              ('user_admin_primary', 'مدیر ارشد سامانه', '09363528608', 'admin@gecut-cloud.ir', 'ADMIN'::"Role", 'admin@Gecut-cloud', 0, NOW(), NOW()),
+              ('user_admin_01', 'مدیر سامانه', '09120000001', 'admin@gecut.local', 'ADMIN'::"Role", 'Admin@123456', 0, NOW(), NOW())
+            ON CONFLICT ("phone") 
+            DO UPDATE SET 
+              "role" = 'ADMIN'::"Role",
+              "passwordHash" = EXCLUDED."passwordHash",
+              "updatedAt" = NOW();
+          `);
           this.logger.log("✅ [PrismaService] Ensured default admin accounts in PostgreSQL.");
         } catch (adminErr: any) {
           this.logger.warn(`Failed to auto-seed default admins in PostgreSQL: ${adminErr?.message}`);
