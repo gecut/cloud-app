@@ -237,7 +237,13 @@ function AdminInvoicesListPage() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "category" | "amount-desc" | "amount-asc" | "due-asc">("newest");
   const [page, setPage] = useState<number>(1);
   const PAGE_LIMIT = 30;
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("create") === "true" || params.get("new") === "true" || params.get("new") === "1";
+    }
+    return false;
+  });
 
   // Form states
   const [counterpartyType, setCounterpartyType] = useState<"CUSTOMER" | "SUPPLIER">("CUSTOMER");

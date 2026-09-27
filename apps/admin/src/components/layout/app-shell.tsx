@@ -151,10 +151,41 @@ export function AppShell({ header, children }: AppShellProps) {
         </aside>
 
         {/* Main Content Area with Entrance Animation & min-w-0 for Table Responsiveness */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto animate-entrance min-w-0">
+        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto animate-entrance min-w-0 pb-20 md:pb-8">
           {children}
         </main>
       </div>
+
+      {/* Sleek Mobile Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card/85 backdrop-blur-xl border-t border-border/50 py-1.5 px-3 flex items-center justify-around shadow-lg">
+        {navItems.slice(0, 5).map((item) => {
+          const Icon = item.icon;
+          const isActive = item.exact
+            ? currentPath === item.to
+            : currentPath.startsWith(item.to);
+
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+                isActive
+                  ? "text-emerald-600 dark:text-emerald-400 font-bold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <div
+                className={`p-1.5 rounded-xl transition-all ${
+                  isActive ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 scale-105" : "text-muted-foreground"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+              </div>
+              <span className="text-[10px] tracking-tight">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

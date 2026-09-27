@@ -25,6 +25,7 @@ import {
   LogOut,
   Menu,
   X,
+  ArrowRight,
   Database,
   AlertTriangle,
   Trash2,
@@ -213,12 +214,25 @@ export function AdminHeader() {
     <>
       <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-border/40 bg-background/80 px-4 sm:px-6 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Mobile Back Button (When not on Dashboard) */}
+          {currentPath !== "/" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate({ to: "/" })}
+              className="md:hidden h-9 w-9 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+              title="بازگشت به داشبورد"
+            >
+              <ArrowRight className="h-5 w-5" />
+            </Button>
+          )}
+
           {/* Mobile Hamburger Button */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsMobileMenuOpen(true)}
-            className="md:hidden h-9 w-9 text-muted-foreground hover:text-foreground"
+            className="md:hidden h-9 w-9 text-muted-foreground hover:text-foreground cursor-pointer"
             title="منوی ناوبری"
           >
             <Menu className="h-5 w-5" />
@@ -315,125 +329,127 @@ export function AdminHeader() {
 
       {/* Mobile Navigation Drawer */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 md:hidden flex justify-start">
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
 
-          {/* Drawer Content */}
-          <div className="relative w-4/5 max-w-xs bg-card border-l border-border h-full shadow-2xl p-5 flex flex-col gap-4 z-10 animate-in slide-in-from-right duration-200">
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-border/40">
-              <div className="flex items-center gap-2.5">
-                <img src="/logo.png" alt="Gecut" className="w-6 h-6 object-contain" />
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold">جیکات کلود</span>
-                  <span className="text-[10px] text-muted-foreground">پنل مدیریت موبایل</span>
+            {/* Drawer Content */}
+            <div className="relative w-4/5 max-w-xs bg-card border-l border-border h-full shadow-2xl p-5 flex flex-col gap-4 z-10 animate-in slide-in-from-right duration-200">
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-border/40">
+                <div className="flex items-center gap-2.5">
+                  <img src="/logo.png" alt="Gecut" className="w-6 h-6 object-contain" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold">جیکات کلود</span>
+                    <span className="text-[10px] text-muted-foreground">پنل مدیریت موبایل</span>
+                  </div>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="h-8 w-8 text-muted-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="h-8 w-8 text-muted-foreground"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
 
-            {/* User Info */}
-            <div className="p-3 rounded-xl bg-muted/40 border border-border/40 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                <span className="font-semibold text-foreground truncate max-w-[150px]">
-                  {currentUser.name || "مدیر سامانه"}
+              {/* User Info */}
+              <div className="p-3 rounded-xl bg-muted/40 border border-border/40 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  <span className="font-semibold text-foreground truncate max-w-[150px]">
+                    {currentUser.name || "مدیر سامانه"}
+                  </span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-bold">
+                  مدیر
                 </span>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-bold">
-                مدیر
-              </span>
-            </div>
 
-            {/* Nav Links */}
-            <nav className="flex flex-col gap-1 overflow-y-auto flex-1 py-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = item.exact
-                  ? currentPath === item.to
-                  : currentPath.startsWith(item.to);
+              {/* Nav Links */}
+              <nav className="flex flex-col gap-1 overflow-y-auto flex-1 py-1">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = item.exact
+                    ? currentPath === item.to
+                    : currentPath.startsWith(item.to);
 
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-medium transition-colors ${
-                      isActive
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                    }`}
-                  >
-                    <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-emerald-500" : "opacity-70"}`} />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-medium transition-colors ${
+                        isActive
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-emerald-500" : "opacity-70"}`} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
 
-            {/* Drawer Footer */}
-            <div className="pt-3 border-t border-border/40 flex flex-col gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  setAdminsTab("list");
-                  setIsAdminsModalOpen(true);
-                }}
-                className="w-full gap-2 rounded-xl text-xs font-semibold h-9 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-900/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                <span>مدیریت مدیران و گذرواژه‌ها</span>
-              </Button>
+              {/* Drawer Footer */}
+              <div className="pt-3 border-t border-border/40 flex flex-col gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setAdminsTab("list");
+                    setIsAdminsModalOpen(true);
+                  }}
+                  className="w-full gap-2 rounded-xl text-xs font-semibold h-9 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-900/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>مدیریت مدیران و گذرواژه‌ها</span>
+                </Button>
 
-              <a
-                href="https://app.gecut.ir"
-                target="_blank"
-                rel="noreferrer"
-                className="w-full flex items-center justify-center gap-2 h-9 px-3 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-all"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                <span>مشاهده پنل مشتریان</span>
-              </a>
+                <a
+                  href="https://app.gecut.ir"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full flex items-center justify-center gap-2 h-9 px-3 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-all"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>مشاهده پنل مشتریان</span>
+                </a>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  setConfirmKeyword("");
-                  setIsPurgeModalOpen(true);
-                }}
-                className="w-full gap-2 rounded-xl text-xs font-semibold h-9 text-rose-600 border-rose-300 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-              >
-                <Database className="h-3.5 w-3.5" />
-                <span>پاکسازی کامل دیتابیس</span>
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setConfirmKeyword("");
+                    setIsPurgeModalOpen(true);
+                  }}
+                  className="w-full gap-2 rounded-xl text-xs font-semibold h-9 text-rose-600 border-rose-300 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                >
+                  <Database className="h-3.5 w-3.5" />
+                  <span>پاکسازی کامل دیتابیس</span>
+                </Button>
 
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleLogout}
-                className="w-full gap-2 rounded-xl text-xs font-semibold h-9"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                <span>خروج از حساب</span>
-              </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="w-full gap-2 rounded-xl text-xs font-semibold h-9"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>خروج از حساب</span>
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Purge Database Confirmation Modal */}
