@@ -11,6 +11,7 @@ import {
 import { formatInvoiceNumber } from "@/utils/format";
 import { Button } from "@gecut-cloud/ui/components/button";
 import { formatJalaliDateWords, toPersianDigits } from "@gecut-cloud/contracts";
+import { ModalPortal } from "../common/modal-portal";
 
 interface InvoiceDetailModalProps {
   invoice: any | null;
@@ -302,7 +303,13 @@ export function InvoiceDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto print:p-0 print:bg-white print:static">
+    <ModalPortal>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto print:p-0 print:bg-white print:static"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
       <style>{`
         @media print {
           body * {
@@ -608,7 +615,8 @@ export function InvoiceDetailModal({
           </Button>
         </div>
       </div>
-    </div>
+      </div>
+    </ModalPortal>
   );
 }
 

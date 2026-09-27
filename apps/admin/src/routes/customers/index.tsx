@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ModalPortal } from "@/components/common/modal-portal";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
 import { AppShell } from "@/components/layout/app-shell";
@@ -243,10 +243,16 @@ function AdminCustomersListPage() {
           </div>
         </div>
 
-        {/* Modal / Create Customer (Portal to Body for 100% viewport centering) */}
-        {isCreateOpen && typeof document !== "undefined" && createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200">
+        {/* Modal / Create Customer */}
+        {isCreateOpen && (
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !createCustomerMutation.isPending) setIsCreateOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto m-auto rounded-2xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-border/40">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -414,9 +420,9 @@ function AdminCustomersListPage() {
                 </div>
               </form>
             </div>
-          </div>,
-          document.body
-        )}
+          </div>
+        </ModalPortal>
+      )}
 
         {/* Filters & Search & Sort */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -737,50 +743,57 @@ function AdminCustomersListPage() {
 
         {/* Delete Customer Confirmation Modal */}
         {customerToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-md rounded-2xl border border-rose-500/20 bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-center gap-3 pb-3 border-b border-border/40">
-                <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
-                  <AlertTriangle className="h-5 w-5" />
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !deleteCustomerMutation.isPending) setCustomerToDelete(null);
+              }}
+            >
+              <div className="relative w-full max-w-md m-auto rounded-2xl border border-rose-500/20 bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center gap-3 pb-3 border-b border-border/40">
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-foreground">حذف پرونده مشتری</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">{customerToDelete.name}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-sm text-foreground">حذف پرونده مشتری</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">{customerToDelete.name}</p>
+
+                <div className="py-4 text-xs text-muted-foreground leading-relaxed space-y-2">
+                  <p>
+                    آیا از حذف کامل مشتری <strong className="text-foreground font-semibold">{customerToDelete.name}</strong> اطمینان دارید؟
+                  </p>
+                  <p className="text-rose-500/90 font-medium">
+                    توجه: کلیه سرویس‌ها، فاکتورها و سوابق ثبت‌شده برای این مشتری نیز به صورت خودکار لغو یا پاکسازی خواهند شد و این عملیات غیرقابل بازگشت است.
+                  </p>
                 </div>
-              </div>
 
-              <div className="py-4 text-xs text-muted-foreground leading-relaxed space-y-2">
-                <p>
-                  آیا از حذف کامل مشتری <strong className="text-foreground font-semibold">{customerToDelete.name}</strong> اطمینان دارید؟
-                </p>
-                <p className="text-rose-500/90 font-medium">
-                  توجه: کلیه سرویس‌ها، فاکتورها و سوابق ثبت‌شده برای این مشتری نیز به صورت خودکار لغو یا پاکسازی خواهند شد و این عملیات غیرقابل بازگشت است.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/40">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCustomerToDelete(null)}
-                  disabled={deleteCustomerMutation.isPending}
-                  className="rounded-xl text-xs"
-                >
-                  انصراف
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => deleteCustomerMutation.mutate(customerToDelete.id)}
-                  disabled={deleteCustomerMutation.isPending}
-                  className="rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold gap-1.5"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {deleteCustomerMutation.isPending ? "در حال حذف..." : "تأیید و حذف مشتری"}
-                </Button>
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/40">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCustomerToDelete(null)}
+                    disabled={deleteCustomerMutation.isPending}
+                    className="rounded-xl text-xs"
+                  >
+                    انصراف
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteCustomerMutation.mutate(customerToDelete.id)}
+                    disabled={deleteCustomerMutation.isPending}
+                    className="rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold gap-1.5"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {deleteCustomerMutation.isPending ? "در حال حذف..." : "تأیید و حذف مشتری"}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
       </div>
     </AppShell>

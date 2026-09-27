@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { formatJalaliDate, analyzeDateRange } from "@gecut-cloud/contracts";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
 import { ConfirmModal } from "@/components/common/confirm-modal";
+import { ModalPortal } from "@/components/common/modal-portal";
 import {
   Server,
   Plus,
@@ -1586,107 +1587,120 @@ function AdminServicesListPage() {
 
         {/* MODAL: CREATE SERVICE / CATALOG TEMPLATE */}
         {isCreateOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 my-8">
-              <div className="flex items-center justify-between pb-4 border-b">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
-                    <Plus className="h-5 w-5" />
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !createServiceMutation.isPending) setIsCreateOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-lg m-auto max-h-[90vh] overflow-y-auto rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between pb-4 border-b">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                      <Plus className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base">ایجاد سرویس / بسته جدید</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        تعریف در کاتالوگ سیستم با قابلیت تخصیص مستقیم به مشتری
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-base">ایجاد سرویس / بسته جدید</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      تعریف در کاتالوگ سیستم با قابلیت تخصیص مستقیم به مشتری
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4 mt-4 text-xs">
-                {/* 1. Category */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">انتخاب دسته‌بندی / نوع سرویس *</Label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring font-medium cursor-pointer"
-                    required
-                  >
-                    {dynamicCategories.length > 0 ? (
-                      dynamicCategories.map((c: any) => (
-                        <option key={c.id} value={c.slug || c.id}>
-                          {c.name}
-                        </option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="domain">دامنه (ثبت و مدیریت دامنه)</option>
-                        <option value="server">سرور (سرور ابری و اختصاصی)</option>
-                        <option value="hosting">هاست (هاستینگ و میزبانی وب)</option>
-                        <option value="api">وب‌سرویس و API (سرویس‌های ابری و API)</option>
-                        <option value="package">بسته تعدادی / پکیج (بسته‌های پیامک، پکیج‌های حجمی و...)</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-
-                {/* 2. Name */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">نام بسته / سرویس اصلی *</Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="مثال: هاست لینوکس ابری NVMe، سرور مجازی آلمان، بسته ۵۰۰۰ پیامک..."
-                    className="rounded-xl h-9 text-xs"
-                    required
-                  />
-                </div>
-
-                {/* 3. Description */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">توضیحات و مشخصات فنی (اختیاری)</Label>
-                  <Input
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="توضیحات اختیاری درباره امکانات و کاربرد این سرویس"
-                    className="rounded-xl h-9 text-xs"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
                   <Button
-                    type="button"
-                    variant="outline"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setIsCreateOpen(false)}
-                    className="cursor-pointer rounded-xl text-xs"
+                    className="cursor-pointer"
                   >
-                    انصراف
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createServiceMutation.isPending}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs"
-                  >
-                    {createServiceMutation.isPending ? "در حال ایجاد..." : "ثبت و ایجاد سرویس"}
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-              </form>
+
+                <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4 mt-4 text-xs">
+                  {/* 1. Category */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">انتخاب دسته‌بندی / نوع سرویس *</Label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring font-medium cursor-pointer"
+                      required
+                    >
+                      {dynamicCategories.length > 0 ? (
+                        dynamicCategories.map((c: any) => (
+                          <option key={c.id} value={c.slug || c.id}>
+                            {c.name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="domain">دامنه (ثبت و مدیریت دامنه)</option>
+                          <option value="server">سرور (سرور ابری و اختصاصی)</option>
+                          <option value="hosting">هاست (هاستینگ و میزبانی وب)</option>
+                          <option value="api">وب‌سرویس و API (سرویس‌های ابری و API)</option>
+                          <option value="package">بسته تعدادی / پکیج (بسته‌های پیامک، پکیج‌های حجمی و...)</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  {/* 2. Name */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">نام بسته / سرویس اصلی *</Label>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="مثال: هاست لینوکس ابری NVMe، سرور مجازی آلمان، بسته ۵۰۰۰ پیامک..."
+                      className="rounded-xl h-9 text-xs"
+                      required
+                    />
+                  </div>
+
+                  {/* 3. Description */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">توضیحات و مشخصات فنی (اختیاری)</Label>
+                    <Input
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="توضیحات اختیاری درباره امکانات و کاربرد این سرویس"
+                      className="rounded-xl h-9 text-xs"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCreateOpen(false)}
+                      className="cursor-pointer rounded-xl text-xs"
+                    >
+                      انصراف
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createServiceMutation.isPending}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs"
+                    >
+                      {createServiceMutation.isPending ? "در حال ایجاد..." : "ثبت و ایجاد سرویس"}
+                    </Button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* MODAL: QUICK ASSIGN CATALOG TEMPLATE TO CUSTOMER (with custom name) */}
         {assigningToCatalog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 my-8">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !createServiceMutation.isPending) setAssigningToCatalog(null);
+              }}
+            >
+              <div className="relative w-full max-w-lg m-auto max-h-[90vh] overflow-y-auto rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
@@ -2077,106 +2091,120 @@ function AdminServicesListPage() {
               </form>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
         {/* MODAL: EDIT SERVICE TEMPLATE (Master Catalog) */}
         {editingService && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between pb-4 border-b">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
-                    <Edit2 className="h-5 w-5" />
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !updateServiceMutation.isPending) setEditingService(null);
+              }}
+            >
+              <div className="relative w-full max-w-lg m-auto max-h-[90vh] overflow-y-auto rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between pb-4 border-b">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                      <Edit2 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base">ویرایش کاتالوگ سرویس مرجع</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        تغییر نام قالب مرجع، دسته‌بندی و مشخصات کاتالوگ
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-base">ویرایش کاتالوگ سرویس مرجع</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      تغییر نام قالب مرجع، دسته‌بندی و مشخصات کاتالوگ
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setEditingService(null)}
-                  className="cursor-pointer rounded-lg"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <form onSubmit={handleEditSubmit} className="flex flex-col gap-4 mt-4 text-xs">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">انتخاب دسته‌بندی / نوع سرویس *</Label>
-                  <select
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring font-medium cursor-pointer"
-                    required
-                  >
-                    {dynamicCategories.length > 0 ? (
-                      dynamicCategories.map((c: any) => (
-                        <option key={c.id} value={c.slug || c.id}>
-                          {c.name}
-                        </option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="domain">دامنه (ثبت و مدیریت دامنه)</option>
-                        <option value="server">سرور (سرور ابری و اختصاصی)</option>
-                        <option value="hosting">هاست (هاستینگ و میزبانی وب)</option>
-                        <option value="api">وب‌سرویس و API (سرویس‌های ابری و API)</option>
-                        <option value="package">بسته تعدادی / پکیج (بسته‌های پیامک، پکیج‌های حجمی و...)</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">نام بسته / سرویس مرجع *</Label>
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="rounded-xl h-9 text-xs font-medium"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">توضیحات و مشخصات فنی (اختیاری)</Label>
-                  <Input
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    className="rounded-xl h-9 text-xs"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
                   <Button
-                    type="button"
-                    variant="outline"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setEditingService(null)}
-                    className="cursor-pointer rounded-xl text-xs"
+                    className="cursor-pointer rounded-lg"
                   >
-                    انصراف
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={updateServiceMutation.isPending}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs"
-                  >
-                    {updateServiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-              </form>
+
+                <form onSubmit={handleEditSubmit} className="flex flex-col gap-4 mt-4 text-xs">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">انتخاب دسته‌بندی / نوع سرویس *</Label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring font-medium cursor-pointer"
+                      required
+                    >
+                      {dynamicCategories.length > 0 ? (
+                        dynamicCategories.map((c: any) => (
+                          <option key={c.id} value={c.slug || c.id}>
+                            {c.name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="domain">دامنه (ثبت و مدیریت دامنه)</option>
+                          <option value="server">سرور (سرور ابری و اختصاصی)</option>
+                          <option value="hosting">هاست (هاستینگ و میزبانی وب)</option>
+                          <option value="api">وب‌سرویس و API (سرویس‌های ابری و API)</option>
+                          <option value="package">بسته تعدادی / پکیج (بسته‌های پیامک، پکیج‌های حجمی و...)</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">نام بسته / سرویس مرجع *</Label>
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="rounded-xl h-9 text-xs font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">توضیحات و مشخصات فنی (اختیاری)</Label>
+                    <Input
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="rounded-xl h-9 text-xs"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setEditingService(null)}
+                      className="cursor-pointer rounded-xl text-xs"
+                    >
+                      انصراف
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={updateServiceMutation.isPending}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs"
+                    >
+                      {updateServiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
+                    </Button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* MODAL: EDIT ASSIGNED SUB-SERVICE (Instance of Customer) */}
         {editingSubService && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 my-8">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !updateServiceMutation.isPending) setEditingSubService(null);
+              }}
+            >
+              <div className="relative w-full max-w-lg m-auto max-h-[90vh] overflow-y-auto rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600">
@@ -2510,7 +2538,8 @@ function AdminServicesListPage() {
               </form>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
         {/* Confirm Modal for Status Toggle */}
         {confirmStatusModal && (

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { formatJalaliDate, getJalaliMonthPeriods } from "@gecut-cloud/contracts";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
 import { ConfirmModal } from "@/components/common/confirm-modal";
+import { ModalPortal } from "@/components/common/modal-portal";
 import {
   Building2,
   Server,
@@ -1269,480 +1270,515 @@ function AdminSuppliersPage() {
 
         {/* Modal: Create Supplier */}
         {isCreateSupplierOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-md rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-2.5">
-                  <Building2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  <h3 className="font-bold text-sm text-foreground">تعریف تامین‌کننده جدید</h3>
-                </div>
-                <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsCreateSupplierOpen(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <form onSubmit={handleCreateSupplierSubmit} className="flex flex-col gap-5 mt-5 text-xs">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">نام تامین‌کننده یا دیتاسنتر *</Label>
-                  <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="مثال: دیتاسنتر هتزنر (Hetzner)" required className="h-10 text-xs rounded-xl" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">مسئول ارتباط / فروش</Label>
-                    <Input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} placeholder="مثال: آقای حسینی" className="h-10 text-xs rounded-xl" />
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !createSupplierMutation.isPending) setIsCreateSupplierOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-md m-auto rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
+                <div className="flex items-center justify-between pb-4 border-b border-border/40">
+                  <div className="flex items-center gap-2.5">
+                    <Building2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    <h3 className="font-bold text-sm text-foreground">تعریف تامین‌کننده جدید</h3>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">تلفن تماس / پشتیبانی</Label>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="021..." dir="ltr" className="h-10 text-xs rounded-xl" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">ایمیل ارتباطی</Label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="support@domain.com" dir="ltr" className="h-10 text-xs rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">یادداشت‌ها</Label>
-                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="توضیحات تکمیلی، نحوه تسویه یا پنل مدیریت" className="h-10 text-xs rounded-xl" />
-                </div>
-                <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsCreateSupplierOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
-                  <Button type="submit" size="sm" disabled={createSupplierMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
-                    {createSupplierMutation.isPending ? "در حال ثبت..." : "ثبت تامین‌کننده"}
+                  <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsCreateSupplierOpen(false)}>
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-              </form>
+
+                <form onSubmit={handleCreateSupplierSubmit} className="flex flex-col gap-5 mt-5 text-xs">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">نام تامین‌کننده یا دیتاسنتر *</Label>
+                    <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="مثال: دیتاسنتر هتزنر (Hetzner)" required className="h-10 text-xs rounded-xl" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">مسئول ارتباط / فروش</Label>
+                      <Input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} placeholder="مثال: آقای حسینی" className="h-10 text-xs rounded-xl" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">تلفن تماس / پشتیبانی</Label>
+                      <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="021..." dir="ltr" className="h-10 text-xs rounded-xl" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">ایمیل ارتباطی</Label>
+                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="support@domain.com" dir="ltr" className="h-10 text-xs rounded-xl" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">یادداشت‌ها</Label>
+                    <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="توضیحات تکمیلی، نحوه تسویه یا پنل مدیریت" className="h-10 text-xs rounded-xl" />
+                  </div>
+                  <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setIsCreateSupplierOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
+                    <Button type="submit" size="sm" disabled={createSupplierMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
+                      {createSupplierMutation.isPending ? "در حال ثبت..." : "ثبت تامین‌کننده"}
+                    </Button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* Modal: Edit Supplier */}
         {isEditSupplierOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-md rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-2.5">
-                  <Edit className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  <h3 className="font-bold text-sm text-foreground">ویرایش تامین‌کننده {supplierName}</h3>
-                </div>
-                <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsEditSupplierOpen(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <form onSubmit={handleEditSupplierSubmit} className="flex flex-col gap-5 mt-5 text-xs">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">نام تامین‌کننده *</Label>
-                  <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} required className="h-10 text-xs rounded-xl" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">مسئول ارتباط</Label>
-                    <Input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="h-10 text-xs rounded-xl" />
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !updateSupplierMutation.isPending) setIsEditSupplierOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-md m-auto max-h-[90vh] overflow-y-auto rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
+                <div className="flex items-center justify-between pb-4 border-b border-border/40">
+                  <div className="flex items-center gap-2.5">
+                    <Edit className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    <h3 className="font-bold text-sm text-foreground">ویرایش تامین‌کننده {supplierName}</h3>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">تلفن تماس</Label>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="h-10 text-xs rounded-xl" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">ایمیل</Label>
-                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="h-10 text-xs rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">وضعیت</Label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
-                    >
-                      <option value="ACTIVE">فعال (همکاری مستمر)</option>
-                      <option value="INACTIVE">غیرفعال / قطع همکاری</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditSupplierOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
-                  <Button type="submit" size="sm" disabled={updateSupplierMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
-                    {updateSupplierMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
+                  <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsEditSupplierOpen(false)}>
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-              </form>
+
+                <form onSubmit={handleEditSupplierSubmit} className="flex flex-col gap-5 mt-5 text-xs">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">نام تامین‌کننده *</Label>
+                    <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} required className="h-10 text-xs rounded-xl" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">مسئول ارتباط</Label>
+                      <Input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="h-10 text-xs rounded-xl" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">تلفن تماس</Label>
+                      <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" className="h-10 text-xs rounded-xl" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">ایمیل</Label>
+                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" className="h-10 text-xs rounded-xl" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">وضعیت</Label>
+                      <select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                      >
+                        <option value="ACTIVE">فعال (همکاری مستمر)</option>
+                        <option value="INACTIVE">غیرفعال / قطع همکاری</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditSupplierOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
+                    <Button type="submit" size="sm" disabled={updateSupplierMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
+                      {updateSupplierMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
+                    </Button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* Modal: Add Service to Supplier */}
         {isAddServiceOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-lg rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-2.5">
-                  <Server className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  <h3 className="font-bold text-sm text-foreground">ثبت خدمت / سرویس خریداری‌شده از تامین‌کننده</h3>
-                </div>
-                <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsAddServiceOpen(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <form onSubmit={handleAddServiceSubmit} className="flex flex-col gap-5 mt-5 text-xs">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">تامین‌کننده مربوطه *</Label>
-                  <select
-                    value={targetSupplierId}
-                    onChange={(e) => setTargetSupplierId(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
-                    required
-                  >
-                    <option value="">-- انتخاب تامین‌کننده --</option>
-                    {suppliersList.map((sup: any) => (
-                      <option key={sup.id} value={sup.id}>{sup.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">عنوان خدمت / ماشین *</Label>
-                  <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="مثال: سرور اختصاصی لینوکس AX41" required className="h-10 text-xs rounded-xl" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
-                    <select
-                      value={serviceType}
-                      onChange={(e) => setServiceType(e.target.value)}
-                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
-                    >
-                      {dynamicCategories.length > 0 ? (
-                        dynamicCategories.map((c: any) => (
-                          <option key={c.id} value={c.slug || c.id}>
-                            {c.name}
-                          </option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="DEDICATED_SERVER">سرور اختصاصی و ابری</option>
-                          <option value="CLOUD_HOSTING">هاستینگ و فضای ابری</option>
-                          <option value="DOMAIN">ثبت و تمدید دامنه</option>
-                          <option value="LICENSE">لایسنس نرم‌افزاری</option>
-                          <option value="API">وب‌سرویس و شبکه</option>
-                        </>
-                      )}
-                    </select>
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !addServiceMutation.isPending) setIsAddServiceOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-lg m-auto max-h-[90vh] overflow-y-auto rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
+                <div className="flex items-center justify-between pb-4 border-b border-border/40">
+                  <div className="flex items-center gap-2.5">
+                    <Server className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    <h3 className="font-bold text-sm text-foreground">ثبت خدمت / سرویس خریداری‌شده از تامین‌کننده</h3>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      dir="ltr"
-                      value={formatPriceInput(servicePriceToman)}
-                      onChange={(e) => setServicePriceToman(parsePriceInput(e.target.value))}
-                      placeholder="0"
-                      required
-                      className="h-10 rounded-xl font-mono text-left text-xs"
-                    />
-                    {Number(servicePriceToman) > 0 && (
-                      <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
-                        معادل: {Number(servicePriceToman).toLocaleString("fa-IR")} تومان
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <JalaliDatePicker
-                      label="تاریخ خرید (شمسی)"
-                      value={servicePurchaseDate}
-                      onChange={(val) => setServicePurchaseDate(val)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <JalaliDatePicker
-                      label="موعد سررسید تمدید (شمسی)"
-                      value={serviceRenewalDate}
-                      onChange={(val) => setServiceRenewalDate(val)}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddServiceOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
-                  <Button type="submit" size="sm" disabled={addServiceMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
-                    {addServiceMutation.isPending ? "در حال ثبت..." : "افزودن به خدمات تامین‌کننده"}
+                  <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsAddServiceOpen(false)}>
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-              </form>
+
+                <form onSubmit={handleAddServiceSubmit} className="flex flex-col gap-5 mt-5 text-xs">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">تامین‌کننده مربوطه *</Label>
+                    <select
+                      value={targetSupplierId}
+                      onChange={(e) => setTargetSupplierId(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                      required
+                    >
+                      <option value="">-- انتخاب تامین‌کننده --</option>
+                      {suppliersList.map((sup: any) => (
+                        <option key={sup.id} value={sup.id}>{sup.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">عنوان خدمت / ماشین *</Label>
+                    <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="مثال: سرور اختصاصی لینوکس AX41" required className="h-10 text-xs rounded-xl" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
+                      <select
+                        value={serviceType}
+                        onChange={(e) => setServiceType(e.target.value)}
+                        className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                      >
+                        {dynamicCategories.length > 0 ? (
+                          dynamicCategories.map((c: any) => (
+                            <option key={c.id} value={c.slug || c.id}>
+                              {c.name}
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="DEDICATED_SERVER">سرور اختصاصی و ابری</option>
+                            <option value="CLOUD_HOSTING">هاستینگ و فضای ابری</option>
+                            <option value="DOMAIN">ثبت و تمدید دامنه</option>
+                            <option value="LICENSE">لایسنس نرم‌افزاری</option>
+                            <option value="API">وب‌سرویس و شبکه</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        dir="ltr"
+                        value={formatPriceInput(servicePriceToman)}
+                        onChange={(e) => setServicePriceToman(parsePriceInput(e.target.value))}
+                        placeholder="0"
+                        required
+                        className="h-10 rounded-xl font-mono text-left text-xs"
+                      />
+                      {Number(servicePriceToman) > 0 && (
+                        <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                          معادل: {Number(servicePriceToman).toLocaleString("fa-IR")} تومان
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <JalaliDatePicker
+                        label="تاریخ خرید (شمسی)"
+                        value={servicePurchaseDate}
+                        onChange={(val) => setServicePurchaseDate(val)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <JalaliDatePicker
+                        label="موعد سررسید تمدید (شمسی)"
+                        value={serviceRenewalDate}
+                        onChange={(val) => setServiceRenewalDate(val)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddServiceOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
+                    <Button type="submit" size="sm" disabled={addServiceMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
+                      {addServiceMutation.isPending ? "در حال ثبت..." : "افزودن به خدمات تامین‌کننده"}
+                    </Button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* Modal: Edit Service of Supplier */}
         {isEditServiceOpen && editingService && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-lg rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-2.5">
-                  <Edit className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  <h3 className="font-bold text-sm text-foreground">ویرایش خدمت: {editingService.name}</h3>
-                </div>
-                <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsEditServiceOpen(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <form onSubmit={handleEditServiceSubmit} className="flex flex-col gap-5 mt-5 text-xs">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">عنوان خدمت *</Label>
-                  <Input value={editServiceName} onChange={(e) => setEditServiceName(e.target.value)} required className="h-10 text-xs rounded-xl" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
-                    <select
-                      value={editServiceType}
-                      onChange={(e) => setEditServiceType(e.target.value)}
-                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
-                    >
-                      {dynamicCategories.length > 0 ? (
-                        dynamicCategories.map((c: any) => (
-                          <option key={c.id} value={c.slug || c.id}>
-                            {c.name}
-                          </option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="DEDICATED_SERVER">سرور اختصاصی و ابری</option>
-                          <option value="CLOUD_HOSTING">هاستینگ و فضای ابری</option>
-                          <option value="DOMAIN">ثبت و تمدید دامنه</option>
-                          <option value="LICENSE">لایسنس نرم‌افزاری</option>
-                          <option value="API">وب‌سرویس و شبکه</option>
-                        </>
-                      )}
-                    </select>
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !updateServiceMutation.isPending) setIsEditServiceOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-lg m-auto max-h-[90vh] overflow-y-auto rounded-3xl border border-border/60 bg-card p-6 sm:p-7 shadow-2xl">
+                <div className="flex items-center justify-between pb-4 border-b border-border/40">
+                  <div className="flex items-center gap-2.5">
+                    <Edit className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    <h3 className="font-bold text-sm text-foreground">ویرایش خدمت: {editingService.name}</h3>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      dir="ltr"
-                      value={formatPriceInput(editServicePriceToman)}
-                      onChange={(e) => setEditServicePriceToman(parsePriceInput(e.target.value))}
-                      placeholder="0"
-                      required
-                      className="h-10 rounded-xl font-mono text-left text-xs"
-                    />
-                    {Number(editServicePriceToman) > 0 && (
-                      <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
-                        معادل: {Number(editServicePriceToman).toLocaleString("fa-IR")} تومان
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <JalaliDatePicker
-                      label="تاریخ خرید (شمسی)"
-                      value={editServicePurchaseDate}
-                      onChange={(val) => setEditServicePurchaseDate(val)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <JalaliDatePicker
-                      label="موعد سررسید تمدید (شمسی)"
-                      value={editServiceRenewalDate}
-                      onChange={(val) => setEditServiceRenewalDate(val)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">وضعیت سرویس</Label>
-                    <select
-                      value={editServiceStatus}
-                      onChange={(e) => setEditServiceStatus(e.target.value)}
-                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
-                    >
-                      <option value="ACTIVE">فعال (ACTIVE)</option>
-                      <option value="INACTIVE">غیرفعال (INACTIVE)</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">یادداشت</Label>
-                    <Input value={editServiceNotes} onChange={(e) => setEditServiceNotes(e.target.value)} placeholder="توضیحات اختیاری" className="h-10 text-xs rounded-xl" />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditServiceOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
-                  <Button type="submit" size="sm" disabled={updateServiceMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
-                    {updateServiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
+                  <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsEditServiceOpen(false)}>
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-              </form>
+
+                <form onSubmit={handleEditServiceSubmit} className="flex flex-col gap-5 mt-5 text-xs">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">عنوان خدمت *</Label>
+                    <Input value={editServiceName} onChange={(e) => setEditServiceName(e.target.value)} required className="h-10 text-xs rounded-xl" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
+                      <select
+                        value={editServiceType}
+                        onChange={(e) => setEditServiceType(e.target.value)}
+                        className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                      >
+                        {dynamicCategories.length > 0 ? (
+                          dynamicCategories.map((c: any) => (
+                            <option key={c.id} value={c.slug || c.id}>
+                              {c.name}
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="DEDICATED_SERVER">سرور اختصاصی و ابری</option>
+                            <option value="CLOUD_HOSTING">هاستینگ و فضای ابری</option>
+                            <option value="DOMAIN">ثبت و تمدید دامنه</option>
+                            <option value="LICENSE">لایسنس نرم‌افزاری</option>
+                            <option value="API">وب‌سرویس و شبکه</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        dir="ltr"
+                        value={formatPriceInput(editServicePriceToman)}
+                        onChange={(e) => setEditServicePriceToman(parsePriceInput(e.target.value))}
+                        placeholder="0"
+                        required
+                        className="h-10 rounded-xl font-mono text-left text-xs"
+                      />
+                      {Number(editServicePriceToman) > 0 && (
+                        <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                          معادل: {Number(editServicePriceToman).toLocaleString("fa-IR")} تومان
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <JalaliDatePicker
+                        label="تاریخ خرید (شمسی)"
+                        value={editServicePurchaseDate}
+                        onChange={(val) => setEditServicePurchaseDate(val)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <JalaliDatePicker
+                        label="موعد سررسید تمدید (شمسی)"
+                        value={editServiceRenewalDate}
+                        onChange={(val) => setEditServiceRenewalDate(val)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">وضعیت سرویس</Label>
+                      <select
+                        value={editServiceStatus}
+                        onChange={(e) => setEditServiceStatus(e.target.value)}
+                        className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                      >
+                        <option value="ACTIVE">فعال (ACTIVE)</option>
+                        <option value="INACTIVE">غیرفعال (INACTIVE)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">یادداشت</Label>
+                      <Input value={editServiceNotes} onChange={(e) => setEditServiceNotes(e.target.value)} placeholder="توضیحات اختیاری" className="h-10 text-xs rounded-xl" />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditServiceOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
+                    <Button type="submit" size="sm" disabled={updateServiceMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
+                      {updateServiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
+                    </Button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* Modal / Dedicated Panel: Supplier Services Panel */}
         {isServicesPanelOpen && selectedSupplier && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-3xl border border-border/60 bg-card p-6 sm:p-8 shadow-2xl flex flex-col gap-6">
-              <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                    <Building2 className="h-6 w-6" />
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setIsServicesPanelOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-3xl m-auto max-h-[85vh] overflow-y-auto rounded-3xl border border-border/60 bg-card p-6 sm:p-8 shadow-2xl flex flex-col gap-6">
+                <div className="flex items-center justify-between pb-4 border-b border-border/40">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                      <Building2 className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base text-foreground">پنل خدمات تامین‌کننده: {selectedSupplier.name}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">مشاهده، ویرایش و مدیریت تمامی ماشین‌ها و سرویس‌های فعال</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setIsServicesPanelOpen(false);
+                        openAddServiceForSupplier(selectedSupplier.id);
+                      }}
+                      className="h-9 px-3.5 gap-1.5 text-xs rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold"
+                    >
+                      <Plus className="h-4 w-4" />
+                      خدمت جدید
+                    </Button>
+                    <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsServicesPanelOpen(false)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Summary in Panel */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 sm:p-5 rounded-2xl bg-muted/20 border border-border/40 text-xs">
+                  <div>
+                    <span className="text-muted-foreground text-xs">تعداد خدمات:</span>
+                    <div className="font-bold font-mono text-foreground text-base mt-1">{(selectedSupplier.services?.length || 0).toLocaleString("fa-IR")} سرویس</div>
                   </div>
                   <div>
-                    <h3 className="font-bold text-base text-foreground">پنل خدمات تامین‌کننده: {selectedSupplier.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">مشاهده، ویرایش و مدیریت تمامی ماشین‌ها و سرویس‌های فعال</p>
+                    <span className="text-muted-foreground text-xs">مجموع هزینه دوره:</span>
+                    <div className="font-bold font-mono text-purple-600 dark:text-purple-400 text-base mt-1">
+                      {Number(selectedSupplier.totalPayableToman || 0).toLocaleString("fa-IR")} تومان
+                    </div>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <span className="text-muted-foreground text-xs">وضعیت تامین‌کننده:</span>
+                    <div className="font-bold text-emerald-600 text-base mt-1">
+                      {selectedSupplier.status === "ACTIVE" ? "همکاری فعال" : "غیرفعال"}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2.5">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setIsServicesPanelOpen(false);
-                      openAddServiceForSupplier(selectedSupplier.id);
-                    }}
-                    className="h-9 px-3.5 gap-1.5 text-xs rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold"
-                  >
-                    <Plus className="h-4 w-4" />
-                    خدمت جدید
-                  </Button>
-                  <Button variant="ghost" size="icon" className="rounded-xl h-8.5 w-8.5" onClick={() => setIsServicesPanelOpen(false)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
 
-              {/* Summary in Panel */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 sm:p-5 rounded-2xl bg-muted/20 border border-border/40 text-xs">
-                <div>
-                  <span className="text-muted-foreground text-xs">تعداد خدمات:</span>
-                  <div className="font-bold font-mono text-foreground text-base mt-1">{(selectedSupplier.services?.length || 0).toLocaleString("fa-IR")} سرویس</div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground text-xs">مجموع هزینه دوره:</span>
-                  <div className="font-bold font-mono text-purple-600 dark:text-purple-400 text-base mt-1">
-                    {Number(selectedSupplier.totalPayableToman || 0).toLocaleString("fa-IR")} تومان
-                  </div>
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <span className="text-muted-foreground text-xs">وضعیت تامین‌کننده:</span>
-                  <div className="font-bold text-emerald-600 text-base mt-1">
-                    {selectedSupplier.status === "ACTIVE" ? "همکاری فعال" : "غیرفعال"}
-                  </div>
-                </div>
-              </div>
+                {/* Service Cards inside Panel */}
+                <div className="flex flex-col gap-3.5">
+                  {(!selectedSupplier.services || selectedSupplier.services.length === 0) ? (
+                    <div className="p-10 text-center text-xs text-muted-foreground border border-dashed rounded-2xl">
+                      هیچ خدمتی برای این تامین‌کننده ثبت نشده است.
+                    </div>
+                  ) : (
+                    sortSupplierServices(selectedSupplier.services).map((svc: any) => {
+                      const badge = getSupplierServiceBadge(svc.type, dynamicCategories);
+                      const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
+                      const isExpired = svc.renewalDate && new Date(svc.renewalDate).getTime() < Date.now();
+                      const overdueDays = isExpired
+                        ? Math.max(1, Math.ceil((Date.now() - new Date(svc.renewalDate).getTime()) / (1000 * 60 * 60 * 24)))
+                        : 0;
+                      const daysLeft = svc.renewalDate
+                        ? Math.ceil((new Date(svc.renewalDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                        : null;
 
-              {/* Service Cards inside Panel */}
-              <div className="flex flex-col gap-3.5">
-                {(!selectedSupplier.services || selectedSupplier.services.length === 0) ? (
-                  <div className="p-10 text-center text-xs text-muted-foreground border border-dashed rounded-2xl">
-                    هیچ خدمتی برای این تامین‌کننده ثبت نشده است.
-                  </div>
-                ) : (
-                  sortSupplierServices(selectedSupplier.services).map((svc: any) => {
-                    const badge = getSupplierServiceBadge(svc.type, dynamicCategories);
-                    const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
-                    const isExpired = svc.renewalDate && new Date(svc.renewalDate).getTime() < Date.now();
-                    const overdueDays = isExpired
-                      ? Math.max(1, Math.ceil((Date.now() - new Date(svc.renewalDate).getTime()) / (1000 * 60 * 60 * 24)))
-                      : 0;
-                    const daysLeft = svc.renewalDate
-                      ? Math.ceil((new Date(svc.renewalDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                      : null;
-
-                    return (
-                      <div
-                        key={svc.id}
-                        className={`p-4.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs transition-all ${
-                          isExpired
-                            ? "bg-rose-500/5 border-rose-500/40 shadow-xs shadow-rose-500/10 hover:border-rose-500/60"
-                            : "border-border/50 bg-card/80 hover:border-purple-500/40 hover:shadow-xs"
-                        }`}
-                      >
-                        <div className="space-y-2 flex-1">
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="font-bold text-sm text-foreground">{svc.name}</span>
-                            <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
-                              {badge.label}
-                            </span>
-                            {daysLeft !== null && (
-                              <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
-                                isExpired
-                                  ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold"
-                                  : daysLeft <= 3
-                                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold"
-                                  : "bg-muted text-muted-foreground"
-                              }`}>
-                                {isExpired
-                                  ? `۰ روز باقی‌مانده (منقضی شده - ${overdueDays.toLocaleString("fa-IR")} روز گذشته)`
-                                  : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
+                      return (
+                        <div
+                          key={svc.id}
+                          className={`p-4.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs transition-all ${
+                            isExpired
+                              ? "bg-rose-500/5 border-rose-500/40 shadow-xs shadow-rose-500/10 hover:border-rose-500/60"
+                              : "border-border/50 bg-card/80 hover:border-purple-500/40 hover:shadow-xs"
+                          }`}
+                        >
+                          <div className="space-y-2 flex-1">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <span className="font-bold text-sm text-foreground">{svc.name}</span>
+                              <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
+                                {badge.label}
                               </span>
-                            )}
-                          </div>
-                          {isExpired && (
-                            <div className="flex items-center gap-1.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-semibold">
-                              <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
-                              <span>هشدار: مهلت این سرور به پایان رسیده است ({overdueDays.toLocaleString("fa-IR")} روز گذشته از سررسید)!</span>
+                              {daysLeft !== null && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
+                                  isExpired
+                                    ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold"
+                                    : daysLeft <= 3
+                                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold"
+                                    : "bg-muted text-muted-foreground"
+                                }`}>
+                                  {isExpired
+                                    ? `۰ روز باقی‌مانده (منقضی شده - ${overdueDays.toLocaleString("fa-IR")} روز گذشته)`
+                                    : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
+                                </span>
+                              )}
                             </div>
-                          )}
-                          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                            {svc.purchaseDate && <span>تاریخ خرید: {formatJalaliDate(svc.purchaseDate)}</span>}
-                            {svc.renewalDate && (
-                              <span className={`font-medium ${isExpired ? "text-rose-600 dark:text-rose-400 font-bold" : "text-amber-600 dark:text-amber-400"}`}>
-                                سررسید بعدی: {formatJalaliDate(svc.renewalDate)}
-                              </span>
+                            {isExpired && (
+                              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-semibold">
+                                <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                                <span>هشدار: مهلت این سرور به پایان رسیده است ({overdueDays.toLocaleString("fa-IR")} روز گذشته از سررسید)!</span>
+                              </div>
                             )}
-                            {svc.notes && <span className="italic">یادداشت: {svc.notes}</span>}
+                            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                              {svc.purchaseDate && <span>تاریخ خرید: {formatJalaliDate(svc.purchaseDate)}</span>}
+                              {svc.renewalDate && (
+                                <span className={`font-medium ${isExpired ? "text-rose-600 dark:text-rose-400 font-bold" : "text-amber-600 dark:text-amber-400"}`}>
+                                  سررسید بعدی: {formatJalaliDate(svc.renewalDate)}
+                                </span>
+                              )}
+                              {svc.notes && <span className="italic">یادداشت: {svc.notes}</span>}
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center justify-between sm:justify-end gap-3.5 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/40">
-                          <div className="font-mono font-bold text-foreground text-sm">
-                            {amt.toLocaleString("fa-IR")} <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setIsServicesPanelOpen(false);
-                                openEditServiceModal(svc);
-                              }}
-                              className="h-8.5 px-3 rounded-xl text-xs gap-1.5"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                              ویرایش
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setConfirmDeleteServiceModal(svc);
-                              }}
-                              className="h-8.5 w-8.5 rounded-xl text-rose-500 hover:bg-rose-500/10 cursor-pointer"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                          <div className="flex items-center justify-between sm:justify-end gap-3.5 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                            <div className="font-mono font-bold text-foreground text-sm">
+                              {amt.toLocaleString("fa-IR")} <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setIsServicesPanelOpen(false);
+                                  openEditServiceModal(svc);
+                                }}
+                                className="h-8.5 px-3 rounded-xl text-xs gap-1.5"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                                ویرایش
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setConfirmDeleteServiceModal(svc);
+                                }}
+                                className="h-8.5 w-8.5 rounded-xl text-rose-500 hover:bg-rose-500/10 cursor-pointer"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* Confirm Modal for Deleting Supplier */}

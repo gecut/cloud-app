@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
 import { AppShell } from "@/components/layout/app-shell";
+import { ModalPortal } from "@/components/common/modal-portal";
 import { apiClient } from "@/utils/api-client";
 import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
@@ -1224,8 +1225,14 @@ function AdminAccountingPage() {
 
         {/* MODAL: ADD SUPPLIER */}
         {isAddSupplierOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="relative w-full max-w-md rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !createSupplierMutation.isPending) setIsAddSupplierOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-md m-auto rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
@@ -1323,7 +1330,8 @@ function AdminAccountingPage() {
               </form>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
       </div>
     </AppShell>
   );

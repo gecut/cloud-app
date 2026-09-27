@@ -5,6 +5,7 @@ import { AdminHeader } from "@/components/layout/admin-header";
 import { AppShell } from "@/components/layout/app-shell";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
 import { ConfirmModal } from "@/components/common/confirm-modal";
+import { ModalPortal } from "@/components/common/modal-portal";
 import { apiClient } from "@/utils/api-client";
 import {
   Card,
@@ -2265,8 +2266,14 @@ function AdminCustomerProfileDetailPage() {
 
         {/* MODAL 1: ASSIGN CREATED SERVICE TO CUSTOMER */}
         {isCreateServiceOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !createServiceMutation.isPending) setIsCreateServiceOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto m-auto rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -2648,12 +2655,19 @@ function AdminCustomerProfileDetailPage() {
               )}
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
-        {/* MODAL 2: EDIT SERVICE */}
-        {isEditServiceOpen && selectedService && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+      {/* MODAL 2: EDIT SERVICE */}
+      {isEditServiceOpen && selectedService && (
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !updateServiceMutation.isPending) setIsEditServiceOpen(false);
+            }}
+          >
+            <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto m-auto rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -2986,13 +3000,20 @@ function AdminCustomerProfileDetailPage() {
               </form>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
 
         {/* MODAL 3: CREATE INVOICE */}
         {isCreateInvoiceOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !createInvoiceMutation.isPending) setIsCreateInvoiceOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto m-auto rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -3067,7 +3088,8 @@ function AdminCustomerProfileDetailPage() {
               </form>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
         {/* MODAL 4: INVOICE DETAILS MODAL */}
         <InvoiceDetailModal
@@ -3084,8 +3106,14 @@ function AdminCustomerProfileDetailPage() {
 
         {/* MODAL 4.5: EDIT INVOICE MODAL */}
         {isEditInvoiceOpen && editingInvoice && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !updateInvoiceMutation.isPending) setIsEditInvoiceOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto m-auto rounded-2xl border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
@@ -3193,54 +3221,62 @@ function AdminCustomerProfileDetailPage() {
               </form>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
         {/* MODAL 5: DELETE CUSTOMER MODAL */}
         {isDeleteCustomerOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-md rounded-2xl border border-rose-500/20 bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-center gap-3 pb-3 border-b border-border/40">
-                <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
-                  <AlertCircle className="h-5 w-5" />
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !deleteCustomerMutation.isPending) setIsDeleteCustomerOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-md m-auto rounded-2xl border border-rose-500/20 bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center gap-3 pb-3 border-b border-border/40">
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
+                    <AlertCircle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-foreground">حذف کامل پرونده مشتری</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">{customer?.name}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-sm text-foreground">حذف کامل پرونده مشتری</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">{customer?.name}</p>
+
+                <div className="py-4 text-xs text-muted-foreground leading-relaxed space-y-2">
+                  <p>
+                    آیا از حذف پرونده مشترک <strong className="text-foreground font-semibold">{customer?.name}</strong> اطمینان دارید؟
+                  </p>
+                  <p className="text-rose-500/90 font-medium">
+                    هشدار: با انجام این عملیات، تمامی سرویس‌های تخصیص‌یافته، صورت‌حساب‌ها و سوابق ثبت‌شده برای این مشتری از سیستم پاکسازی خواهند شد. این فرآیند غیرقابل بازگشت است.
+                  </p>
                 </div>
-              </div>
 
-              <div className="py-4 text-xs text-muted-foreground leading-relaxed space-y-2">
-                <p>
-                  آیا از حذف پرونده مشترک <strong className="text-foreground font-semibold">{customer?.name}</strong> اطمینان دارید؟
-                </p>
-                <p className="text-rose-500/90 font-medium">
-                  هشدار: با انجام این عملیات، تمامی سرویس‌های تخصیص‌یافته، صورت‌حساب‌ها و سوابق ثبت‌شده برای این مشتری از سیستم پاکسازی خواهند شد. این فرآیند غیرقابل بازگشت است.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/40">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsDeleteCustomerOpen(false)}
-                  disabled={deleteCustomerMutation.isPending}
-                  className="rounded-xl text-xs"
-                >
-                  انصراف
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => deleteCustomerMutation.mutate()}
-                  disabled={deleteCustomerMutation.isPending}
-                  className="rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold gap-1.5"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {deleteCustomerMutation.isPending ? "در حال حذف..." : "تأیید و حذف مشتری"}
-                </Button>
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/40">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsDeleteCustomerOpen(false)}
+                    disabled={deleteCustomerMutation.isPending}
+                    className="rounded-xl text-xs"
+                  >
+                    انصراف
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteCustomerMutation.mutate()}
+                    disabled={deleteCustomerMutation.isPending}
+                    className="rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold gap-1.5"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {deleteCustomerMutation.isPending ? "در حال حذف..." : "تأیید و حذف مشتری"}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* Confirm Modal for Deactivating / Suspending Customer Service */}

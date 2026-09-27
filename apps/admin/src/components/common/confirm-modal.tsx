@@ -1,6 +1,7 @@
 import React from "react";
 import { AlertTriangle, AlertCircle, Trash2, CheckCircle2, X } from "lucide-react";
 import { Button } from "@gecut-cloud/ui/components/button";
+import { ModalPortal } from "./modal-portal";
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -51,58 +52,65 @@ export function ConfirmModal({
   }[variant];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="relative w-full max-w-md rounded-2xl border bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200 dir-rtl text-right">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 pb-3 border-b border-border/40">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl border ${variantStyles.iconBg}`}>
-              {variantStyles.icon}
+    <ModalPortal>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-150"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !isLoading) onClose();
+        }}
+      >
+        <div className="relative w-full max-w-md m-auto rounded-2xl border bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200 dir-rtl text-right">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3 pb-3 border-b border-border/40">
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl border ${variantStyles.iconBg}`}>
+                {variantStyles.icon}
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-foreground">{title}</h3>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-sm text-foreground">{title}</h3>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="text-muted-foreground hover:text-foreground p-1 rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            className="text-muted-foreground hover:text-foreground p-1 rounded-lg transition-colors cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
 
-        {/* Content */}
-        <div className="py-4 text-xs text-muted-foreground leading-relaxed">
-          {description}
-        </div>
+          {/* Content */}
+          <div className="py-4 text-xs text-muted-foreground leading-relaxed">
+            {description}
+          </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/40">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={isLoading}
-            className="rounded-xl text-xs cursor-pointer"
-          >
-            {cancelText}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              onConfirm();
-            }}
-            disabled={isLoading}
-            className={`rounded-xl text-xs cursor-pointer ${variantStyles.btn}`}
-          >
-            {isLoading ? "در حال پردازش..." : confirmText}
-          </Button>
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/40">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              disabled={isLoading}
+              className="rounded-xl text-xs cursor-pointer"
+            >
+              {cancelText}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                onConfirm();
+              }}
+              disabled={isLoading}
+              className={`rounded-xl text-xs cursor-pointer ${variantStyles.btn}`}
+            >
+              {isLoading ? "در حال پردازش..." : confirmText}
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

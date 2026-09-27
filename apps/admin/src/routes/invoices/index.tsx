@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminHeader } from "@/components/layout/admin-header";
 import { AppShell } from "@/components/layout/app-shell";
+import { ModalPortal } from "@/components/common/modal-portal";
 import { apiClient } from "@/utils/api-client";
 import { Card, CardContent } from "@gecut-cloud/ui/components/card";
 import { Button } from "@gecut-cloud/ui/components/button";
@@ -813,8 +814,14 @@ function AdminInvoicesListPage() {
 
         {/* Create Invoice Modal */}
         {isCreateOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 sm:p-7 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !createInvoiceMutation.isPending) setIsCreateOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto m-auto rounded-2xl border bg-card p-6 sm:p-7 shadow-xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
@@ -1075,12 +1082,19 @@ function AdminInvoicesListPage() {
               </form>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
         {/* Edit Invoice Modal */}
         {isEditOpen && editingInvoice && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 sm:p-7 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !updateInvoiceMutation.isPending) setIsEditOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto m-auto rounded-2xl border bg-card p-6 sm:p-7 shadow-xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
@@ -1218,7 +1232,8 @@ function AdminInvoicesListPage() {
               </form>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
         {/* Content-Based Category Tabs */}
         <div className="flex flex-col gap-3">

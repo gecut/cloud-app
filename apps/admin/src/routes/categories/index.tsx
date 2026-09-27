@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/app-shell";
 import { AdminHeader } from "@/components/layout/admin-header";
+import { ModalPortal } from "@/components/common/modal-portal";
 import { apiClient } from "@/utils/api-client";
 import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
@@ -487,8 +488,14 @@ export function AdminCategoriesPage() {
 
         {/* Create Category Modal */}
         {isCreateOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-            <div className="w-full max-w-md bg-card border rounded-3xl p-6 shadow-2xl flex flex-col gap-5">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !createMutation.isPending) setIsCreateOpen(false);
+              }}
+            >
+              <div className="w-full max-w-md m-auto bg-card border rounded-3xl p-6 shadow-2xl flex flex-col gap-5">
               <div className="flex items-center justify-between border-b pb-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
@@ -595,12 +602,19 @@ export function AdminCategoriesPage() {
               </div>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
         {/* Edit Category Modal */}
         {isEditOpen && editingCategory && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-            <div className="w-full max-w-md bg-card border rounded-3xl p-6 shadow-2xl flex flex-col gap-5">
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !updateMutation.isPending) setIsEditOpen(false);
+              }}
+            >
+              <div className="w-full max-w-md m-auto bg-card border rounded-3xl p-6 shadow-2xl flex flex-col gap-5">
               <div className="flex items-center justify-between border-b pb-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 border border-blue-500/20">
@@ -709,47 +723,55 @@ export function AdminCategoriesPage() {
               </div>
             </div>
           </div>
-        )}
+        </ModalPortal>
+      )}
 
         {/* Delete Category Modal */}
         {isDeleteOpen && deletingCategory && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-            <div className="w-full max-w-sm bg-card border rounded-3xl p-6 shadow-2xl flex flex-col gap-5 text-center">
-              <div className="h-12 w-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center mx-auto border border-rose-500/20">
-                <Trash2 className="h-6 w-6" />
-              </div>
+          <ModalPortal>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !deleteMutation.isPending) setIsDeleteOpen(false);
+              }}
+            >
+              <div className="w-full max-w-sm m-auto bg-card border rounded-3xl p-6 shadow-2xl flex flex-col gap-5 text-center">
+                <div className="h-12 w-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center mx-auto border border-rose-500/20">
+                  <Trash2 className="h-6 w-6" />
+                </div>
 
-              <div className="flex flex-col gap-1.5">
-                <h3 className="text-base font-bold text-foreground">حذف دسته‌بندی</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  آیا از حذف دسته‌بندی <span className="font-bold text-foreground">«{deletingCategory.name}»</span> اطمینان دارید؟
-                </p>
-                {deletingCategory.servicesCount > 0 && (
-                  <div className="p-3 mt-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-400 text-right">
-                    <span className="font-bold">توجه:</span> این دسته‌بندی دارای{" "}
-                    <span className="font-bold">{deletingCategory.servicesCount}</span> سرویس متصل است. در صورت حذف، سرویس‌های متصل به صورت خودکار به دسته‌بندی پیش‌فرض منتقل خواهند شد.
-                  </div>
-                )}
-              </div>
+                <div className="flex flex-col gap-1.5">
+                  <h3 className="text-base font-bold text-foreground">حذف دسته‌بندی</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    آیا از حذف دسته‌بندی <span className="font-bold text-foreground">«{deletingCategory.name}»</span> اطمینان دارید؟
+                  </p>
+                  {deletingCategory.servicesCount > 0 && (
+                    <div className="p-3 mt-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-400 text-right">
+                      <span className="font-bold">توجه:</span> این دسته‌بندی دارای{" "}
+                      <span className="font-bold">{deletingCategory.servicesCount}</span> سرویس متصل است. در صورت حذف، سرویس‌های متصل به صورت خودکار به دسته‌بندی پیش‌فرض منتقل خواهند شد.
+                    </div>
+                  )}
+                </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <Button
-                  onClick={() => deleteMutation.mutate(deletingCategory.id)}
-                  disabled={deleteMutation.isPending}
-                  className="flex-1 rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white cursor-pointer"
-                >
-                  {deleteMutation.isPending ? "در حال حذف..." : "تایید و حذف"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsDeleteOpen(false)}
-                  className="flex-1 rounded-xl text-xs cursor-pointer"
-                >
-                  انصراف
-                </Button>
+                <div className="flex items-center gap-2 pt-2">
+                  <Button
+                    onClick={() => deleteMutation.mutate(deletingCategory.id)}
+                    disabled={deleteMutation.isPending}
+                    className="flex-1 rounded-xl text-xs bg-rose-600 hover:bg-rose-500 text-white cursor-pointer"
+                  >
+                    {deleteMutation.isPending ? "در حال حذف..." : "تایید و حذف"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsDeleteOpen(false)}
+                    className="flex-1 rounded-xl text-xs cursor-pointer"
+                  >
+                    انصراف
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
       </div>
     </AppShell>

@@ -10,6 +10,7 @@ import {
   type DemoUser,
 } from "@/utils/api-client";
 import { ModeToggle } from "@/components/mode-toggle";
+import { ModalPortal } from "@/components/common/modal-portal";
 import { Button } from "@gecut-cloud/ui/components/button";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
@@ -437,66 +438,79 @@ export function AdminHeader() {
 
       {/* Purge Database Confirmation Modal */}
       {isPurgeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md rounded-2xl border border-destructive/40 bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 text-destructive mb-3">
-              <div className="p-2.5 rounded-xl bg-destructive/10 text-destructive">
-                <AlertTriangle className="h-6 w-6" />
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isPurging) setIsPurgeModalOpen(false);
+            }}
+          >
+            <div className="relative w-full max-w-md m-auto rounded-2xl border border-destructive/40 bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3 text-destructive mb-3">
+                <div className="p-2.5 rounded-xl bg-destructive/10 text-destructive">
+                  <AlertTriangle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-foreground">پاکسازی کامل محتوای دیتابیس</h3>
+                  <p className="text-xs text-muted-foreground">حذف رکوردهای محتوایی بدون تغییر ساختار مدل‌ها</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-base text-foreground">پاکسازی کامل محتوای دیتابیس</h3>
-                <p className="text-xs text-muted-foreground">حذف رکوردهای محتوایی بدون تغییر ساختار مدل‌ها</p>
-              </div>
-            </div>
 
-            <div className="space-y-3 py-3 text-xs text-muted-foreground leading-relaxed border-y border-border/50 my-3">
-              <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20 text-foreground font-medium flex flex-col gap-1.5">
-                <span className="text-destructive font-bold text-xs flex items-center gap-1.5">
-                  <Trash2 className="h-3.5 w-3.5" />
-                  موارد زیر به طور کامل حذف خواهند شد:
-                </span>
-                <ul className="list-disc list-inside space-y-1 text-[11px] text-muted-foreground pr-1">
-                  <li>تمام مشتریان (پروفایل‌ها و اطلاعات تماس)</li>
-                  <li>تمام سرویس‌ها و پکیج‌های تخصیص‌یافته</li>
-                  <li>تمام فاکتورها، اقلام و صورت‌حساب‌ها</li>
-                  <li>تمام تراکنش‌ها، پرداخت‌ها و رسیدها</li>
-                  <li>تمام تامین‌کنندگان و سرورها</li>
-                  <li>تمام لاگ‌های سیستمی و مانیتورینگ</li>
-                </ul>
+              <div className="space-y-3 py-3 text-xs text-muted-foreground leading-relaxed border-y border-border/50 my-3">
+                <div className="p-3 rounded-xl bg-destructive/5 border border-destructive/20 text-foreground font-medium flex flex-col gap-1.5">
+                  <span className="text-destructive font-bold text-xs flex items-center gap-1.5">
+                    <Trash2 className="h-3.5 w-3.5" />
+                    موارد زیر به طور کامل حذف خواهند شد:
+                  </span>
+                  <ul className="list-disc list-inside space-y-1 text-[11px] text-muted-foreground pr-1">
+                    <li>تمام مشتریان (پروفایل‌ها و اطلاعات تماس)</li>
+                    <li>تمام سرویس‌ها و پکیج‌های تخصیص‌یافته</li>
+                    <li>تمام فاکتورها، اقلام و صورت‌حساب‌ها</li>
+                    <li>تمام تراکنش‌ها، پرداخت‌ها و رسیدها</li>
+                    <li>تمام تامین‌کنندگان و سرورها</li>
+                    <li>تمام لاگ‌های سیستمی و مانیتورینگ</li>
+                  </ul>
+                </div>
+                <p className="text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
+                  ✓ حساب کاربری ادمین ({currentUser.name}) و ساختار تمام مدل‌ها و جداول دست‌نخورده حفظ می‌شوند.
+                </p>
               </div>
-              <p className="text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
-                ✓ حساب کاربری ادمین ({currentUser.name}) و ساختار تمام مدل‌ها و جداول دست‌نخورده حفظ می‌شوند.
-              </p>
-            </div>
 
-            <div className="flex items-center justify-end gap-2.5 mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsPurgeModalOpen(false)}
-                disabled={isPurging}
-                className="rounded-xl text-xs"
-              >
-                انصراف
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handlePurgeDatabase}
-                disabled={isPurging}
-                className="gap-1.5 rounded-xl text-xs font-bold shadow-md cursor-pointer"
-              >
-                {isPurging ? "در حال پاکسازی..." : "بله، همه داده‌ها پاک شوند"}
-              </Button>
+              <div className="flex items-center justify-end gap-2.5 mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsPurgeModalOpen(false)}
+                  disabled={isPurging}
+                  className="rounded-xl text-xs"
+                >
+                  انصراف
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handlePurgeDatabase}
+                  disabled={isPurging}
+                  className="gap-1.5 rounded-xl text-xs font-bold shadow-md cursor-pointer"
+                >
+                  {isPurging ? "در حال پاکسازی..." : "بله، همه داده‌ها پاک شوند"}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Admin Management Modal */}
       {isAdminsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-lg rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setIsAdminsModalOpen(false);
+            }}
+          >
+            <div className="relative w-full max-w-lg m-auto rounded-2xl border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b">
               <div className="flex items-center gap-2.5">
@@ -779,7 +793,8 @@ export function AdminHeader() {
               </form>
             )}
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
     </>
   );
