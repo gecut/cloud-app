@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DEMO_USERS,
@@ -41,6 +41,7 @@ import { toast } from "sonner";
 import { navItems } from "./app-shell";
 
 export function AdminHeader() {
+  const router = useRouter();
   const navigate = useNavigate();
   const routerState = useRouterState();
   const currentPath = routerState?.location?.pathname || "/";
@@ -219,9 +220,15 @@ export function AdminHeader() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate({ to: "/" })}
+              onClick={() => {
+                if (typeof window !== "undefined" && window.history.length > 1) {
+                  router.history.back();
+                } else {
+                  navigate({ to: "/" });
+                }
+              }}
               className="md:hidden h-9 w-9 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
-              title="بازگشت به داشبورد"
+              title="بازگشت به صفحه قبل"
             >
               <ArrowRight className="h-5 w-5" />
             </Button>
