@@ -909,6 +909,16 @@ function AdminCustomerProfileDetailPage() {
     });
   }, [customer?.invoices, customerInvoicesData?.items]);
 
+  const servicesList = useMemo(() => {
+    return [...(customer?.services || [])]
+      .filter((s: any) => !s.childServices || s.childServices.length === 0)
+      .sort((a: any, b: any) => {
+        const timeA = new Date(a.createdAt || a.purchaseDate || a.startDate || 0).getTime();
+        const timeB = new Date(b.createdAt || b.purchaseDate || b.startDate || 0).getTime();
+        return timeB - timeA;
+      });
+  }, [customer?.services]);
+
   const activeCustomer = customer;
 
   if (isLoading) {
@@ -940,16 +950,6 @@ function AdminCustomerProfileDetailPage() {
       </AppShell>
     );
   }
-
-  const servicesList = useMemo(() => {
-    return [...(activeCustomer.services || [])]
-      .filter((s: any) => (!s.childServices || s.childServices.length === 0))
-      .sort((a: any, b: any) => {
-        const timeA = new Date(a.createdAt || a.purchaseDate || a.startDate || 0).getTime();
-        const timeB = new Date(b.createdAt || b.purchaseDate || b.startDate || 0).getTime();
-        return timeB - timeA;
-      });
-  }, [activeCustomer?.services]);
   
   // Calculate summary metrics
   const isInvoicePaid = (inv: any) => String(inv.status).toUpperCase() === "PAID" || Boolean(inv.payment);
