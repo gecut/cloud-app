@@ -1169,7 +1169,7 @@ function AdminServicesListPage() {
                           variant="outline"
                           onClick={() => {
                             setAssigningToCatalog(svc);
-                            setAssignSubServiceName("");
+                            setAssignSubServiceName(svc.name);
                             setSelectedCustomerId("");
                             setPriceToman(0);
                             const nowIso = new Date().toISOString();
@@ -1181,7 +1181,7 @@ function AdminServicesListPage() {
                           className="h-8 text-xs gap-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-300 dark:border-emerald-900/50 cursor-pointer rounded-xl px-2.5 whitespace-nowrap shrink-0"
                         >
                           <Plus className="h-3.5 w-3.5 shrink-0" />
-                          <span>تخصیص به مشتری</span>
+                          <span>ایجاد سرویس زیرمجموعه</span>
                         </Button>
 
                         <Button
@@ -1247,7 +1247,7 @@ function AdminServicesListPage() {
                               variant="outline"
                               onClick={() => {
                                 setAssigningToCatalog(svc);
-                                setAssignSubServiceName("");
+                                setAssignSubServiceName(svc.name);
                                 setSelectedCustomerId("");
                                 setPriceToman(0);
                                 const nowIso = new Date().toISOString();
@@ -1259,13 +1259,13 @@ function AdminServicesListPage() {
                               className="h-7 text-xs px-2.5 gap-1.5 text-emerald-600 hover:text-emerald-700 cursor-pointer rounded-lg"
                             >
                               <Plus className="h-3 w-3" />
-                              تخصیص نمونه جدید
+                              ایجاد سرویس زیرمجموعه جدید
                             </Button>
                           </div>
 
                           {assignedList.length === 0 ? (
                             <div className="py-6 text-center text-xs text-muted-foreground">
-                              هنوز هیچ مشتری این سرویس را دریافت نکرده است. از دکمه «تخصیص به مشتری» استفاده کنید.
+                              هنوز هیچ زیرمجموعه‌ای برای این سرویس ثبت نشده است. از دکمه «ایجاد سرویس زیرمجموعه» استفاده کنید.
                             </div>
                           ) : (
                             <div className="overflow-x-auto w-full">
@@ -1645,160 +1645,11 @@ function AdminServicesListPage() {
                     />
                   </div>
 
-                  {/* 4. Tracking Mode */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">مدل ردگیری و نوع پکیج *</Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={trackingType === "HYBRID" ? "default" : "outline"}
-                        onClick={() => setTrackingType("HYBRID")}
-                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
-                          trackingType === "HYBRID" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
-                        }`}
-                      >
-                        بسته ترکیبی (زمان + تعداد)
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={trackingType === "TIME" ? "default" : "outline"}
-                        onClick={() => setTrackingType("TIME")}
-                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
-                          trackingType === "TIME" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
-                        }`}
-                      >
-                        زمانی (فقط مدت)
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={trackingType === "QUANTITY" ? "default" : "outline"}
-                        onClick={() => setTrackingType("QUANTITY")}
-                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
-                          trackingType === "QUANTITY" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
-                        }`}
-                      >
-                        تعدادی (فقط سهمیه)
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* 5. Tracking Parameters: Price, Duration, Quantity */}
-                  {trackingType === "TIME" && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">مبلغ دوره (تومان)</Label>
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          dir="ltr"
-                          value={formatPriceInput(priceToman)}
-                          onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
-                          placeholder="0"
-                          className="rounded-xl h-9 text-xs text-left"
-                        />
-                        {priceToman > 0 && (
-                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                            معادل: {priceToman.toLocaleString("fa-IR")} تومان
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">بازه روزانه (مدت دوره به روز) *</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={durationDays}
-                          onChange={(e) => handleAssignDurationChange(Number(e.target.value))}
-                          className="rounded-xl h-9 text-xs font-mono"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {trackingType === "QUANTITY" && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">مبلغ کل بسته (تومان)</Label>
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          dir="ltr"
-                          value={formatPriceInput(priceToman)}
-                          onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
-                          placeholder="0"
-                          className="rounded-xl h-9 text-xs text-left"
-                        />
-                        {priceToman > 0 && (
-                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                            معادل: {priceToman.toLocaleString("fa-IR")} تومان
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">تعداد ظرفیت / پکیج اولیه (عدد) *</Label>
-                        <Input
-                          type="number"
-                          value={quantity}
-                          onChange={(e) => setQuantity(Number(e.target.value))}
-                          className="rounded-xl h-9 text-xs font-mono"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {trackingType === "HYBRID" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">مبلغ قرارداد (تومان)</Label>
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          dir="ltr"
-                          value={formatPriceInput(priceToman)}
-                          onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
-                          placeholder="0"
-                          className="rounded-xl h-9 text-xs text-left"
-                        />
-                        {priceToman > 0 && (
-                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                            معادل: {priceToman.toLocaleString("fa-IR")} تومان
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">بازه روزانه (دوره به روز) *</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={durationDays}
-                          onChange={(e) => handleAssignDurationChange(Number(e.target.value))}
-                          className="rounded-xl h-9 text-xs font-mono"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">ظرفیت پکیج (تعداد) *</Label>
-                        <Input
-                          type="number"
-                          value={quantity}
-                          onChange={(e) => setQuantity(Number(e.target.value))}
-                          className="rounded-xl h-9 text-xs font-mono"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-
                   {/* Info Notice: Parent Catalog Service */}
                   <div className="p-3.5 rounded-xl bg-muted/40 border border-border/50 text-[11px] text-muted-foreground flex items-start gap-2.5">
                     <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                     <p className="leading-relaxed">
-                      این فرم صرفاً برای تعریف <strong>سرویس مادر (الگوی کاتالوگ)</strong> است. تاریخ‌های شروع، سررسید تمدید، اطلاعات مشتری و وضعیت تمدید خودکار هنگام تخصیص این سرویس به مشتری ثبت می‌شوند.
+                      این فرم صرفاً برای تعریف <strong>سرویس مادر</strong> است. مدل ردگیری (زمانی، تعدادی یا ترکیبی)، مبالغ، ظرفیت‌ها و تاریخ‌ها از داخل همین سرویس و در زمان ایجاد سرویس زیرمجموعه برای مشتری تعیین می‌شوند.
                     </p>
                   </div>
 
@@ -1841,9 +1692,9 @@ function AdminServicesListPage() {
                     <Users className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-base">تخصیص سرویس به مشتری جدید</h3>
+                    <h3 className="font-bold text-base">ایجاد سرویس زیرمجموعه جدید</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      قالب کاتالوگ پایه: {assigningToCatalog.name}
+                      تعریف سرویس بر مبنای الگوی مادر: {assigningToCatalog.name}
                     </p>
                   </div>
                 </div>
@@ -1861,7 +1712,7 @@ function AdminServicesListPage() {
                 {/* Info Card: Parent Base Catalog Template */}
                 <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground">الگوی کاتالوگ پایه:</span>
+                    <span className="text-[11px] text-muted-foreground">الگوی سرویس مادر:</span>
                     <span className="font-bold text-foreground text-xs">{assigningToCatalog.name}</span>
                   </div>
                   {(() => {
@@ -2219,7 +2070,7 @@ function AdminServicesListPage() {
                     disabled={createServiceMutation.isPending || (trackingType !== "QUANTITY" && assignRangeAnalysis.isNegativeRange)}
                     className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs disabled:opacity-50"
                   >
-                    {createServiceMutation.isPending ? "در حال ثبت..." : "تخصیص به مشتری و ثبت"}
+                    {createServiceMutation.isPending ? "در حال ایجاد..." : "ثبت و ایجاد سرویس زیرمجموعه"}
                   </Button>
                 </div>
               </form>
