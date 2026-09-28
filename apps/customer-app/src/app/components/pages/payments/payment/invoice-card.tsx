@@ -184,28 +184,10 @@ export function InvoiceCard({
             <div style="display: flex; justify-content: center; margin-top: 18px; margin-bottom: 24px;">
               <div style="display: flex; flex-direction: column; gap: 8px; width: 330px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div style="background: #c3eccd; color: #166534; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
-                    مبلغ کل
+                  <div style="background: #c3eccd; color: #166534; font-size: 12.5px; font-weight: 800; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
+                    قیمت کل
                   </div>
-                  <div style="font-size: 13px; font-weight: 600; color: #111827; text-align: left;">
-                    ${formatPrice(priceVal)} تومان
-                  </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div style="background: #c3eccd; color: #166534; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
-                    تخفیف
-                  </div>
-                  <div style="font-size: 13px; font-weight: 600; color: #111827; text-align: left;">
-                    -
-                  </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div style="background: #c3eccd; color: #166534; font-size: 12px; font-weight: 800; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
-                    مبلغ قابل پرداخت
-                  </div>
-                  <div style="font-size: 13.5px; font-weight: 800; color: #111827; text-align: left;">
+                  <div style="font-size: 14px; font-weight: 800; color: #111827; text-align: left;">
                     ${formatPrice(priceVal)} تومان
                   </div>
                 </div>

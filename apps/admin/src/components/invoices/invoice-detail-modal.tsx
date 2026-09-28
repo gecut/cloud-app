@@ -46,14 +46,44 @@ export function InvoiceDetailModal({
           },
         ];
 
-  const subtotal = items.reduce(
-    (sum: number, it: any) => sum + (it.unitPriceToman || 0) * (it.quantity || 1),
-    0,
+  // Helper to determine accurate line item total, quantity, and unit price
+  const getItemPricing = (it: any) => {
+    const rawTotal = it.totalToman != null ? Number(it.totalToman) : null;
+    const rawUnit = Number(it.unitPriceToman) || 0;
+    const rawQty = Number(it.quantity) || 1;
+
+    // Check if this is a package where quantity and unit price shouldn't multiply:
+    // Capacity is stored in quantity or title, but unitPrice is the total package price
+    const isPackageOrCapacity =
+      it.service?.trackingType === "QUANTITY" ||
+      it.title?.includes("بسته") ||
+      it.title?.includes("تعداد:") ||
+      (rawQty > 1 && rawTotal !== null && (rawTotal === rawUnit || invoice.totalToman === rawUnit));
+
+    let qty = rawQty;
+    let unit = rawUnit;
+    let lineTotal = rawTotal != null ? rawTotal : rawUnit * rawQty;
+
+    if (isPackageOrCapacity) {
+      qty = 1;
+      lineTotal = rawUnit || rawTotal || 0;
+      unit = lineTotal;
+    }
+
+    return { qty, unit, lineTotal };
+  };
+
+  const hasPackageMultiplicationBug = items.some(
+    (it: any) =>
+      (it.service?.trackingType === "QUANTITY" || it.title?.includes("بسته") || it.title?.includes("تعداد:")) &&
+      it.quantity > 1 &&
+      invoice.totalToman === it.quantity * it.unitPriceToman,
   );
-  const discountVal =
-    invoice.discountToman ||
-    (invoice.totalToman && subtotal > invoice.totalToman ? subtotal - invoice.totalToman : 0);
-  const total = invoice.totalToman || subtotal - discountVal;
+
+  const total =
+    invoice.totalToman && !hasPackageMultiplicationBug
+      ? invoice.totalToman
+      : items.reduce((sum: number, it: any) => sum + getItemPricing(it).lineTotal, 0);
 
   const formatPrice = (n: number) => Number(n || 0).toLocaleString("fa-IR");
 
@@ -85,9 +115,7 @@ export function InvoiceDetailModal({
 
     const rowsHtml = items
       .map((it: any, idx: number) => {
-        const qty = it.quantity || 1;
-        const unit = it.unitPriceToman || 0;
-        const lineTotal = qty * unit;
+        const { qty, unit, lineTotal } = getItemPricing(it);
         const title = it.title || it.serviceNameSnapshot || it.service?.name || "خدمات میزبانی سرور";
         const desc = it.description || it.period || "";
         return `
@@ -238,28 +266,10 @@ export function InvoiceDetailModal({
             <div style="display: flex; justify-content: center; margin-top: 18px; margin-bottom: 24px;">
               <div style="display: flex; flex-direction: column; gap: 8px; width: 330px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div style="background: #c3eccd; color: #166534; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
-                    مبلغ کل
+                  <div style="background: #c3eccd; color: #166534; font-size: 12.5px; font-weight: 800; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
+                    قیمت کل
                   </div>
-                  <div style="font-size: 13px; font-weight: 600; color: #111827; text-align: left;">
-                    ${formatPrice(subtotal)} تومان
-                  </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div style="background: #c3eccd; color: #166534; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
-                    تخفیف
-                  </div>
-                  <div style="font-size: 13px; font-weight: 600; color: #111827; text-align: left;">
-                    ${discountVal > 0 ? `${formatPrice(discountVal)} تومان` : "-"}
-                  </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div style="background: #c3eccd; color: #166534; font-size: 12px; font-weight: 800; border-radius: 8px; padding: 7px 22px; text-align: center; width: 120px;">
-                    مبلغ قابل پرداخت
-                  </div>
-                  <div style="font-size: 13.5px; font-weight: 800; color: #111827; text-align: left;">
+                  <div style="font-size: 14px; font-weight: 800; color: #111827; text-align: left;">
                     ${formatPrice(total)} تومان
                   </div>
                 </div>
@@ -472,9 +482,7 @@ export function InvoiceDetailModal({
             </thead>
             <tbody>
               {items.map((it: any, idx: number) => {
-                const qty = it.quantity || 1;
-                const unit = it.unitPriceToman || 0;
-                const lineTotal = qty * unit;
+                const { qty, unit, lineTotal } = getItemPricing(it);
                 const title = it.title || it.serviceNameSnapshot || it.service?.name || "خدمات میزبانی سرور";
                 const desc = it.description || it.period || "";
                 return (
@@ -505,24 +513,8 @@ export function InvoiceDetailModal({
           <div className="flex justify-center my-6">
             <div className="flex flex-col gap-2 w-80">
               <div className="flex items-center justify-between">
-                <div className="bg-[#c3eccd] text-[#166534] text-xs font-bold rounded-lg py-1.5 px-5 text-center w-32">
-                  مبلغ کل
-                </div>
-                <div className="text-xs font-semibold text-gray-900 text-left">
-                  {formatPrice(subtotal)} تومان
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="bg-[#c3eccd] text-[#166534] text-xs font-bold rounded-lg py-1.5 px-5 text-center w-32">
-                  تخفیف
-                </div>
-                <div className="text-xs font-semibold text-gray-900 text-left">
-                  {discountVal > 0 ? `${formatPrice(discountVal)} تومان` : "-"}
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
                 <div className="bg-[#c3eccd] text-[#166534] text-xs font-extrabold rounded-lg py-1.5 px-5 text-center w-32">
-                  مبلغ قابل پرداخت
+                  قیمت کل
                 </div>
                 <div className="text-sm font-bold text-gray-900 text-left">
                   {formatPrice(total)} تومان

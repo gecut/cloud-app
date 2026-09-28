@@ -133,15 +133,16 @@ export class UpdateServiceHandler
 
         for (const it of allItems) {
           if (it.serviceId === updated.id) {
-            const qty = it.quantity || 1;
             const unitPrice = updated.priceToman !== undefined ? updated.priceToman : (it.unitPriceToman || 0);
-            const lineTotal = unitPrice * qty;
+            const lineTotal = unitPrice;
             const isQtyMode = updated.trackingType === "QUANTITY";
+            const capacityQty = updated.quantity || 1;
             const title = isQtyMode
-              ? `${updated.name} (تعداد: ${qty.toLocaleString("fa-IR")})`
+              ? `${updated.name} (تعداد: ${capacityQty.toLocaleString("fa-IR")})`
               : `صورت‌حساب سرویس ${updated.name}`;
 
             it.title = title;
+            it.quantity = 1;
             it.unitPriceToman = unitPrice;
             it.totalToman = lineTotal;
             it.serviceNameSnapshot = updated.name;
@@ -154,6 +155,7 @@ export class UpdateServiceHandler
               const memIt = this.prisma.memInvoiceItems.get(it.id);
               Object.assign(memIt, {
                 title,
+                quantity: 1,
                 unitPriceToman: unitPrice,
                 totalToman: lineTotal,
                 serviceNameSnapshot: updated.name,

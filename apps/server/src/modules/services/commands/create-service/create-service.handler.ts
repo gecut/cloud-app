@@ -192,7 +192,7 @@ export class CreateServiceHandler
                     serviceId: service.id,
                     title: itemTitle,
                     description: service.description || `سرویس فعال ${service.name}`,
-                    quantity: qty,
+                    quantity: 1,
                     unitPriceToman: price,
                     totalToman: price,
                     serviceNameSnapshot: service.name,
