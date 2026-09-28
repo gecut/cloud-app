@@ -44,6 +44,7 @@ import {
   Image,
   Tag,
   Repeat,
+  Info,
 } from "lucide-react";
 
 export const Route = createFileRoute("/services/")({
@@ -783,21 +784,17 @@ function AdminServicesListPage() {
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("نام بسته / سرویس کاتالوگ الزامی است");
-      return;
-    }
-
-    const pDate = safeDate(purchaseDate);
-    const renDate = safeDate(assignRenewalDate, new Date(calcAddDays(pDate, durationDays)));
-
-    if (trackingType !== "QUANTITY" && renDate.getTime() < pDate.getTime()) {
-      toast.error("خطا در بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!");
+      toast.error("نام سرویس مادر الزامی است");
       return;
     }
 
     const matchedCategory = dynamicCategories.find(
       (c: any) => c.slug === category || c.id === category
     );
+
+    const now = new Date();
+    const cycleDays = durationDays || 30;
+    const defaultRenewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
 
     createServiceMutation.mutate({
       name: name.trim(),
@@ -808,12 +805,13 @@ function AdminServicesListPage() {
       trackingType,
       priceToman: Math.round(Number(priceToman)) || 0,
       quantity: trackingType === "TIME" ? 1 : Math.max(1, Number(quantity) || 1),
-      billingCycle: trackingType === "QUANTITY" ? "NONE" : String(durationDays),
-      autoRenew: assignAutoRenew,
-      purchaseDate: trackingType !== "QUANTITY" ? pDate.toISOString() : undefined,
-      startDate: trackingType !== "QUANTITY" ? pDate.toISOString() : undefined,
-      renewalDate: trackingType !== "QUANTITY" ? (renDate.toISOString()) : undefined,
-      customerId: selectedCustomerId || undefined,
+      billingCycle: trackingType === "QUANTITY" ? "NONE" : String(cycleDays),
+      autoRenew: false,
+      startDate: now.toISOString(),
+      purchaseDate: now.toISOString(),
+      renewalDate: defaultRenewalDate.toISOString(),
+      customerId: undefined,
+      parentServiceId: undefined,
     });
   };
 
@@ -1580,9 +1578,9 @@ function AdminServicesListPage() {
                       <Plus className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-base">ایجاد سرویس / بسته جدید</h3>
+                      <h3 className="font-bold text-base">ایجاد سرویس مادر (قالب کاتالوگ)</h3>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        تعریف در کاتالوگ سیستم با قابلیت تخصیص مستقیم به مشتری
+                        تعریف الگوی پایه سرویس در کاتالوگ سیستم جهت تخصیص به مشتریان
                       </p>
                     </div>
                   </div>
@@ -1796,66 +1794,12 @@ function AdminServicesListPage() {
                     </div>
                   )}
 
-                  {/* 6. Dates: Purchase & Renewal Date */}
-                  {trackingType !== "QUANTITY" && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs font-semibold">تاریخ خرید / شروع خدمت (شمسی) *</Label>
-                          <JalaliDatePicker
-                            value={purchaseDate}
-                            onChange={handleAssignPurchaseDateChange}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs font-semibold">تاریخ سررسید تمدید / پایان (شمسی) *</Label>
-                          <JalaliDatePicker
-                            value={assignRenewalDate}
-                            onChange={handleAssignRenewalDateChange}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Live Span & Alarm indicator */}
-                      <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col gap-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">بازه زمانی کلی سررسید:</span>
-                          <span className="font-bold text-foreground font-mono">
-                            {assignSpanDays.toLocaleString("fa-IR")} روز
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">دوره تعیین‌شده برای سرویس:</span>
-                          <span className="font-bold text-foreground font-mono">
-                            {durationDays.toLocaleString("fa-IR")} روز
-                          </span>
-                        </div>
-
-                        {assignRangeAnalysis.isNegativeRange && (
-                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
-                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                            <span>
-                              خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 7. Auto-renew switch */}
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/60">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="createAutoRenewSwitch" className="text-xs font-semibold cursor-pointer">تمدید خودکار سرویس</Label>
-                      <p className="text-[11px] text-muted-foreground">با رسیدن به سررسید، سرویس به‌صورت خودکار تمدید شود</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      id="createAutoRenewSwitch"
-                      checked={assignAutoRenew}
-                      onChange={(e) => setAssignAutoRenew(e.target.checked)}
-                      className="h-4 w-4 rounded accent-emerald-600 cursor-pointer"
-                    />
+                  {/* Info Notice: Parent Catalog Service */}
+                  <div className="p-3.5 rounded-xl bg-muted/40 border border-border/50 text-[11px] text-muted-foreground flex items-start gap-2.5">
+                    <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <p className="leading-relaxed">
+                      این فرم صرفاً برای تعریف <strong>سرویس مادر (الگوی کاتالوگ)</strong> است. تاریخ‌های شروع، سررسید تمدید، اطلاعات مشتری و وضعیت تمدید خودکار هنگام تخصیص این سرویس به مشتری ثبت می‌شوند.
+                    </p>
                   </div>
 
                   <div className="flex items-center justify-end gap-3 pt-4 border-t mt-2">

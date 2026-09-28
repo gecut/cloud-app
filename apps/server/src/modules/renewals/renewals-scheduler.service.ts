@@ -17,8 +17,8 @@ export class RenewalsSchedulerService implements OnModuleInit {
   }
 
   
-  // Run every 15 minutes to catch expired services promptly
-  @Cron("*/15 * * * *")
+  // Run every 1 minute to catch expired services promptly
+  @Cron("*/1 * * * *")
   async handleCron() {
     await this.checkAndProcessExpiredServices();
   }
@@ -26,153 +26,164 @@ export class RenewalsSchedulerService implements OnModuleInit {
   async checkAndProcessExpiredServices() {
     const now = new Date();
 
-    // 1. Auto-heal any services that were marked INACTIVE but are valid and autoRenew is ON
+    // 1. Process customer services with autoRenew: true that are expired, quota-depleted, or were inactive
     try {
-      const inactiveServices = await this.prisma.service.findMany({
-        where: { status: "INACTIVE" },
+      const autoRenewServices = await this.prisma.service.findMany({
+        where: {
+          autoRenew: true,
+          customerId: { not: null },
+        },
+        include: {
+          customer: true,
+        },
       });
-      for (const s of inactiveServices) {
-        const trackingType = (s.trackingType || "HYBRID").toUpperCase();
-        const isTimeValid = !s.renewalDate || new Date(s.renewalDate).getTime() >= now.getTime();
-        const hasRemainingQuota = s.quantity == null || Number(s.quantity) > Number(s.usedQuantity || 0);
 
-        let shouldHeal = false;
-        if (trackingType === "QUANTITY") {
-          shouldHeal = hasRemainingQuota;
-        } else if (trackingType === "TIME") {
-          shouldHeal = isTimeValid;
-        } else {
-          // HYBRID: Both must be valid (priority to quota)
-          shouldHeal = isTimeValid && hasRemainingQuota;
-        }
+      for (const service of autoRenewServices) {
+        const trackingType = (service.trackingType || "HYBRID").toUpperCase();
+        const isTimeExpired =
+          trackingType !== "QUANTITY" &&
+          service.renewalDate &&
+          new Date(service.renewalDate).getTime() <= now.getTime();
 
-        if (shouldHeal && s.autoRenew) {
-          await this.prisma.service.update({
-            where: { id: s.id },
-            data: { status: "ACTIVE" },
-          });
-          this.logger.log(`[RenewalsScheduler] Restored ACTIVE status for valid service ${s.name} (${s.id})`);
+        const isQuantityDepleted =
+          (trackingType === "QUANTITY" || trackingType === "HYBRID" || (service.quantity && service.quantity > 1)) &&
+          service.quantity != null &&
+          Number(service.usedQuantity || 0) >= Number(service.quantity);
+
+        if (isTimeExpired || isQuantityDepleted || service.status === "INACTIVE") {
+          try {
+            await this.processServiceExpiration(service, now);
+          } catch (err) {
+            this.logger.error(`Failed to auto-renew service ${service.id}`, err);
+          }
         }
       }
     } catch (err) {
-      this.logger.error("Error during auto-healing inactive services", err);
+      this.logger.error("Error during auto-renewing services", err);
     }
 
-    // 2. Find all active services whose renewalDate is in the past OR quantity quota is depleted
-    const activeServices = await this.prisma.service.findMany({
-      where: {
-        status: "ACTIVE",
-        customerId: { not: null },
-      },
-      include: {
-        customer: true,
-      },
-    });
+    // 2. Find active services with autoRenew: false whose renewalDate is in the past OR quantity quota is depleted, and deactivate them
+    try {
+      const activeNonAutoServices = await this.prisma.service.findMany({
+        where: {
+          status: "ACTIVE",
+          autoRenew: false,
+          customerId: { not: null },
+        },
+        include: {
+          customer: true,
+        },
+      });
 
-    const expiredServices = activeServices.filter((service) => {
-      const trackingType = (service.trackingType || "HYBRID").toUpperCase();
-      const isTimeExpired =
-        trackingType !== "QUANTITY" &&
-        service.renewalDate &&
-        new Date(service.renewalDate).getTime() <= now.getTime();
+      for (const service of activeNonAutoServices) {
+        const trackingType = (service.trackingType || "HYBRID").toUpperCase();
+        const isTimeExpired =
+          trackingType !== "QUANTITY" &&
+          service.renewalDate &&
+          new Date(service.renewalDate).getTime() <= now.getTime();
 
-      const isQuantityDepleted =
-        (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
-        service.quantity != null &&
-        Number(service.usedQuantity || 0) >= Number(service.quantity);
+        const isQuantityDepleted =
+          (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+          service.quantity != null &&
+          Number(service.usedQuantity || 0) >= Number(service.quantity);
 
-      // In HYBRID: Quantity depletion takes precedence and finishes the service immediately
-      return isTimeExpired || isQuantityDepleted;
-    });
-
-    if (expiredServices.length === 0) {
-      return;
-    }
-
-    this.logger.log(`Found ${expiredServices.length} expired or depleted service(s) to process.`);
-
-    for (const service of expiredServices) {
-      try {
-        await this.processServiceExpiration(service, now);
-      } catch (err) {
-        this.logger.error(`Failed to process expired service ${service.id}`, err);
+        if (isTimeExpired || isQuantityDepleted) {
+          try {
+            await this.processServiceExpiration(service, now);
+          } catch (err) {
+            this.logger.error(`Failed to process expired service ${service.id}`, err);
+          }
+        }
       }
+    } catch (err) {
+      this.logger.error("Error processing non-auto-renew services", err);
     }
 
-    // 3. Process expired Supplier Services (تامین‌کنندگان)
+    // 3. Process Supplier Services (تامین‌کنندگان) with autoRenew !== false that are expired or depleted
     try {
       for (const supSvc of Array.from(this.prisma.memSupplierServices.values())) {
-        if (
-          supSvc.status === "ACTIVE" &&
-          supSvc.renewalDate &&
-          new Date(supSvc.renewalDate).getTime() < now.getTime()
-        ) {
-          const cycleDays = supSvc.billingCycleDays || 30;
-          const prevRenewal = new Date(supSvc.renewalDate);
-          let nextRenewal = new Date(prevRenewal.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-          if (nextRenewal.getTime() <= now.getTime()) {
-            nextRenewal = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-          }
+        if (supSvc.status === "ACTIVE" && supSvc.autoRenew !== false) {
+          const trackingType = (supSvc.trackingType || "TIME").toUpperCase();
+          const isTimeExpired =
+            trackingType !== "QUANTITY" &&
+            supSvc.renewalDate &&
+            new Date(supSvc.renewalDate).getTime() <= now.getTime();
 
-          supSvc.purchaseDate = prevRenewal;
-          supSvc.renewalDate = nextRenewal;
-          supSvc.updatedAt = now;
+          const isQuantityDepleted =
+            (trackingType === "QUANTITY" || trackingType === "HYBRID" || (supSvc.quantity && supSvc.quantity > 1)) &&
+            supSvc.quantity != null &&
+            Number(supSvc.usedQuantity || 0) >= Number(supSvc.quantity);
 
-          const amount = Number(supSvc.priceToman ?? supSvc.monthlyExpenseToman) || 0;
-          const isFree = amount === 0;
+          if (isTimeExpired || isQuantityDepleted) {
+            const cycleDays = supSvc.billingCycleDays || 30;
+            const prevRenewal = supSvc.renewalDate ? new Date(supSvc.renewalDate) : now;
+            let nextRenewal = new Date(prevRenewal.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+            if (nextRenewal.getTime() <= now.getTime()) {
+              nextRenewal = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+            }
 
-          const invoiceNumber = await getNextUniqueInvoiceNumber(this.prisma);
-          const sup = this.prisma.memSuppliers.get(supSvc.supplierId);
+            supSvc.purchaseDate = prevRenewal;
+            supSvc.renewalDate = nextRenewal;
+            supSvc.usedQuantity = 0;
+            supSvc.status = "ACTIVE";
+            supSvc.updatedAt = now;
 
-          const supInvoice = await this.prisma.invoice.create({
-            data: {
-              customerId: null,
-              supplierId: supSvc.supplierId,
-              counterpartyType: "SUPPLIER",
-              invoiceNumber,
-              status: isFree ? "PAID" : "UNPAID",
-              subtotalToman: amount,
-              totalToman: amount,
-              paidAt: isFree ? now : null,
-              issuedAt: now,
-              dueDate: nextRenewal,
-              notes: isFree
-                ? `فاکتور خرید رایگان سرویس تامین‌کننده ${supSvc.name} (تایید خودکار سیستمی)`
-                : `فاکتور تمدید دوره خرید سرویس «${supSvc.name}» از تامین‌کننده ${sup?.name || ""}`,
-              items: {
-                create: [
-                  {
-                    serviceId: supSvc.id,
-                    title: `تمدید سرویس تامین‌کننده ${supSvc.name}`,
-                    quantity: 1,
-                    unitPriceToman: amount,
-                    totalToman: amount,
-                    serviceNameSnapshot: supSvc.name,
-                    serviceTypeSnapshot: supSvc.type,
-                    servicePriceSnapshotToman: amount,
-                    serviceRenewalDateSnapshot: nextRenewal,
-                  },
-                ],
-              },
-            } as any,
-          });
+            const amount = Number(supSvc.priceToman ?? supSvc.monthlyExpenseToman) || 0;
+            const isFree = amount === 0;
 
-          if (isFree) {
-            await this.prisma.payment.create({
+            const invoiceNumber = await getNextUniqueInvoiceNumber(this.prisma);
+            const sup = this.prisma.memSuppliers.get(supSvc.supplierId);
+
+            const supInvoice = await this.prisma.invoice.create({
               data: {
-                invoiceId: supInvoice.id,
-                amountToman: 0,
-                provider: "FREE_PLAN",
-                gatewayRef: `FREE_${supInvoice.id}_${Date.now()}`,
-                paidAt: now,
-              },
+                customerId: null,
+                supplierId: supSvc.supplierId,
+                counterpartyType: "SUPPLIER",
+                invoiceNumber,
+                status: isFree ? "PAID" : "UNPAID",
+                subtotalToman: amount,
+                totalToman: amount,
+                paidAt: isFree ? now : null,
+                issuedAt: now,
+                dueDate: nextRenewal,
+                notes: isFree
+                  ? `فاکتور خرید رایگان سرویس تامین‌کننده ${supSvc.name} (تایید خودکار سیستمی)`
+                  : `فاکتور تمدید دوره خرید سرویس «${supSvc.name}» از تامین‌کننده ${sup?.name || ""}`,
+                items: {
+                  create: [
+                    {
+                      serviceId: supSvc.id,
+                      title: `تمدید سرویس تامین‌کننده ${supSvc.name}`,
+                      quantity: 1,
+                      unitPriceToman: amount,
+                      totalToman: amount,
+                      serviceNameSnapshot: supSvc.name,
+                      serviceTypeSnapshot: supSvc.type,
+                      servicePriceSnapshotToman: amount,
+                      serviceRenewalDateSnapshot: nextRenewal,
+                    },
+                  ],
+                },
+              } as any,
             });
-          } else if (sup) {
-            sup.totalPayableToman = (sup.totalPayableToman || 0) + amount;
-          }
 
-          this.prisma.saveToDisk();
-          this.logger.log(`[AutoRenew] Renewed supplier service ${supSvc.name} to ${nextRenewal.toISOString().slice(0, 10)}. Issued purchase invoice #${invoiceNumber}.`);
+            if (isFree) {
+              await this.prisma.payment.create({
+                data: {
+                  invoiceId: supInvoice.id,
+                  amountToman: 0,
+                  provider: "FREE_PLAN",
+                  gatewayRef: `FREE_${supInvoice.id}_${Date.now()}`,
+                  paidAt: now,
+                },
+              });
+            } else if (sup) {
+              sup.totalPayableToman = (sup.totalPayableToman || 0) + amount;
+            }
+
+            this.prisma.saveToDisk();
+            this.logger.log(`[AutoRenew] Renewed supplier service ${supSvc.name} to ${nextRenewal.toISOString().slice(0, 10)}. Reset usedQuantity to 0. Issued purchase invoice #${invoiceNumber}.`);
+          }
         }
       }
     } catch (supErr) {
@@ -198,18 +209,19 @@ export class RenewalsSchedulerService implements OnModuleInit {
       new Date(service.renewalDate).getTime() <= now.getTime();
 
     const isQuantityDepleted =
-      (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+      (trackingType === "QUANTITY" || trackingType === "HYBRID" || (service.quantity && service.quantity > 1)) &&
       service.quantity != null &&
       Number(service.usedQuantity || 0) >= Number(service.quantity);
 
     // Business rule: For HYBRID packages, priority is on quantity:
     // If quantity ends first, service is expired immediately!
     const isExpired =
-      trackingType === "QUANTITY"
+      (service.status === "INACTIVE" && Boolean(service.autoRenew)) ||
+      (trackingType === "QUANTITY"
         ? isQuantityDepleted
         : trackingType === "TIME"
         ? isTimeExpired
-        : isQuantityDepleted || isTimeExpired;
+        : isQuantityDepleted || isTimeExpired);
 
     if (!isExpired) {
       return false;

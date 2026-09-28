@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { CqrsModule } from "@nestjs/cqrs";
+import { RenewalsModule } from "../renewals/renewals.module";
 import { CreateCustomerHandler } from "./commands/create-customer/create-customer.handler";
 import { UpdateCustomerHandler } from "./commands/update-customer/update-customer.handler";
 import { CustomersController } from "./customers.controller";
@@ -10,7 +11,7 @@ const CommandHandlers = [CreateCustomerHandler, UpdateCustomerHandler];
 const QueryHandlers = [GetCustomerHandler, ListCustomersHandler];
 
 @Module({
-  imports: [CqrsModule],
+  imports: [CqrsModule, RenewalsModule],
   controllers: [CustomersController],
   providers: [...CommandHandlers, ...QueryHandlers],
   exports: [...CommandHandlers, ...QueryHandlers],

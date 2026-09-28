@@ -1600,7 +1600,7 @@ function AdminCustomerProfileDetailPage() {
                   const isPackage = targetSlug === "package" || svc.quantity;
                   const details = getServiceRemainingDetails(svc);
                   const showDays = details.trackingType === "TIME" || details.trackingType === "HYBRID";
-                  const showQty = details.trackingType === "QUANTITY" || details.trackingType === "HYBRID";
+                  const showQty = details.trackingType === "QUANTITY" || details.trackingType === "HYBRID" || (svc.quantity && svc.quantity > 1);
 
                   return (
                     <Card key={svc.id} className="rounded-2xl border bg-card shadow-xs overflow-hidden">
@@ -1639,6 +1639,12 @@ function AdminCustomerProfileDetailPage() {
                                         ? "فعال"
                                         : "معلق"}
                                     </span>
+                                    {(svc.quantity || details.totalQty > 1 || details.trackingType !== "TIME") && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-mono">
+                                        <Package className="h-3 w-3 text-emerald-500" />
+                                        تعداد: {(svc.quantity || details.totalQty || 1).toLocaleString("fa-IR")} عدد
+                                      </span>
+                                    )}
                                   </div>
 
                                   {/* Remaining Balance Badges & Progress */}
@@ -1803,6 +1809,12 @@ function AdminCustomerProfileDetailPage() {
                               {(svc.trackingType || "HYBRID").toUpperCase() === "QUANTITY"
                                 ? "شارژ مصرفی / بسته اعتباری"
                                 : getBillingCycleLabel(svc.billingCycle)}
+                            </span>
+                          </div>
+                          <div className="text-left">
+                            <span className="text-[11px] text-muted-foreground block">تعداد / سهمیه:</span>
+                            <span className="font-semibold text-xs text-foreground font-mono">
+                              {(svc.quantity || details.totalQty || 1).toLocaleString("fa-IR")} عدد
                             </span>
                           </div>
                           <div className="text-left">

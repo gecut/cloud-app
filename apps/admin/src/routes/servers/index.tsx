@@ -1448,7 +1448,7 @@ function AdminSuppliersPage() {
                           const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
                           const details = getServiceRemainingDetails(svc);
                           const showDays = details.trackingType === "TIME" || details.trackingType === "HYBRID";
-                          const showQty = details.trackingType === "QUANTITY" || details.trackingType === "HYBRID";
+                          const showQty = details.trackingType === "QUANTITY" || details.trackingType === "HYBRID" || (svc.quantity && svc.quantity > 1);
 
                           return (
                             <div
@@ -1489,6 +1489,10 @@ function AdminSuppliersPage() {
                                   </span>
                                   <span className="text-[10px] px-2 py-0.5 rounded-lg bg-muted/60 text-muted-foreground font-medium">
                                     {details.trackingType === "HYBRID" ? "بسته ترکیبی" : details.trackingType === "TIME" ? "زمانی" : "تعدادی"}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-mono">
+                                    <Package className="h-2.5 w-2.5 text-emerald-500" />
+                                    تعداد: {(svc.quantity || details.totalQty || 1).toLocaleString("fa-IR")} عدد
                                   </span>
 
                                   {/* Interactive Auto-Renew Toggle Button */}
@@ -1653,10 +1657,18 @@ function AdminSuppliersPage() {
                                 )}
 
                                 <div className="flex items-center justify-between text-xs text-muted-foreground pt-2.5 border-t border-border/30">
-                                  <span>مبلغ دوره:</span>
-                                  <span className="font-bold text-foreground font-mono">
-                                    {amt.toLocaleString("fa-IR")} تومان
-                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span>مبلغ دوره:</span>
+                                    <span className="font-bold text-foreground font-mono">
+                                      {amt.toLocaleString("fa-IR")} تومان
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1 font-mono text-[11px]">
+                                    <span className="text-muted-foreground">تعداد:</span>
+                                    <span className="font-bold text-foreground">
+                                      {(svc.quantity || details.totalQty || 1).toLocaleString("fa-IR")} عدد
+                                    </span>
+                                  </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground pt-1">
@@ -2527,7 +2539,7 @@ function AdminSuppliersPage() {
                       const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
                       const details = getServiceRemainingDetails(svc);
                       const showDays = details.trackingType === "TIME" || details.trackingType === "HYBRID";
-                      const showQty = details.trackingType === "QUANTITY" || details.trackingType === "HYBRID";
+                      const showQty = details.trackingType === "QUANTITY" || details.trackingType === "HYBRID" || (svc.quantity && svc.quantity > 1);
 
                       return (
                         <div
@@ -2548,6 +2560,10 @@ function AdminSuppliersPage() {
                                 </span>
                                 <span className="text-[10px] px-2 py-0.5 rounded-lg bg-muted/60 text-muted-foreground font-medium">
                                   {details.trackingType === "HYBRID" ? "بسته ترکیبی" : details.trackingType === "TIME" ? "زمانی" : "تعدادی"}
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-[10px] px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-mono">
+                                  <Package className="h-3 w-3 text-emerald-500" />
+                                  تعداد: {(svc.quantity || details.totalQty || 1).toLocaleString("fa-IR")} عدد
                                 </span>
 
                                 {/* Interactive Auto-Renew Toggle Button */}
@@ -2724,8 +2740,14 @@ function AdminSuppliersPage() {
                           </div>
 
                           <div className="flex items-center justify-between sm:justify-end gap-3 pt-2.5 border-t border-border/30">
-                            <div className="font-mono font-bold text-foreground text-sm">
-                              {amt.toLocaleString("fa-IR")} <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
+                            <div className="flex items-center gap-3">
+                              <div className="font-mono font-bold text-foreground text-sm">
+                                {amt.toLocaleString("fa-IR")} <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground font-mono">
+                                <span>تعداد: </span>
+                                <strong className="text-foreground">{(svc.quantity || details.totalQty || 1).toLocaleString("fa-IR")}</strong> عدد
+                              </div>
                             </div>
 
                             <div className="flex items-center gap-2">
