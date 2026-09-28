@@ -1806,17 +1806,27 @@ function AdminCustomerProfileDetailPage() {
                             </span>
                           </div>
                           <div className="text-left">
-                            <span className="text-[11px] text-muted-foreground block">تمدید خودکار:</span>
-                            {svc.autoRenew !== false ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                <Repeat className="h-3 w-3" />
-                                فعال
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground font-medium">
-                                غیرفعال
-                              </span>
-                            )}
+                            <span className="text-[11px] text-muted-foreground block mb-0.5">تمدید خودکار:</span>
+                            <button
+                              type="button"
+                              disabled={updateServiceMutation.isPending}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateServiceMutation.mutate({
+                                  serviceId: svc.id,
+                                  data: { autoRenew: svc.autoRenew === false },
+                                });
+                              }}
+                              className={`inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-lg font-semibold transition-all border cursor-pointer ${
+                                svc.autoRenew !== false
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                                  : "bg-muted text-muted-foreground border-border/50 hover:bg-muted/80"
+                              }`}
+                              title={svc.autoRenew !== false ? "تمدید خودکار فعال است (برای غیرفعال‌سازی کلیک کنید)" : "تمدید خودکار غیرفعال است (برای فعال‌سازی کلیک کنید)"}
+                            >
+                              <Repeat className="h-3 w-3" />
+                              <span>{svc.autoRenew !== false ? "فعال" : "غیرفعال"}</span>
+                            </button>
                           </div>
                           <div className="text-left">
                             <span className="text-[11px] text-muted-foreground block">

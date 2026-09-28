@@ -39,6 +39,7 @@ import {
   CalendarDays,
   ExternalLink,
   Repeat,
+  Package,
 } from "lucide-react";
 
 export const Route = createFileRoute("/servers/")({
@@ -285,6 +286,96 @@ function calcDaysBetween(startIso: string | Date | null, endIso: string | Date |
   const diffDays = Math.round((endDay - startDay) / (1000 * 60 * 60 * 24));
   return Math.max(1, diffDays);
 }
+
+function parseBillingCycleDays(cycle?: string | number | null): number | null {
+  if (!cycle) return null;
+  const num = Number(cycle);
+  if (!isNaN(num) && num > 0) return num;
+  const s = String(cycle).toUpperCase();
+  if (s === "MONTHLY") return 30;
+  if (s === "QUARTERLY") return 90;
+  if (s === "SEMI_ANNUAL") return 180;
+  if (s === "ANNUAL") return 365;
+  return null;
+}
+
+function getServiceRemainingDetails(service: any) {
+  const trackingType = (service.trackingType || "HYBRID").toUpperCase();
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+  const configuredCycleDays = parseBillingCycleDays(service.billingCycle || service.billingCycleDays);
+
+  let end: Date;
+  if (service.renewalDate) {
+    end = new Date(service.renewalDate);
+    if (isNaN(end.getTime())) end = new Date(Date.now() + 30 * MS_PER_DAY);
+  } else {
+    end = new Date(Date.now() + (configuredCycleDays || 30) * MS_PER_DAY);
+  }
+
+  let start: Date;
+  const rawStart = service.purchaseDate || service.startDate || service.createdAt;
+  if (rawStart) {
+    start = new Date(rawStart);
+    if (isNaN(start.getTime())) {
+      start = new Date(end.getTime() - (configuredCycleDays || 30) * MS_PER_DAY);
+    }
+  } else {
+    start = new Date(end.getTime() - (configuredCycleDays || 30) * MS_PER_DAY);
+  }
+
+  if (trackingType !== "QUANTITY" && start.getTime() > end.getTime()) {
+    start = new Date(end.getTime() - (configuredCycleDays || 30) * MS_PER_DAY);
+  }
+
+  const analysis = analyzeDateRange({
+    startDate: start,
+    endDate: end,
+    configuredCycleDays,
+  });
+
+  const totalQty = service.quantity || 1;
+  const usedQty = service.usedQuantity || 0;
+  const remainingQty = Math.max(0, totalQty - usedQty);
+
+  const isQuantityDepleted =
+    (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+    (remainingQty <= 0 || usedQty >= totalQty);
+
+  const isQuantityNearDepletion =
+    (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
+    !isQuantityDepleted &&
+    (remainingQty <= Math.max(1, Math.ceil(totalQty * 0.05)) || (totalQty > 0 && (remainingQty / totalQty) <= 0.05));
+
+  const isTimeExpired = trackingType !== "QUANTITY" && analysis.isExpired;
+  const isTimeNearExpiry =
+    trackingType !== "QUANTITY" && !isTimeExpired && analysis.daysLeft > 0 && analysis.daysLeft <= 3;
+
+  const isExpired = isTimeExpired || isQuantityDepleted;
+
+  return {
+    trackingType,
+    daysTotal: analysis.totalDays,
+    daysPassed: analysis.daysPassed,
+    daysLeft: analysis.daysLeft,
+    remainingPercent: analysis.remainingPercent,
+    configuredCycleDays,
+    isAlarmExceeded: analysis.isAlarmExceeded,
+    isExpired,
+    isTimeExpired,
+    isTimeNearExpiry,
+    isQuantityDepleted,
+    isQuantityNearDepletion,
+    overdueDays: analysis.overdueDays,
+    urgency: analysis.urgency,
+    startDate: start,
+    renewalDate: end,
+    totalQty,
+    usedQty,
+    remainingQty,
+  };
+}
+
 
 
 function AdminSuppliersPage() {
@@ -534,6 +625,25 @@ function AdminSuppliersPage() {
     },
   });
 
+  // Renew Supplier Service Mutation
+  const renewSupplierServiceMutation = useMutation({
+    mutationFn: (serviceId: string) =>
+      apiClient(`/suppliers/services/${serviceId}/renew`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      toast.success("سرویس تامین‌کننده با موفقیت تمدید شد و فاکتور دوره جدید صادر گردید");
+      queryClient.invalidateQueries({ queryKey: ["admin", "suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "accounting"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "payments"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "خطا در تمدید سرویس تامین‌کننده");
+    },
+  });
+
   // Delete Purchased Service Mutation
   const deleteServiceMutation = useMutation({
     mutationFn: (serviceId: string) =>
@@ -706,6 +816,15 @@ function AdminSuppliersPage() {
   };
 
   const suppliersList = data?.items || [];
+
+  useEffect(() => {
+    if (selectedSupplier && suppliersList.length > 0) {
+      const refreshed = suppliersList.find((s: any) => s.id === selectedSupplier.id);
+      if (refreshed) {
+        setSelectedSupplier(refreshed);
+      }
+    }
+  }, [suppliersList]);
 
   // Flatten all services for nearest payment & monthly cost calculations
   const allSupplierServices = useMemo(() => {
@@ -1327,19 +1446,15 @@ function AdminSuppliersPage() {
                         {sortedServices.map((svc: any) => {
                           const badge = getSupplierServiceBadge(svc.type, dynamicCategories);
                           const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
-                          const isExpired = svc.renewalDate && new Date(svc.renewalDate).getTime() < Date.now();
-                          const overdueDays = isExpired
-                            ? Math.max(1, Math.ceil((Date.now() - new Date(svc.renewalDate).getTime()) / (1000 * 60 * 60 * 24)))
-                            : 0;
-                          const daysLeft = svc.renewalDate
-                            ? Math.ceil((new Date(svc.renewalDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                            : null;
+                          const details = getServiceRemainingDetails(svc);
+                          const showDays = details.trackingType === "TIME" || details.trackingType === "HYBRID";
+                          const showQty = details.trackingType === "QUANTITY" || details.trackingType === "HYBRID";
 
                           return (
                             <div
                               key={svc.id}
                               className={`p-4 rounded-xl flex flex-col justify-between text-xs transition-all group ${
-                                isExpired
+                                details.isExpired
                                   ? "bg-rose-500/5 border-2 border-rose-500/40 shadow-xs shadow-rose-500/10 hover:border-rose-500/60"
                                   : "bg-card/70 border border-border/50 hover:border-purple-500/40 hover:shadow-xs"
                               }`}
@@ -1367,48 +1482,177 @@ function AdminSuppliersPage() {
                                   </div>
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
+                                {/* Badges row */}
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
                                     {badge.label}
                                   </span>
-                                  {svc.trackingType && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-lg bg-muted/60 text-muted-foreground font-medium">
-                                      {svc.trackingType === "HYBRID" ? "بسته ترکیبی" : svc.trackingType === "TIME" ? "زمانی" : "تعدادی"}
-                                      {svc.quantity && svc.trackingType !== "TIME" ? ` (${Number(svc.quantity).toLocaleString("fa-IR")} سهمیه)` : ""}
-                                      {svc.billingCycleDays && svc.trackingType !== "QUANTITY" ? ` (${Number(svc.billingCycleDays).toLocaleString("fa-IR")} روز)` : ""}
-                                    </span>
-                                  )}
-                                  {svc.autoRenew !== undefined && (
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-lg font-medium inline-flex items-center gap-1 ${
-                                      svc.autoRenew ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-zinc-500/10 text-zinc-500"
-                                    }`}>
-                                      <Repeat className="h-2.5 w-2.5" />
-                                      {svc.autoRenew ? "تمدید خودکار" : "تمدید دستی"}
-                                    </span>
-                                  )}
-                                  {daysLeft !== null && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-lg bg-muted/60 text-muted-foreground font-medium">
+                                    {details.trackingType === "HYBRID" ? "بسته ترکیبی" : details.trackingType === "TIME" ? "زمانی" : "تعدادی"}
+                                  </span>
+
+                                  {/* Interactive Auto-Renew Toggle Button */}
+                                  <button
+                                    type="button"
+                                    disabled={updateServiceMutation.isPending}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateServiceMutation.mutate({
+                                        serviceId: svc.id,
+                                        body: { autoRenew: svc.autoRenew === false },
+                                      });
+                                    }}
+                                    className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg font-semibold border transition-all cursor-pointer ${
+                                      svc.autoRenew !== false
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                                        : "bg-muted text-muted-foreground border-border/50 hover:bg-muted/80"
+                                    }`}
+                                    title={svc.autoRenew !== false ? "تمدید خودکار فعال است (کلیک برای تغییر به تمدید دستی)" : "تمدید دستی است (کلیک برای فعال‌سازی تمدید خودکار)"}
+                                  >
+                                    <Repeat className="h-2.5 w-2.5" />
+                                    <span>{svc.autoRenew !== false ? "تمدید خودکار" : "تمدید دستی"}</span>
+                                  </button>
+
+                                  {details.trackingType !== "QUANTITY" && (
                                     <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
-                                      isExpired
+                                      details.isExpired
                                         ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold"
-                                        : daysLeft <= 3
+                                        : details.daysLeft <= 3
                                         ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold"
                                         : "bg-muted text-muted-foreground"
                                     }`}>
-                                      {isExpired
-                                        ? `۰ روز باقی‌مانده (منقضی شده - ${overdueDays.toLocaleString("fa-IR")} روز گذشته)`
-                                        : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
+                                      {details.isExpired
+                                        ? `۰ روز مانده (منقضی - ${details.overdueDays?.toLocaleString("fa-IR")} روز)`
+                                        : `${details.daysLeft.toLocaleString("fa-IR")} روز مانده`}
                                     </span>
                                   )}
                                 </div>
 
-                                {isExpired && (
-                                  <div className="flex items-center gap-1.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-semibold">
-                                    <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
-                                    <span>هشدار: مهلت سرور به پایان رسیده است ({overdueDays.toLocaleString("fa-IR")} روز گذشته از سررسید)!</span>
+                                {/* Progress: Time Remaining */}
+                                {showDays && (
+                                  <div className="flex flex-col gap-1 w-full bg-muted/20 p-2 rounded-xl border border-border/30">
+                                    <div className="flex items-center justify-between text-[11px] font-mono">
+                                      <span className="flex items-center gap-1 text-muted-foreground">
+                                        <Clock className={`h-3 w-3 ${details.isExpired ? "text-rose-500" : details.urgency === "critical" ? "text-amber-500" : "text-blue-500"}`} />
+                                        {details.isExpired ? (
+                                          <span className="text-rose-600 dark:text-rose-400 font-bold">
+                                            منقضی شده ({details.overdueDays?.toLocaleString("fa-IR")} روز گذشته)
+                                          </span>
+                                        ) : (
+                                          <span>
+                                            {details.daysLeft.toLocaleString("fa-IR")} روز باقی‌مانده از {details.daysTotal.toLocaleString("fa-IR")} روز
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className="font-bold text-[10px] text-muted-foreground">
+                                        {Math.round(details.remainingPercent).toLocaleString("fa-IR")}%
+                                      </span>
+                                    </div>
+                                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full transition-all duration-300 ${
+                                          details.isExpired
+                                            ? "bg-rose-500"
+                                            : details.urgency === "critical"
+                                            ? "bg-amber-500"
+                                            : "bg-blue-500"
+                                        }`}
+                                        style={{ width: `${details.remainingPercent}%` }}
+                                      />
+                                    </div>
                                   </div>
                                 )}
 
-                                <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border/30">
+                                {/* Progress: Quantity Remaining */}
+                                {showQty && (
+                                  <div className="flex flex-col gap-1 w-full bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/20">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <div className="flex items-center gap-1 text-[11px] font-mono text-emerald-700 dark:text-emerald-400">
+                                        <Package className="h-3 w-3 text-emerald-500 shrink-0" />
+                                        <span className="font-semibold">
+                                          {details.remainingQty.toLocaleString("fa-IR")} باقی‌مانده از {details.totalQty.toLocaleString("fa-IR")}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground">
+                                          ({details.usedQty.toLocaleString("fa-IR")} مصرف)
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                          type="button"
+                                          title="کاهش مصرف (بازگشت به موجودی)"
+                                          disabled={details.usedQty <= 0 || updateServiceMutation.isPending}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            updateServiceMutation.mutate({
+                                              serviceId: svc.id,
+                                              body: { usedQuantity: Math.max(0, details.usedQty - 1) },
+                                            });
+                                          }}
+                                          className="h-5 w-5 rounded bg-card border border-emerald-500/30 text-foreground hover:bg-muted flex items-center justify-center text-xs font-bold disabled:opacity-30 cursor-pointer"
+                                        >
+                                          -
+                                        </button>
+                                        <button
+                                          type="button"
+                                          title="ثبت یک واحد مصرف دستی"
+                                          disabled={details.remainingQty <= 0 || updateServiceMutation.isPending}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            updateServiceMutation.mutate({
+                                              serviceId: svc.id,
+                                              body: { usedQuantity: details.usedQty + 1 },
+                                            });
+                                          }}
+                                          className="h-5 px-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-0.5 text-[9px] font-semibold disabled:opacity-30 cursor-pointer shadow-xs"
+                                        >
+                                          + مصرف
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-emerald-500 transition-all duration-300"
+                                        style={{
+                                          width: `${Math.min(100, Math.max(0, (details.remainingQty / details.totalQty) * 100))}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Alarms and Warnings */}
+                                {details.isAlarmExceeded && (
+                                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-medium">
+                                    <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                    <span>هشدار: دوره تعیین‌شده ({details.configuredCycleDays?.toLocaleString("fa-IR")} روز) بیشتر از بازه است</span>
+                                  </div>
+                                )}
+                                {details.isQuantityDepleted && (
+                                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-[10px] font-bold">
+                                    <AlertCircle className="h-3 w-3 text-rose-500 shrink-0" />
+                                    <span>بسته تمام شده (نیازمند تمدید سهمیه)</span>
+                                  </div>
+                                )}
+                                {details.isTimeExpired && !details.isQuantityDepleted && (
+                                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-[10px] font-semibold">
+                                    <AlertCircle className="h-3 w-3 text-rose-600 shrink-0" />
+                                    <span>هشدار: مهلت سرور منقضی شده است ({details.overdueDays?.toLocaleString("fa-IR")} روز گذشته)!</span>
+                                  </div>
+                                )}
+                                {!details.isExpired && details.isQuantityNearDepletion && (
+                                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-semibold">
+                                    <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                    <span>هشدار: کمتر از ۵٪ سهمیه بسته باقی مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
+                                  </div>
+                                )}
+                                {!details.isExpired && details.isTimeNearExpiry && (
+                                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-semibold">
+                                    <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                    <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرور</span>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2.5 border-t border-border/30">
                                   <span>مبلغ دوره:</span>
                                   <span className="font-bold text-foreground font-mono">
                                     {amt.toLocaleString("fa-IR")} تومان
@@ -1423,11 +1667,35 @@ function AdminSuppliersPage() {
                                     </div>
                                   )}
                                   {svc.renewalDate && (
-                                    <div className={`flex items-center gap-1.5 justify-end font-mono ${isExpired ? "text-rose-600 dark:text-rose-400 font-bold" : ""}`}>
-                                      <Clock className={`h-3 w-3 shrink-0 ${isExpired ? "text-rose-500" : "text-amber-500"}`} />
-                                      <span className="truncate">سررسید: {formatJalaliDate(svc.renewalDate)}</span>
+                                    <div className={`flex items-center gap-1.5 justify-end font-mono ${details.isExpired ? "text-rose-600 dark:text-rose-400 font-bold" : ""}`}>
+                                      <Clock className={`h-3 w-3 shrink-0 ${details.isExpired ? "text-rose-500" : "text-amber-500"}`} />
+                                      <span className="truncate">سررسید: {details.trackingType === "QUANTITY" ? "بدون انقضا" : formatJalaliDate(svc.renewalDate)}</span>
                                     </div>
                                   )}
+                                </div>
+
+                                {/* Manual Renew Action Button */}
+                                <div className="pt-2 border-t border-border/30">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={renewSupplierServiceMutation.isPending}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      renewSupplierServiceMutation.mutate(svc.id);
+                                    }}
+                                    className={`w-full h-7.5 px-2.5 text-xs gap-1.5 rounded-xl font-bold cursor-pointer ${
+                                      details.isExpired || details.isQuantityDepleted
+                                        ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 hover:bg-rose-500/25 border-rose-500/30 animate-pulse"
+                                        : details.isQuantityNearDepletion || details.isTimeNearExpiry
+                                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border-amber-500/30"
+                                        : "text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/30 border-purple-500/20"
+                                    }`}
+                                    title={`تمدید دستی سرویس ${svc.name} (تمدید دوره و ثبت فاکتور)`}
+                                  >
+                                    <Repeat className={`h-3.5 w-3.5 ${renewSupplierServiceMutation.isPending ? "animate-spin" : ""}`} />
+                                    <span>{renewSupplierServiceMutation.isPending ? "در حال تمدید..." : "تمدید سرویس"}</span>
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -2257,80 +2525,232 @@ function AdminSuppliersPage() {
                     sortSupplierServices(selectedSupplier.services).map((svc: any) => {
                       const badge = getSupplierServiceBadge(svc.type, dynamicCategories);
                       const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
-                      const isExpired = svc.renewalDate && new Date(svc.renewalDate).getTime() < Date.now();
-                      const overdueDays = isExpired
-                        ? Math.max(1, Math.ceil((Date.now() - new Date(svc.renewalDate).getTime()) / (1000 * 60 * 60 * 24)))
-                        : 0;
-                      const daysLeft = svc.renewalDate
-                        ? Math.ceil((new Date(svc.renewalDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                        : null;
+                      const details = getServiceRemainingDetails(svc);
+                      const showDays = details.trackingType === "TIME" || details.trackingType === "HYBRID";
+                      const showQty = details.trackingType === "QUANTITY" || details.trackingType === "HYBRID";
 
                       return (
                         <div
                           key={svc.id}
-                          className={`p-4.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs transition-all ${
-                            isExpired
+                          className={`p-4.5 rounded-2xl border flex flex-col gap-3.5 text-xs transition-all ${
+                            details.isExpired
                               ? "bg-rose-500/5 border-rose-500/40 shadow-xs shadow-rose-500/10 hover:border-rose-500/60"
                               : "border-border/50 bg-card/80 hover:border-purple-500/40 hover:shadow-xs"
                           }`}
                         >
-                          <div className="space-y-2 flex-1">
-                            <div className="flex flex-wrap items-center gap-2.5">
-                              <span className="font-bold text-sm text-foreground">{svc.name}</span>
-                              <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
-                                {badge.label}
-                              </span>
-                              {svc.trackingType && (
+                          <div className="space-y-2.5 flex-1">
+                            {/* Title & Badges */}
+                            <div className="flex flex-wrap items-center justify-between gap-2.5">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-bold text-sm text-foreground">{svc.name}</span>
+                                <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
+                                  {badge.label}
+                                </span>
                                 <span className="text-[10px] px-2 py-0.5 rounded-lg bg-muted/60 text-muted-foreground font-medium">
-                                  {svc.trackingType === "HYBRID" ? "بسته ترکیبی" : svc.trackingType === "TIME" ? "زمانی" : "تعدادی"}
-                                  {svc.quantity && svc.trackingType !== "TIME" ? ` (${Number(svc.quantity).toLocaleString("fa-IR")} سهمیه)` : ""}
-                                  {svc.billingCycleDays && svc.trackingType !== "QUANTITY" ? ` (${Number(svc.billingCycleDays).toLocaleString("fa-IR")} روز)` : ""}
+                                  {details.trackingType === "HYBRID" ? "بسته ترکیبی" : details.trackingType === "TIME" ? "زمانی" : "تعدادی"}
                                 </span>
-                              )}
-                              {svc.autoRenew !== undefined && (
-                                <span className={`text-[10px] px-2 py-0.5 rounded-lg font-medium inline-flex items-center gap-1 ${
-                                  svc.autoRenew ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-zinc-500/10 text-zinc-500"
-                                }`}>
-                                  <Repeat className="h-2.5 w-2.5" />
-                                  {svc.autoRenew ? "تمدید خودکار" : "تمدید دستی"}
-                                </span>
-                              )}
-                              {daysLeft !== null && (
+
+                                {/* Interactive Auto-Renew Toggle Button */}
+                                <button
+                                  type="button"
+                                  disabled={updateServiceMutation.isPending}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateServiceMutation.mutate({
+                                      serviceId: svc.id,
+                                      body: { autoRenew: svc.autoRenew === false },
+                                    });
+                                  }}
+                                  className={`inline-flex items-center gap-1 text-[10px] px-2.5 py-0.5 rounded-lg font-semibold border transition-all cursor-pointer ${
+                                    svc.autoRenew !== false
+                                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                                      : "bg-muted text-muted-foreground border-border/50 hover:bg-muted/80"
+                                  }`}
+                                  title={svc.autoRenew !== false ? "تمدید خودکار فعال است (کلیک برای تغییر به تمدید دستی)" : "تمدید دستی است (کلیک برای فعال‌سازی تمدید خودکار)"}
+                                >
+                                  <Repeat className="h-3 w-3" />
+                                  <span>{svc.autoRenew !== false ? "تمدید خودکار" : "تمدید دستی"}</span>
+                                </button>
+                              </div>
+
+                              {details.trackingType !== "QUANTITY" && (
                                 <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
-                                  isExpired
+                                  details.isExpired
                                     ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold"
-                                    : daysLeft <= 3
+                                    : details.daysLeft <= 3
                                     ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold"
                                     : "bg-muted text-muted-foreground"
                                 }`}>
-                                  {isExpired
-                                    ? `۰ روز باقی‌مانده (منقضی شده - ${overdueDays.toLocaleString("fa-IR")} روز گذشته)`
-                                    : `${daysLeft.toLocaleString("fa-IR")} روز مانده`}
+                                  {details.isExpired
+                                    ? `۰ روز باقی‌مانده (منقضی شده - ${details.overdueDays?.toLocaleString("fa-IR")} روز گذشته)`
+                                    : `${details.daysLeft.toLocaleString("fa-IR")} روز مانده`}
                                 </span>
                               )}
                             </div>
-                            {isExpired && (
-                              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-[11px] font-semibold">
-                                <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
-                                <span>هشدار: مهلت این سرور به پایان رسیده است ({overdueDays.toLocaleString("fa-IR")} روز گذشته از سررسید)!</span>
+
+                            {/* Progress: Time Remaining */}
+                            {showDays && (
+                              <div className="flex flex-col gap-1 w-full bg-muted/20 p-2.5 rounded-xl border border-border/30">
+                                <div className="flex items-center justify-between text-[11px] font-mono">
+                                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    <Clock className={`h-3.5 w-3.5 ${details.isExpired ? "text-rose-500" : details.urgency === "critical" ? "text-amber-500" : "text-blue-500"}`} />
+                                    {details.isExpired ? (
+                                      <span className="text-rose-600 dark:text-rose-400 font-bold">
+                                        مهلت سرور منقضی شده ({details.overdueDays?.toLocaleString("fa-IR")} روز گذشته)
+                                      </span>
+                                    ) : (
+                                      <span>
+                                        {details.daysLeft.toLocaleString("fa-IR")} روز باقی‌مانده از {details.daysTotal.toLocaleString("fa-IR")} روز
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="font-bold text-[11px] text-muted-foreground">
+                                    {Math.round(details.remainingPercent).toLocaleString("fa-IR")}%
+                                  </span>
+                                </div>
+                                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full transition-all duration-300 ${
+                                      details.isExpired
+                                        ? "bg-rose-500"
+                                        : details.urgency === "critical"
+                                        ? "bg-amber-500"
+                                        : "bg-blue-500"
+                                    }`}
+                                    style={{ width: `${details.remainingPercent}%` }}
+                                  />
+                                </div>
                               </div>
                             )}
-                            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+
+                            {/* Progress: Quantity Remaining */}
+                            {showQty && (
+                              <div className="flex flex-col gap-1 w-full bg-emerald-500/5 p-2.5 rounded-xl border border-emerald-500/20">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 dark:text-emerald-400">
+                                    <Package className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                    <span className="font-semibold">
+                                      {details.remainingQty.toLocaleString("fa-IR")} باقی‌مانده از {details.totalQty.toLocaleString("fa-IR")} سهمیه
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      ({details.usedQty.toLocaleString("fa-IR")} مصرف‌شده)
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      title="کاهش مصرف (بازگشت به موجودی)"
+                                      disabled={details.usedQty <= 0 || updateServiceMutation.isPending}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateServiceMutation.mutate({
+                                          serviceId: svc.id,
+                                          body: { usedQuantity: Math.max(0, details.usedQty - 1) },
+                                        });
+                                      }}
+                                      className="h-5.5 w-5.5 rounded-md bg-card border border-emerald-500/30 text-foreground hover:bg-muted flex items-center justify-center text-xs font-bold disabled:opacity-30 cursor-pointer"
+                                    >
+                                      -
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title="ثبت یک واحد مصرف دستی"
+                                      disabled={details.remainingQty <= 0 || updateServiceMutation.isPending}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateServiceMutation.mutate({
+                                          serviceId: svc.id,
+                                          body: { usedQuantity: details.usedQty + 1 },
+                                        });
+                                      }}
+                                      className="h-5.5 px-2 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-0.5 text-[10px] font-semibold disabled:opacity-30 cursor-pointer shadow-xs"
+                                    >
+                                      + مصرف
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-emerald-500 transition-all duration-300"
+                                    style={{
+                                      width: `${Math.min(100, Math.max(0, (details.remainingQty / details.totalQty) * 100))}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Alarms and Warnings */}
+                            {details.isAlarmExceeded && (
+                              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-medium">
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                <span>هشدار: دوره تعیین‌شده ({details.configuredCycleDays?.toLocaleString("fa-IR")} روز) بیشتر از بازه است</span>
+                              </div>
+                            )}
+                            {details.isQuantityDepleted && (
+                              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-bold">
+                                <AlertCircle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                                <span>بسته تمام شده (نیازمند تمدید سهمیه)</span>
+                              </div>
+                            )}
+                            {details.isTimeExpired && !details.isQuantityDepleted && (
+                              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-semibold">
+                                <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                                <span>هشدار: مهلت این سرور به پایان رسیده است ({details.overdueDays?.toLocaleString("fa-IR")} روز گذشته از سررسید)!</span>
+                              </div>
+                            )}
+                            {!details.isExpired && details.isQuantityNearDepletion && (
+                              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                <span>هشدار: کمتر از ۵٪ سهمیه بسته باقی مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
+                              </div>
+                            )}
+                            {!details.isExpired && details.isTimeNearExpiry && (
+                              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرور</span>
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1">
                               {svc.purchaseDate && <span>تاریخ خرید: {formatJalaliDate(svc.purchaseDate)}</span>}
                               {svc.renewalDate && (
-                                <span className={`font-medium ${isExpired ? "text-rose-600 dark:text-rose-400 font-bold" : "text-amber-600 dark:text-amber-400"}`}>
-                                  سررسید بعدی: {formatJalaliDate(svc.renewalDate)}
+                                <span className={`font-medium ${details.isExpired ? "text-rose-600 dark:text-rose-400 font-bold" : "text-amber-600 dark:text-amber-400"}`}>
+                                  سررسید بعدی: {details.trackingType === "QUANTITY" ? "بدون انقضا" : formatJalaliDate(svc.renewalDate)}
                                 </span>
                               )}
                               {svc.notes && <span className="italic">یادداشت: {svc.notes}</span>}
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between sm:justify-end gap-3.5 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2.5 border-t border-border/30">
                             <div className="font-mono font-bold text-foreground text-sm">
                               {amt.toLocaleString("fa-IR")} <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
                             </div>
+
                             <div className="flex items-center gap-2">
+                              {/* Manual Renew Button */}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={renewSupplierServiceMutation.isPending}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  renewSupplierServiceMutation.mutate(svc.id);
+                                }}
+                                className={`h-8 px-3 rounded-xl text-xs gap-1.5 font-bold cursor-pointer ${
+                                  details.isExpired || details.isQuantityDepleted
+                                    ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 hover:bg-rose-500/25 border-rose-500/30 animate-pulse"
+                                    : details.isQuantityNearDepletion || details.isTimeNearExpiry
+                                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border-amber-500/30"
+                                    : "text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/30 border-purple-500/20"
+                                }`}
+                                title={`تمدید دستی سرویس ${svc.name}`}
+                              >
+                                <Repeat className={`h-3 w-3 ${renewSupplierServiceMutation.isPending ? "animate-spin" : ""}`} />
+                                <span>تمدید</span>
+                              </Button>
+
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -2338,18 +2758,19 @@ function AdminSuppliersPage() {
                                   setIsServicesPanelOpen(false);
                                   openEditServiceModal(svc);
                                 }}
-                                className="h-8.5 px-3 rounded-xl text-xs gap-1.5"
+                                className="h-8 px-3 rounded-xl text-xs gap-1.5"
                               >
                                 <Edit className="h-3.5 w-3.5" />
                                 ویرایش
                               </Button>
+
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => {
                                   setConfirmDeleteServiceModal(svc);
                                 }}
-                                className="h-8.5 w-8.5 rounded-xl text-rose-500 hover:bg-rose-500/10 cursor-pointer"
+                                className="h-8 w-8 rounded-xl text-rose-500 hover:bg-rose-500/10 cursor-pointer"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>

@@ -418,6 +418,7 @@ export class SuppliersController {
 
     s.purchaseDate = prevRenewal;
     s.renewalDate = nextRenewal;
+    s.usedQuantity = 0;
     s.status = "ACTIVE";
     s.updatedAt = now;
 
