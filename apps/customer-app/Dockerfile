@@ -9,8 +9,20 @@ RUN apk add --no-cache libc6-compat openssl
 
 WORKDIR /app
 
-# Copy monorepo configuration
+# 1. Copy package definitions first for Docker layer caching
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json tsconfig.json ./
+COPY packages/config/package.json ./packages/config/
+COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/db/package.json ./packages/db/
+COPY packages/env/package.json ./packages/env/
+COPY packages/payment/package.json ./packages/payment/
+COPY packages/ui/package.json ./packages/ui/
+COPY apps/customer-app/package.json ./apps/customer-app/
+
+# Install dependencies with BuildKit pnpm cache
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# 2. Copy source code
 COPY packages ./packages
 COPY apps/customer-app ./apps/customer-app
 
@@ -18,8 +30,7 @@ COPY apps/customer-app ./apps/customer-app
 ARG VITE_SERVER_URL=https://api.app.gecut.ir
 ENV VITE_SERVER_URL=$VITE_SERVER_URL
 
-# Install dependencies and build static assets
-RUN pnpm install --frozen-lockfile
+# 3. Generate Prisma client & build static assets
 RUN pnpm --filter @gecut-cloud/db db:generate
 RUN pnpm --filter customer-app build
 

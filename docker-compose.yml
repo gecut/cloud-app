@@ -1,5 +1,6 @@
 services:
   migration:
+    platform: linux/amd64
     image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-latest}}
     restart: "no"
     command: ["pnpm", "--filter", "@gecut-cloud/db", "db:migrate:deploy"]
@@ -9,6 +10,7 @@ services:
       - dokploy-network
 
   server:
+    platform: linux/amd64
     image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-latest}}
     build:
       context: .
@@ -40,6 +42,7 @@ services:
       - dokploy-network
 
   admin:
+    platform: linux/amd64
     image: ghcr.io/gecut/cloud-app/admin:${ADMIN_TAG:-${TAG:-latest}}
     build:
       context: .
@@ -53,6 +56,7 @@ services:
       - dokploy-network
 
   customer-app:
+    platform: linux/amd64
     image: ghcr.io/gecut/cloud-app/customer-app:${CUSTOMER_APP_TAG:-${TAG:-latest}}
     build:
       context: .

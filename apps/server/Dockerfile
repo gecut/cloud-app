@@ -12,15 +12,30 @@ WORKDIR /app
 
 ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gecut_cloud"
 
-# Copy monorepo configuration
+# 1. Copy package definitions first for Docker layer caching
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json tsconfig.json ./
+COPY packages/config/package.json ./packages/config/
+COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/db/package.json ./packages/db/
+COPY packages/env/package.json ./packages/env/
+COPY packages/payment/package.json ./packages/payment/
+COPY packages/ui/package.json ./packages/ui/
+COPY apps/server/package.json ./apps/server/
+
+# Install dependencies with BuildKit pnpm cache
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# 2. Copy source code
 COPY packages ./packages
 COPY apps/server ./apps/server
 
-# Install dependencies and build
-RUN pnpm install --frozen-lockfile
+# 3. Generate Prisma client & compile server
 RUN pnpm --filter @gecut-cloud/db db:generate
 RUN pnpm --filter server build
+
+# 4. Prune devDependencies to keep final image compact
+RUN pnpm prune --prod --no-optional && \
+    rm -rf /root/.local /root/.cache /root/.npm /tmp/*
 
 # --- Production Runner Stage ---
 FROM base AS runner
@@ -29,10 +44,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy workspace dependencies and built server
+# Copy pruned workspace dependencies and built server
 COPY --from=builder /app /app
 
 WORKDIR /app/apps/server
+
+# Ensure persistent data directory exists
+RUN mkdir -p /app/apps/server/data
 
 EXPOSE 3000
 

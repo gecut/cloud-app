@@ -24,12 +24,12 @@
     "@prisma/client": "catalog:",
     "dotenv": "catalog:",
     "pg": "^8.17.1",
+    "prisma": "^7.7.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@gecut-cloud/config": "workspace:*",
     "@types/pg": "^8.16.0",
-    "prisma": "^7.7.0",
     "typescript": "catalog:"
   }
 }

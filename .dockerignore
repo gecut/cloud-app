@@ -1,22 +1,44 @@
+# Dependencies
 node_modules
 **/node_modules
-.pnpm-store
-**/.pnpm-store
+
+# Version control
+.git
+.gitignore
+.github
+
+# Build artifacts
 dist
 **/dist
-.git
-.github
 .turbo
-**/.turbo
+.next
+.output
+out
+
+# Environment & local configurations
 .env
-**/.env
-.env*.local
+.env.local
+.env.*.local
+apps/server/.env
+apps/admin/.env
+apps/customer-app/.env
+
+# Temporary files and logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .DS_Store
+Thumbs.db
+.cache
+.tempmediaStorage
 .idea
 .vscode
 *.tsbuildinfo
+
+# Documentation
+docs
+*.md
+!packages/*/package.json
+!apps/*/package.json
