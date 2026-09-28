@@ -1,12 +1,21 @@
 @font-face {
   font-family: "peyda";
-  src: url("./app/fonts/PEYDA-MEDIUM.TTF") format("woff2-variations");
+  src: url("./app/fonts/PEYDA-MEDIUM.TTF") format("truetype");
   font-weight: 100 900;
-  font-stretch: 75% 125%;
-  font-display: swap; /* Recommended for better performance */
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("./app/fonts/Vazirmatn[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
 }
 
 *,
+html,
 body,
 button,
 input,
@@ -14,17 +23,21 @@ select,
 textarea,
 span,
 p,
+a,
+label,
 h1,
 h2,
 h3,
 h4,
 h5,
 h6,
-table {
-  font-family: "peyda", sans-serif !important;
+table,
+th,
+td {
+  font-family: "peyda", "Vazirmatn", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
 }
 
 .font-mono {
-  font-family: "peyda", sans-serif !important;
+  font-family: "peyda", "Vazirmatn", monospace !important;
   font-feature-settings: "tnum" 1;
 }
