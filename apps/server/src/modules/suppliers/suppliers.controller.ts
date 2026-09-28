@@ -140,6 +140,11 @@ export class SuppliersController {
       purchaseDate?: string;
       renewalDate?: string;
       billingCycleDays?: number;
+      durationDays?: number;
+      trackingType?: string;
+      quantity?: number;
+      usedQuantity?: number;
+      autoRenew?: boolean;
       status?: string;
       notes?: string;
     },
@@ -147,6 +152,8 @@ export class SuppliersController {
     const id = `supsvc_${Date.now()}`;
     const amount = Number(body.priceToman ?? body.monthlyExpenseToman) || 0;
     const now = new Date();
+    const cycleDays = Number(body.durationDays || body.billingCycleDays) || 30;
+    const trackingType = (body.trackingType || "HYBRID").toUpperCase();
     const newService = {
       id,
       supplierId: body.supplierId,
@@ -155,8 +162,13 @@ export class SuppliersController {
       priceToman: amount,
       monthlyExpenseToman: amount,
       purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : now,
-      renewalDate: body.renewalDate ? new Date(body.renewalDate) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-      billingCycleDays: Number(body.billingCycleDays) || 30,
+      renewalDate: body.renewalDate ? new Date(body.renewalDate) : new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000),
+      billingCycleDays: cycleDays,
+      billingCycle: String(cycleDays),
+      trackingType,
+      quantity: (trackingType === "QUANTITY" || trackingType === "HYBRID") ? Math.max(1, Number(body.quantity) || 1) : 1,
+      usedQuantity: Math.max(0, Number(body.usedQuantity) || 0),
+      autoRenew: body.autoRenew !== undefined ? Boolean(body.autoRenew) : true,
       notes: body.notes || null,
       status: body.status || "ACTIVE",
       createdAt: now,
@@ -323,101 +335,16 @@ export class SuppliersController {
       }
       if (body.purchaseDate) body.purchaseDate = new Date(body.purchaseDate);
       if (body.renewalDate) body.renewalDate = new Date(body.renewalDate);
-      Object.assign(s, body, { updatedAt: new Date() });
-
-      // Synchronize all invoices and payments for this supplier service
-      const openInvoices = Array.from(this.prisma.memInvoices.values()).filter(
-        (inv) =>
-          inv.supplierId === s.supplierId &&
-          ((inv.items && inv.items.some((it: any) => it.serviceId === s.id)) ||
-            Array.from(this.prisma.memInvoiceItems.values()).some(
-              (it) => it.invoiceId === inv.id && it.serviceId === s.id,
-            )),
-      );
-
-      for (const inv of openInvoices) {
-        let updatedSubtotal = 0;
-        const allItems =
-          inv.items && inv.items.length > 0
-            ? inv.items
-            : Array.from(this.prisma.memInvoiceItems.values()).filter(
-                (it) => it.invoiceId === inv.id,
-              );
-
-        for (const item of allItems) {
-          if (item.serviceId === s.id) {
-            item.title = `سرویس تامین‌کننده ${s.name}`;
-            item.serviceNameSnapshot = s.name;
-            if (s.priceToman !== undefined) {
-              item.unitPriceToman = s.priceToman;
-              item.totalToman = s.priceToman * (item.quantity || 1);
-              item.servicePriceSnapshotToman = s.priceToman;
-            }
-            if (s.renewalDate) {
-              item.serviceRenewalDateSnapshot = s.renewalDate;
-            }
-            if (this.prisma.memInvoiceItems.has(item.id)) {
-              const memIt = this.prisma.memInvoiceItems.get(item.id);
-              Object.assign(memIt, {
-                title: item.title,
-                unitPriceToman: item.unitPriceToman,
-                totalToman: item.totalToman,
-                serviceNameSnapshot: s.name,
-                servicePriceSnapshotToman: s.priceToman,
-                serviceRenewalDateSnapshot: s.renewalDate,
-                updatedAt: new Date(),
-              });
-            }
-          }
-          updatedSubtotal += Number(item.totalToman) || 0;
-        }
-
-        inv.subtotalToman = updatedSubtotal;
-        inv.totalToman = updatedSubtotal;
-        if (s.renewalDate) {
-          inv.dueDate = s.renewalDate;
-        }
-
-        const isFree = updatedSubtotal === 0;
-        const existingPayment = Array.from(this.prisma.memPayments.values()).find(
-          (p) => p.invoiceId === inv.id,
-        );
-
-        if (isFree) {
-          inv.status = "PAID";
-          inv.paidAt = inv.paidAt || new Date();
-          if (existingPayment) {
-            existingPayment.amountToman = 0;
-            existingPayment.provider = "FREE_PLAN";
-            existingPayment.gatewayRef = existingPayment.gatewayRef || `FREE_${inv.id}_${Date.now()}`;
-            existingPayment.paidAt = existingPayment.paidAt || new Date();
-            existingPayment.updatedAt = new Date();
-          } else {
-            const payId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-            this.prisma.memPayments.set(payId, {
-              id: payId,
-              invoiceId: inv.id,
-              amountToman: 0,
-              provider: "FREE_PLAN",
-              gatewayRef: `FREE_${inv.id}_${Date.now()}`,
-              paidAt: new Date(),
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            });
-          }
-        } else {
-          if (existingPayment) {
-            if (existingPayment.provider === "FREE_PLAN") {
-              this.prisma.memPayments.delete(existingPayment.id);
-              inv.status = "UNPAID";
-              inv.paidAt = null;
-            } else {
-              existingPayment.amountToman = updatedSubtotal;
-              existingPayment.updatedAt = new Date();
-            }
-          }
-        }
+      if (body.trackingType) body.trackingType = body.trackingType.toUpperCase();
+      if (body.quantity !== undefined) body.quantity = Math.max(1, Number(body.quantity) || 1);
+      if (body.usedQuantity !== undefined) body.usedQuantity = Math.max(0, Number(body.usedQuantity) || 0);
+      if (body.autoRenew !== undefined) body.autoRenew = Boolean(body.autoRenew);
+      if (body.durationDays !== undefined || body.billingCycleDays !== undefined) {
+        const d = Number(body.durationDays || body.billingCycleDays) || 30;
+        body.billingCycleDays = d;
+        body.billingCycle = String(d);
       }
+      Object.assign(s, body, { updatedAt: new Date() });
 
       const sup = this.prisma.memSuppliers.get(s.supplierId);
       if (sup) {

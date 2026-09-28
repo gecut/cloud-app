@@ -10,7 +10,7 @@ import { Chip } from "@heroui/react";
 import { Input } from "@gecut-cloud/ui/components/input";
 import { Label } from "@gecut-cloud/ui/components/label";
 import { toast } from "sonner";
-import { formatJalaliDate, getJalaliMonthPeriods } from "@gecut-cloud/contracts";
+import { formatJalaliDate, getJalaliMonthPeriods, analyzeDateRange } from "@gecut-cloud/contracts";
 import { JalaliDatePicker } from "@/components/common/jalali-datepicker";
 import { ConfirmModal } from "@/components/common/confirm-modal";
 import { ModalPortal } from "@/components/common/modal-portal";
@@ -30,6 +30,7 @@ import {
   Globe,
   Search,
   AlertCircle,
+  AlertTriangle,
   Tag,
   Cpu,
   ArrowUpDown,
@@ -37,6 +38,7 @@ import {
   Wallet,
   CalendarDays,
   ExternalLink,
+  Repeat,
 } from "lucide-react";
 
 export const Route = createFileRoute("/servers/")({
@@ -252,6 +254,39 @@ function parsePriceInput(valStr: string): string {
   return standardDigits;
 }
 
+function safeDate(val?: string | Date | null, fallback = new Date()): Date {
+  if (!val) return fallback;
+  if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+    const parts = val.split("-").map(Number);
+    const y = parts[0] ?? 2026;
+    const m = parts[1] ?? 1;
+    const d = parts[2] ?? 1;
+    return new Date(y, m - 1, d, 12, 0, 0);
+  }
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? fallback : d;
+}
+
+function safeIso(val?: string | Date | null, fallback = new Date()): string {
+  return safeDate(val, fallback).toISOString();
+}
+
+function calcAddDays(baseIso: string | Date | null, days: number): string {
+  const d = safeDate(baseIso);
+  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate() + Number(days || 0), 12, 0, 0);
+  return result.toISOString();
+}
+
+function calcDaysBetween(startIso: string | Date | null, endIso: string | Date | null): number {
+  const s = safeDate(startIso);
+  const e = safeDate(endIso);
+  const startDay = new Date(s.getFullYear(), s.getMonth(), s.getDate(), 12, 0, 0).getTime();
+  const endDay = new Date(e.getFullYear(), e.getMonth(), e.getDate(), 12, 0, 0).getTime();
+  const diffDays = Math.round((endDay - startDay) / (1000 * 60 * 60 * 24));
+  return Math.max(1, diffDays);
+}
+
+
 function AdminSuppliersPage() {
   const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState("ALL");
@@ -287,20 +322,98 @@ function AdminSuppliersPage() {
   const [targetSupplierId, setTargetSupplierId] = useState("");
   const [serviceName, setServiceName] = useState("");
   const [serviceType, setServiceType] = useState("DEDICATED_SERVER");
+  const [serviceTrackingType, setServiceTrackingType] = useState<"HYBRID" | "TIME" | "QUANTITY">("HYBRID");
   const [servicePriceToman, setServicePriceToman] = useState("3400000");
-  const [servicePurchaseDate, setServicePurchaseDate] = useState<string | null>(new Date().toISOString());
-  const [serviceRenewalDate, setServiceRenewalDate] = useState<string | null>(
-    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  const [serviceDurationDays, setServiceDurationDays] = useState<number>(30);
+  const [serviceQuantity, setServiceQuantity] = useState<number>(1000);
+  const [serviceAutoRenew, setServiceAutoRenew] = useState<boolean>(true);
+  const [servicePurchaseDate, setServicePurchaseDate] = useState<string>(() => new Date().toISOString());
+  const [serviceRenewalDate, setServiceRenewalDate] = useState<string>(() =>
+    calcAddDays(new Date().toISOString(), 30),
   );
+
+  // Two-way reactive date handlers for Add Service
+  const handleServiceDurationChange = (days: number) => {
+    const cleanDays = Math.max(1, Number(days) || 1);
+    setServiceDurationDays(cleanDays);
+    setServiceRenewalDate(calcAddDays(servicePurchaseDate, cleanDays));
+  };
+
+  const handleServicePurchaseDateChange = (val: string) => {
+    const cleanVal = safeIso(val);
+    setServicePurchaseDate(cleanVal);
+    if (serviceRenewalDate) {
+      const calculatedDays = calcDaysBetween(cleanVal, serviceRenewalDate);
+      setServiceDurationDays(calculatedDays);
+    }
+  };
+
+  const handleServiceRenewalDateChange = (val: string) => {
+    const cleanVal = safeIso(val, new Date(calcAddDays(servicePurchaseDate, serviceDurationDays)));
+    setServiceRenewalDate(cleanVal);
+    const calculatedDays = calcDaysBetween(servicePurchaseDate, cleanVal);
+    setServiceDurationDays(calculatedDays);
+  };
+
+  // Derived span and alarm for Add Service
+  const serviceRangeAnalysis = analyzeDateRange({
+    startDate: servicePurchaseDate,
+    endDate: serviceRenewalDate,
+    configuredCycleDays: serviceTrackingType !== "QUANTITY" ? serviceDurationDays : undefined,
+  });
+  const serviceSpanDays = serviceRangeAnalysis.totalDays;
+  const isServiceAlarmExceeded =
+    serviceTrackingType !== "QUANTITY" && serviceRangeAnalysis.isAlarmExceeded;
 
   // Form State: Edit Purchased Service
   const [editServiceName, setEditServiceName] = useState("");
   const [editServiceType, setEditServiceType] = useState("DEDICATED_SERVER");
+  const [editServiceTrackingType, setEditServiceTrackingType] = useState<"HYBRID" | "TIME" | "QUANTITY">("HYBRID");
   const [editServicePriceToman, setEditServicePriceToman] = useState("0");
-  const [editServicePurchaseDate, setEditServicePurchaseDate] = useState<string | null>(null);
-  const [editServiceRenewalDate, setEditServiceRenewalDate] = useState<string | null>(null);
+  const [editServiceDurationDays, setEditServiceDurationDays] = useState<number>(30);
+  const [editServiceQuantity, setEditServiceQuantity] = useState<number>(1000);
+  const [editServiceUsedQuantity, setEditServiceUsedQuantity] = useState<number>(0);
+  const [editServiceAutoRenew, setEditServiceAutoRenew] = useState<boolean>(true);
+  const [editServicePurchaseDate, setEditServicePurchaseDate] = useState<string>(() => new Date().toISOString());
+  const [editServiceRenewalDate, setEditServiceRenewalDate] = useState<string>(() =>
+    calcAddDays(new Date().toISOString(), 30),
+  );
   const [editServiceStatus, setEditServiceStatus] = useState("ACTIVE");
   const [editServiceNotes, setEditServiceNotes] = useState("");
+
+  // Two-way reactive date handlers for Edit Service
+  const handleEditServiceDurationChange = (days: number) => {
+    const cleanDays = Math.max(1, Number(days) || 1);
+    setEditServiceDurationDays(cleanDays);
+    setEditServiceRenewalDate(calcAddDays(editServicePurchaseDate, cleanDays));
+  };
+
+  const handleEditServicePurchaseDateChange = (val: string) => {
+    const cleanVal = safeIso(val);
+    setEditServicePurchaseDate(cleanVal);
+    if (editServiceRenewalDate) {
+      const calculatedDays = calcDaysBetween(cleanVal, editServiceRenewalDate);
+      setEditServiceDurationDays(calculatedDays);
+    }
+  };
+
+  const handleEditServiceRenewalDateChange = (val: string) => {
+    const cleanVal = safeIso(val, new Date(calcAddDays(editServicePurchaseDate, editServiceDurationDays)));
+    setEditServiceRenewalDate(cleanVal);
+    const calculatedDays = calcDaysBetween(editServicePurchaseDate, cleanVal);
+    setEditServiceDurationDays(calculatedDays);
+  };
+
+  // Derived span and alarm for Edit Service
+  const editServiceRangeAnalysis = analyzeDateRange({
+    startDate: editServicePurchaseDate,
+    endDate: editServiceRenewalDate,
+    configuredCycleDays: editServiceTrackingType !== "QUANTITY" ? editServiceDurationDays : undefined,
+  });
+  const editServiceSpanDays = editServiceRangeAnalysis.totalDays;
+  const isEditServiceAlarmExceeded =
+    editServiceTrackingType !== "QUANTITY" && editServiceRangeAnalysis.isAlarmExceeded;
+
 
   // Fetch Suppliers List
   const { data, isLoading, refetch } = useQuery({
@@ -484,14 +597,28 @@ function AdminSuppliersPage() {
       toast.error("عنوان سرویس و تامین‌کننده الزامی است");
       return;
     }
+    const pDate = safeIso(servicePurchaseDate);
+    const rDate =
+      serviceTrackingType === "QUANTITY"
+        ? calcAddDays(pDate, 365)
+        : safeIso(serviceRenewalDate, new Date(calcAddDays(pDate, serviceDurationDays)));
+
     addServiceMutation.mutate({
       supplierId: targetSupplierId,
       name: serviceName,
       type: serviceType,
+      trackingType: serviceTrackingType,
       priceToman: Number(servicePriceToman) || 0,
       monthlyExpenseToman: Number(servicePriceToman) || 0,
-      purchaseDate: servicePurchaseDate || new Date().toISOString(),
-      renewalDate: serviceRenewalDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      quantity:
+        serviceTrackingType === "QUANTITY" || serviceTrackingType === "HYBRID"
+          ? Math.max(1, Number(serviceQuantity) || 1)
+          : 1,
+      durationDays: serviceDurationDays,
+      billingCycleDays: serviceDurationDays,
+      autoRenew: serviceAutoRenew,
+      purchaseDate: pDate,
+      renewalDate: rDate,
     });
   };
 
@@ -508,8 +635,15 @@ function AdminSuppliersPage() {
 
   const openAddServiceForSupplier = (supplierId: string) => {
     setTargetSupplierId(supplierId);
-    setServicePurchaseDate(new Date().toISOString());
-    setServiceRenewalDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
+    setServiceName("");
+    setServicePriceToman("3400000");
+    setServiceTrackingType("HYBRID");
+    setServiceDurationDays(30);
+    setServiceQuantity(1000);
+    setServiceAutoRenew(true);
+    const nowIso = new Date().toISOString();
+    setServicePurchaseDate(nowIso);
+    setServiceRenewalDate(calcAddDays(nowIso, 30));
     setIsAddServiceOpen(true);
   };
 
@@ -518,8 +652,16 @@ function AdminSuppliersPage() {
     setEditServiceName(svc.name || "");
     setEditServiceType(svc.type || "DEDICATED_SERVER");
     setEditServicePriceToman(String(svc.priceToman ?? svc.monthlyExpenseToman ?? 0));
-    setEditServicePurchaseDate(svc.purchaseDate ? new Date(svc.purchaseDate).toISOString() : null);
-    setEditServiceRenewalDate(svc.renewalDate ? new Date(svc.renewalDate).toISOString() : null);
+    const pDate = svc.purchaseDate ? new Date(svc.purchaseDate).toISOString() : new Date().toISOString();
+    const rDate = svc.renewalDate ? new Date(svc.renewalDate).toISOString() : calcAddDays(pDate, 30);
+    setEditServicePurchaseDate(pDate);
+    setEditServiceRenewalDate(rDate);
+    setEditServiceTrackingType((svc.trackingType as any) || "HYBRID");
+    const cycleDays = svc.billingCycleDays || calcDaysBetween(pDate, rDate) || 30;
+    setEditServiceDurationDays(cycleDays);
+    setEditServiceQuantity(svc.quantity ?? 1000);
+    setEditServiceUsedQuantity(svc.usedQuantity ?? 0);
+    setEditServiceAutoRenew(svc.autoRenew !== undefined ? Boolean(svc.autoRenew) : true);
     setEditServiceStatus(svc.status || "ACTIVE");
     setEditServiceNotes(svc.notes || "");
     setIsEditServiceOpen(true);
@@ -528,15 +670,30 @@ function AdminSuppliersPage() {
   const handleEditServiceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingService) return;
+    const pDate = safeIso(editServicePurchaseDate);
+    const rDate =
+      editServiceTrackingType === "QUANTITY"
+        ? calcAddDays(pDate, 365)
+        : safeIso(editServiceRenewalDate, new Date(calcAddDays(pDate, editServiceDurationDays)));
+
     updateServiceMutation.mutate({
       serviceId: editingService.id,
       body: {
         name: editServiceName,
         type: editServiceType,
+        trackingType: editServiceTrackingType,
         priceToman: Number(editServicePriceToman) || 0,
         monthlyExpenseToman: Number(editServicePriceToman) || 0,
-        purchaseDate: editServicePurchaseDate,
-        renewalDate: editServiceRenewalDate,
+        quantity:
+          editServiceTrackingType === "QUANTITY" || editServiceTrackingType === "HYBRID"
+            ? Math.max(1, Number(editServiceQuantity) || 1)
+            : 1,
+        usedQuantity: Math.max(0, Number(editServiceUsedQuantity) || 0),
+        durationDays: editServiceDurationDays,
+        billingCycleDays: editServiceDurationDays,
+        autoRenew: editServiceAutoRenew,
+        purchaseDate: pDate,
+        renewalDate: rDate,
         status: editServiceStatus,
         notes: editServiceNotes,
       },
@@ -1214,6 +1371,21 @@ function AdminSuppliersPage() {
                                   <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
                                     {badge.label}
                                   </span>
+                                  {svc.trackingType && (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-lg bg-muted/60 text-muted-foreground font-medium">
+                                      {svc.trackingType === "HYBRID" ? "بسته ترکیبی" : svc.trackingType === "TIME" ? "زمانی" : "تعدادی"}
+                                      {svc.quantity && svc.trackingType !== "TIME" ? ` (${Number(svc.quantity).toLocaleString("fa-IR")} سهمیه)` : ""}
+                                      {svc.billingCycleDays && svc.trackingType !== "QUANTITY" ? ` (${Number(svc.billingCycleDays).toLocaleString("fa-IR")} روز)` : ""}
+                                    </span>
+                                  )}
+                                  {svc.autoRenew !== undefined && (
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-lg font-medium inline-flex items-center gap-1 ${
+                                      svc.autoRenew ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-zinc-500/10 text-zinc-500"
+                                    }`}>
+                                      <Repeat className="h-2.5 w-2.5" />
+                                      {svc.autoRenew ? "تمدید خودکار" : "تمدید دستی"}
+                                    </span>
+                                  )}
                                   {daysLeft !== null && (
                                     <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
                                       isExpired
@@ -1409,8 +1581,9 @@ function AdminSuppliersPage() {
                   </Button>
                 </div>
 
-                <form onSubmit={handleAddServiceSubmit} className="flex flex-col gap-5 mt-5 text-xs">
-                  <div className="space-y-2">
+                <form onSubmit={handleAddServiceSubmit} className="flex flex-col gap-4 mt-5 text-xs">
+                  {/* Supplier */}
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">تامین‌کننده مربوطه *</Label>
                     <select
                       value={targetSupplierId}
@@ -1425,71 +1598,259 @@ function AdminSuppliersPage() {
                     </select>
                   </div>
 
-                  <div className="space-y-2">
+                  {/* Name */}
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">عنوان خدمت / ماشین *</Label>
-                    <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="مثال: سرور اختصاصی لینوکس AX41" required className="h-10 text-xs rounded-xl" />
+                    <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="مثال: سرور اختصاصی لینوکس AX41، بسته ۵۰۰۰ پیامک..." required className="h-10 text-xs rounded-xl" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
-                      <select
-                        value={serviceType}
-                        onChange={(e) => setServiceType(e.target.value)}
-                        className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
-                      >
-                        {dynamicCategories.length > 0 ? (
-                          dynamicCategories.map((c: any) => (
-                            <option key={c.id} value={c.slug || c.id}>
-                              {c.name}
-                            </option>
-                          ))
-                        ) : (
-                          <>
-                            <option value="DEDICATED_SERVER">سرور اختصاصی و ابری</option>
-                            <option value="CLOUD_HOSTING">هاستینگ و فضای ابری</option>
-                            <option value="DOMAIN">ثبت و تمدید دامنه</option>
-                            <option value="LICENSE">لایسنس نرم‌افزاری</option>
-                            <option value="API">وب‌سرویس و شبکه</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        dir="ltr"
-                        value={formatPriceInput(servicePriceToman)}
-                        onChange={(e) => setServicePriceToman(parsePriceInput(e.target.value))}
-                        placeholder="0"
-                        required
-                        className="h-10 rounded-xl font-mono text-left text-xs"
-                      />
-                      {Number(servicePriceToman) > 0 && (
-                        <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
-                          معادل: {Number(servicePriceToman).toLocaleString("fa-IR")} تومان
-                        </p>
+                  {/* Category */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
+                    <select
+                      value={serviceType}
+                      onChange={(e) => setServiceType(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                    >
+                      {dynamicCategories.length > 0 ? (
+                        dynamicCategories.map((c: any) => (
+                          <option key={c.id} value={c.slug || c.id}>
+                            {c.name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="DEDICATED_SERVER">سرور اختصاصی و ابری</option>
+                          <option value="CLOUD_HOSTING">هاستینگ و فضای ابری</option>
+                          <option value="DOMAIN">ثبت و تمدید دامنه</option>
+                          <option value="LICENSE">لایسنس نرم‌افزاری</option>
+                          <option value="API">وب‌سرویس و شبکه</option>
+                        </>
                       )}
+                    </select>
+                  </div>
+
+                  {/* Tracking Mode */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">مدل ردگیری و نوع پکیج *</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={serviceTrackingType === "HYBRID" ? "default" : "outline"}
+                        onClick={() => setServiceTrackingType("HYBRID")}
+                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
+                          serviceTrackingType === "HYBRID" ? "bg-purple-600 hover:bg-purple-500 text-white" : ""
+                        }`}
+                      >
+                        بسته ترکیبی (زمان + تعداد)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={serviceTrackingType === "TIME" ? "default" : "outline"}
+                        onClick={() => setServiceTrackingType("TIME")}
+                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
+                          serviceTrackingType === "TIME" ? "bg-purple-600 hover:bg-purple-500 text-white" : ""
+                        }`}
+                      >
+                        زمانی (فقط مدت)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={serviceTrackingType === "QUANTITY" ? "default" : "outline"}
+                        onClick={() => setServiceTrackingType("QUANTITY")}
+                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
+                          serviceTrackingType === "QUANTITY" ? "bg-purple-600 hover:bg-purple-500 text-white" : ""
+                        }`}
+                      >
+                        تعدادی (فقط سهمیه)
+                      </Button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <JalaliDatePicker
-                        label="تاریخ خرید (شمسی)"
-                        value={servicePurchaseDate}
-                        onChange={(val) => setServicePurchaseDate(val)}
-                      />
+                  {/* Parameters: Price, Duration, Quantity */}
+                  {serviceTrackingType === "TIME" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(servicePriceToman)}
+                          onChange={(e) => setServicePriceToman(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          required
+                          className="rounded-xl h-9 text-xs text-left font-mono"
+                        />
+                        {Number(servicePriceToman) > 0 && (
+                          <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                            معادل: {Number(servicePriceToman).toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">بازه روزانه (مدت دوره به روز) *</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={serviceDurationDays}
+                          onChange={(e) => handleServiceDurationChange(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <JalaliDatePicker
-                        label="موعد سررسید تمدید (شمسی)"
-                        value={serviceRenewalDate}
-                        onChange={(val) => setServiceRenewalDate(val)}
-                      />
+                  )}
+
+                  {serviceTrackingType === "QUANTITY" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مبلغ کل بسته (تومان) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(servicePriceToman)}
+                          onChange={(e) => setServicePriceToman(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          required
+                          className="rounded-xl h-9 text-xs text-left font-mono"
+                        />
+                        {Number(servicePriceToman) > 0 && (
+                          <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                            معادل: {Number(servicePriceToman).toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">تعداد ظرفیت / پکیج اولیه (عدد) *</Label>
+                        <Input
+                          type="number"
+                          value={serviceQuantity}
+                          onChange={(e) => setServiceQuantity(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
                     </div>
+                  )}
+
+                  {serviceTrackingType === "HYBRID" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(servicePriceToman)}
+                          onChange={(e) => setServicePriceToman(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          required
+                          className="rounded-xl h-9 text-xs text-left font-mono"
+                        />
+                        {Number(servicePriceToman) > 0 && (
+                          <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                            معادل: {Number(servicePriceToman).toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">بازه روزانه (دوره به روز) *</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={serviceDurationDays}
+                          onChange={(e) => handleServiceDurationChange(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">ظرفیت پکیج (تعداد) *</Label>
+                        <Input
+                          type="number"
+                          value={serviceQuantity}
+                          onChange={(e) => setServiceQuantity(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dates: Purchase & Renewal Date */}
+                  {serviceTrackingType !== "QUANTITY" && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs font-semibold">تاریخ خرید / شروع خدمت (شمسی) *</Label>
+                          <JalaliDatePicker
+                            value={servicePurchaseDate}
+                            onChange={handleServicePurchaseDateChange}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-semibold">تاریخ سررسید تمدید / پایان (شمسی) *</Label>
+                          <JalaliDatePicker
+                            value={serviceRenewalDate}
+                            onChange={handleServiceRenewalDateChange}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live Span & Alarm indicator */}
+                      <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col gap-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">بازه زمانی کلی سررسید:</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {serviceSpanDays.toLocaleString("fa-IR")} روز
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">دوره تعیین‌شده برای سرویس:</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {serviceDurationDays.toLocaleString("fa-IR")} روز
+                          </span>
+                        </div>
+
+                        {serviceRangeAnalysis.isNegativeRange && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
+                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                            <span>
+                              خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!
+                            </span>
+                          </div>
+                        )}
+
+                        {isServiceAlarmExceeded && !serviceRangeAnalysis.isNegativeRange && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold mt-1">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                            <span>
+                              توجه: فاصله تاریخ سررسید ({serviceSpanDays} روز) با دوره تنظیمی ({serviceDurationDays} روز) همخوانی ندارد.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Auto-renew switch */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/60">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="addServiceAutoRenewSwitch" className="text-xs font-semibold cursor-pointer">تمدید خودکار سرویس</Label>
+                      <p className="text-[11px] text-muted-foreground">با رسیدن به سررسید، سرویس به‌صورت خودکار تمدید شود</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      id="addServiceAutoRenewSwitch"
+                      checked={serviceAutoRenew}
+                      onChange={(e) => setServiceAutoRenew(e.target.checked)}
+                      className="h-4 w-4 rounded accent-purple-600 cursor-pointer"
+                    />
                   </div>
 
                   <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
@@ -1524,73 +1885,264 @@ function AdminSuppliersPage() {
                   </Button>
                 </div>
 
-                <form onSubmit={handleEditServiceSubmit} className="flex flex-col gap-5 mt-5 text-xs">
-                  <div className="space-y-2">
+                <form onSubmit={handleEditServiceSubmit} className="flex flex-col gap-4 mt-5 text-xs">
+                  {/* Name */}
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">عنوان خدمت *</Label>
                     <Input value={editServiceName} onChange={(e) => setEditServiceName(e.target.value)} required className="h-10 text-xs rounded-xl" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
-                      <select
-                        value={editServiceType}
-                        onChange={(e) => setEditServiceType(e.target.value)}
-                        className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
-                      >
-                        {dynamicCategories.length > 0 ? (
-                          dynamicCategories.map((c: any) => (
-                            <option key={c.id} value={c.slug || c.id}>
-                              {c.name}
-                            </option>
-                          ))
-                        ) : (
-                          <>
-                            <option value="DEDICATED_SERVER">سرور اختصاصی و ابری</option>
-                            <option value="CLOUD_HOSTING">هاستینگ و فضای ابری</option>
-                            <option value="DOMAIN">ثبت و تمدید دامنه</option>
-                            <option value="LICENSE">لایسنس نرم‌افزاری</option>
-                            <option value="API">وب‌سرویس و شبکه</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        dir="ltr"
-                        value={formatPriceInput(editServicePriceToman)}
-                        onChange={(e) => setEditServicePriceToman(parsePriceInput(e.target.value))}
-                        placeholder="0"
-                        required
-                        className="h-10 rounded-xl font-mono text-left text-xs"
-                      />
-                      {Number(editServicePriceToman) > 0 && (
-                        <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
-                          معادل: {Number(editServicePriceToman).toLocaleString("fa-IR")} تومان
-                        </p>
+                  {/* Category */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">دسته‌بندی خدمت</Label>
+                    <select
+                      value={editServiceType}
+                      onChange={(e) => setEditServiceType(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-xs"
+                    >
+                      {dynamicCategories.length > 0 ? (
+                        dynamicCategories.map((c: any) => (
+                          <option key={c.id} value={c.slug || c.id}>
+                            {c.name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="DEDICATED_SERVER">سرور اختصاصی و ابری</option>
+                          <option value="CLOUD_HOSTING">هاستینگ و فضای ابری</option>
+                          <option value="DOMAIN">ثبت و تمدید دامنه</option>
+                          <option value="LICENSE">لایسنس نرم‌افزاری</option>
+                          <option value="API">وب‌سرویس و شبکه</option>
+                        </>
                       )}
+                    </select>
+                  </div>
+
+                  {/* Tracking Mode */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">مدل ردگیری و نوع پکیج *</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={editServiceTrackingType === "HYBRID" ? "default" : "outline"}
+                        onClick={() => setEditServiceTrackingType("HYBRID")}
+                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
+                          editServiceTrackingType === "HYBRID" ? "bg-purple-600 hover:bg-purple-500 text-white" : ""
+                        }`}
+                      >
+                        بسته ترکیبی (زمان + تعداد)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={editServiceTrackingType === "TIME" ? "default" : "outline"}
+                        onClick={() => setEditServiceTrackingType("TIME")}
+                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
+                          editServiceTrackingType === "TIME" ? "bg-purple-600 hover:bg-purple-500 text-white" : ""
+                        }`}
+                      >
+                        زمانی (فقط مدت)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={editServiceTrackingType === "QUANTITY" ? "default" : "outline"}
+                        onClick={() => setEditServiceTrackingType("QUANTITY")}
+                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
+                          editServiceTrackingType === "QUANTITY" ? "bg-purple-600 hover:bg-purple-500 text-white" : ""
+                        }`}
+                      >
+                        تعدادی (فقط سهمیه)
+                      </Button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <JalaliDatePicker
-                        label="تاریخ خرید (شمسی)"
-                        value={editServicePurchaseDate}
-                        onChange={(val) => setEditServicePurchaseDate(val)}
-                      />
+                  {/* Parameters: Price, Duration, Quantity */}
+                  {editServiceTrackingType === "TIME" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(editServicePriceToman)}
+                          onChange={(e) => setEditServicePriceToman(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          required
+                          className="rounded-xl h-9 text-xs text-left font-mono"
+                        />
+                        {Number(editServicePriceToman) > 0 && (
+                          <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                            معادل: {Number(editServicePriceToman).toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">بازه روزانه (مدت دوره به روز) *</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={editServiceDurationDays}
+                          onChange={(e) => handleEditServiceDurationChange(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <JalaliDatePicker
-                        label="موعد سررسید تمدید (شمسی)"
-                        value={editServiceRenewalDate}
-                        onChange={(val) => setEditServiceRenewalDate(val)}
-                      />
+                  )}
+
+                  {editServiceTrackingType === "QUANTITY" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مبلغ کل بسته (تومان) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(editServicePriceToman)}
+                          onChange={(e) => setEditServicePriceToman(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          required
+                          className="rounded-xl h-9 text-xs text-left font-mono"
+                        />
+                        {Number(editServicePriceToman) > 0 && (
+                          <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                            معادل: {Number(editServicePriceToman).toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">تعداد سهمیه کل (عدد) *</Label>
+                        <Input
+                          type="number"
+                          value={editServiceQuantity}
+                          onChange={(e) => setEditServiceQuantity(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">سهمیه مصرف‌شده (عدد)</Label>
+                        <Input
+                          type="number"
+                          value={editServiceUsedQuantity}
+                          onChange={(e) => setEditServiceUsedQuantity(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {editServiceTrackingType === "HYBRID" && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مبلغ دوره (تومان) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(editServicePriceToman)}
+                          onChange={(e) => setEditServicePriceToman(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          required
+                          className="rounded-xl h-9 text-xs text-left font-mono"
+                        />
+                        {Number(editServicePriceToman) > 0 && (
+                          <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                            معادل: {Number(editServicePriceToman).toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">بازه روزانه (دوره) *</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={editServiceDurationDays}
+                          onChange={(e) => handleEditServiceDurationChange(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">سهمیه کل *</Label>
+                        <Input
+                          type="number"
+                          value={editServiceQuantity}
+                          onChange={(e) => setEditServiceQuantity(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مصرف‌شده</Label>
+                        <Input
+                          type="number"
+                          value={editServiceUsedQuantity}
+                          onChange={(e) => setEditServiceUsedQuantity(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dates: Purchase & Renewal Date */}
+                  {editServiceTrackingType !== "QUANTITY" && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs font-semibold">تاریخ خرید / شروع خدمت (شمسی) *</Label>
+                          <JalaliDatePicker
+                            value={editServicePurchaseDate}
+                            onChange={handleEditServicePurchaseDateChange}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-semibold">تاریخ سررسید تمدید / پایان (شمسی) *</Label>
+                          <JalaliDatePicker
+                            value={editServiceRenewalDate}
+                            onChange={handleEditServiceRenewalDateChange}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live Span & Alarm indicator */}
+                      <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col gap-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">بازه زمانی کلی سررسید:</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {editServiceSpanDays.toLocaleString("fa-IR")} روز
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">دوره تعیین‌شده برای سرویس:</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {editServiceDurationDays.toLocaleString("fa-IR")} روز
+                          </span>
+                        </div>
+
+                        {editServiceRangeAnalysis.isNegativeRange && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
+                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                            <span>
+                              خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!
+                            </span>
+                          </div>
+                        )}
+
+                        {isEditServiceAlarmExceeded && !editServiceRangeAnalysis.isNegativeRange && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold mt-1">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                            <span>
+                              توجه: فاصله تاریخ سررسید ({editServiceSpanDays} روز) با دوره تنظیمی ({editServiceDurationDays} روز) همخوانی ندارد.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -1608,6 +2160,21 @@ function AdminSuppliersPage() {
                       <Label className="text-xs font-semibold">یادداشت</Label>
                       <Input value={editServiceNotes} onChange={(e) => setEditServiceNotes(e.target.value)} placeholder="توضیحات اختیاری" className="h-10 text-xs rounded-xl" />
                     </div>
+                  </div>
+
+                  {/* Auto-renew switch */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/60">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="editServiceAutoRenewSwitch" className="text-xs font-semibold cursor-pointer">تمدید خودکار سرویس</Label>
+                      <p className="text-[11px] text-muted-foreground">با رسیدن به سررسید، سرویس به‌صورت خودکار تمدید شود</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      id="editServiceAutoRenewSwitch"
+                      checked={editServiceAutoRenew}
+                      onChange={(e) => setEditServiceAutoRenew(e.target.checked)}
+                      className="h-4 w-4 rounded accent-purple-600 cursor-pointer"
+                    />
                   </div>
 
                   <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
@@ -1713,6 +2280,21 @@ function AdminSuppliersPage() {
                               <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
                                 {badge.label}
                               </span>
+                              {svc.trackingType && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-lg bg-muted/60 text-muted-foreground font-medium">
+                                  {svc.trackingType === "HYBRID" ? "بسته ترکیبی" : svc.trackingType === "TIME" ? "زمانی" : "تعدادی"}
+                                  {svc.quantity && svc.trackingType !== "TIME" ? ` (${Number(svc.quantity).toLocaleString("fa-IR")} سهمیه)` : ""}
+                                  {svc.billingCycleDays && svc.trackingType !== "QUANTITY" ? ` (${Number(svc.billingCycleDays).toLocaleString("fa-IR")} روز)` : ""}
+                                </span>
+                              )}
+                              {svc.autoRenew !== undefined && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-lg font-medium inline-flex items-center gap-1 ${
+                                  svc.autoRenew ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-zinc-500/10 text-zinc-500"
+                                }`}>
+                                  <Repeat className="h-2.5 w-2.5" />
+                                  {svc.autoRenew ? "تمدید خودکار" : "تمدید دستی"}
+                                </span>
+                              )}
                               {daysLeft !== null && (
                                 <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
                                   isExpired

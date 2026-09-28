@@ -787,17 +787,33 @@ function AdminServicesListPage() {
       return;
     }
 
+    const pDate = safeDate(purchaseDate);
+    const renDate = safeDate(assignRenewalDate, new Date(calcAddDays(pDate, durationDays)));
+
+    if (trackingType !== "QUANTITY" && renDate.getTime() < pDate.getTime()) {
+      toast.error("خطا در بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!");
+      return;
+    }
+
     const matchedCategory = dynamicCategories.find(
       (c: any) => c.slug === category || c.id === category
     );
 
-    // Master Catalog service is purely template: name, category, and description
     createServiceMutation.mutate({
       name: name.trim(),
       serviceTypeId: matchedCategory?.id,
       serviceTypeSlug: matchedCategory?.slug || category,
       description: description.trim() || undefined,
       status: "ACTIVE",
+      trackingType,
+      priceToman: Math.round(Number(priceToman)) || 0,
+      quantity: trackingType === "TIME" ? 1 : Math.max(1, Number(quantity) || 1),
+      billingCycle: trackingType === "QUANTITY" ? "NONE" : String(durationDays),
+      autoRenew: assignAutoRenew,
+      purchaseDate: trackingType !== "QUANTITY" ? pDate.toISOString() : undefined,
+      startDate: trackingType !== "QUANTITY" ? pDate.toISOString() : undefined,
+      renewalDate: trackingType !== "QUANTITY" ? (renDate.toISOString()) : undefined,
+      customerId: selectedCustomerId || undefined,
     });
   };
 
@@ -1628,6 +1644,217 @@ function AdminServicesListPage() {
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="توضیحات اختیاری درباره امکانات و کاربرد این سرویس"
                       className="rounded-xl h-9 text-xs"
+                    />
+                  </div>
+
+                  {/* 4. Tracking Mode */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">مدل ردگیری و نوع پکیج *</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={trackingType === "HYBRID" ? "default" : "outline"}
+                        onClick={() => setTrackingType("HYBRID")}
+                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
+                          trackingType === "HYBRID" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                        }`}
+                      >
+                        بسته ترکیبی (زمان + تعداد)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={trackingType === "TIME" ? "default" : "outline"}
+                        onClick={() => setTrackingType("TIME")}
+                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
+                          trackingType === "TIME" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                        }`}
+                      >
+                        زمانی (فقط مدت)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={trackingType === "QUANTITY" ? "default" : "outline"}
+                        onClick={() => setTrackingType("QUANTITY")}
+                        className={`text-[11px] sm:text-xs h-8.5 px-2 cursor-pointer rounded-xl whitespace-nowrap ${
+                          trackingType === "QUANTITY" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : ""
+                        }`}
+                      >
+                        تعدادی (فقط سهمیه)
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 5. Tracking Parameters: Price, Duration, Quantity */}
+                  {trackingType === "TIME" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مبلغ دوره (تومان)</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(priceToman)}
+                          onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          className="rounded-xl h-9 text-xs text-left"
+                        />
+                        {priceToman > 0 && (
+                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            معادل: {priceToman.toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">بازه روزانه (مدت دوره به روز) *</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={durationDays}
+                          onChange={(e) => handleAssignDurationChange(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {trackingType === "QUANTITY" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مبلغ کل بسته (تومان)</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(priceToman)}
+                          onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          className="rounded-xl h-9 text-xs text-left"
+                        />
+                        {priceToman > 0 && (
+                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            معادل: {priceToman.toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">تعداد ظرفیت / پکیج اولیه (عدد) *</Label>
+                        <Input
+                          type="number"
+                          value={quantity}
+                          onChange={(e) => setQuantity(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {trackingType === "HYBRID" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">مبلغ قرارداد (تومان)</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          dir="ltr"
+                          value={formatPriceInput(priceToman)}
+                          onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
+                          placeholder="0"
+                          className="rounded-xl h-9 text-xs text-left"
+                        />
+                        {priceToman > 0 && (
+                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            معادل: {priceToman.toLocaleString("fa-IR")} تومان
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">بازه روزانه (دوره به روز) *</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={durationDays}
+                          onChange={(e) => handleAssignDurationChange(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">ظرفیت پکیج (تعداد) *</Label>
+                        <Input
+                          type="number"
+                          value={quantity}
+                          onChange={(e) => setQuantity(Number(e.target.value))}
+                          className="rounded-xl h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 6. Dates: Purchase & Renewal Date */}
+                  {trackingType !== "QUANTITY" && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs font-semibold">تاریخ خرید / شروع خدمت (شمسی) *</Label>
+                          <JalaliDatePicker
+                            value={purchaseDate}
+                            onChange={handleAssignPurchaseDateChange}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-semibold">تاریخ سررسید تمدید / پایان (شمسی) *</Label>
+                          <JalaliDatePicker
+                            value={assignRenewalDate}
+                            onChange={handleAssignRenewalDateChange}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live Span & Alarm indicator */}
+                      <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col gap-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">بازه زمانی کلی سررسید:</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {assignSpanDays.toLocaleString("fa-IR")} روز
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">دوره تعیین‌شده برای سرویس:</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {durationDays.toLocaleString("fa-IR")} روز
+                          </span>
+                        </div>
+
+                        {assignRangeAnalysis.isNegativeRange && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
+                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                            <span>
+                              خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 7. Auto-renew switch */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/60">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="createAutoRenewSwitch" className="text-xs font-semibold cursor-pointer">تمدید خودکار سرویس</Label>
+                      <p className="text-[11px] text-muted-foreground">با رسیدن به سررسید، سرویس به‌صورت خودکار تمدید شود</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      id="createAutoRenewSwitch"
+                      checked={assignAutoRenew}
+                      onChange={(e) => setAssignAutoRenew(e.target.checked)}
+                      className="h-4 w-4 rounded accent-emerald-600 cursor-pointer"
                     />
                   </div>
 
