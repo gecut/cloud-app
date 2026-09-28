@@ -128,7 +128,6 @@ function AdminAccountingPage() {
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [filterFromDate, setFilterFromDate] = useState<string>("");
   const [filterToDate, setFilterToDate] = useState<string>("");
-  const [filterDateType, setFilterDateType] = useState<"issuedAt" | "dueDate">("issuedAt");
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
   const [isFilterOpen, setIsFilterOpen] = useState(true);
@@ -138,7 +137,6 @@ function AdminAccountingPage() {
   const [filterSupplierStatus, setFilterSupplierStatus] = useState<string>("ALL");
   const [filterSupplierFromDate, setFilterSupplierFromDate] = useState<string>("");
   const [filterSupplierToDate, setFilterSupplierToDate] = useState<string>("");
-  const [filterSupplierDateType, setFilterSupplierDateType] = useState<"renewalDate" | "purchaseDate">("renewalDate");
   const [minSupplierAmount, setMinSupplierAmount] = useState<string>("");
   const [maxSupplierAmount, setMaxSupplierAmount] = useState<string>("");
   const [supplierSortBy, setSupplierSortBy] = useState<"newest" | "oldest" | "amount-desc" | "amount-asc">("newest");
@@ -241,8 +239,8 @@ function AdminAccountingPage() {
       if (minAmount && !isNaN(Number(minAmount)) && amount < Number(minAmount)) return false;
       if (maxAmount && !isNaN(Number(maxAmount)) && amount > Number(maxAmount)) return false;
 
-      // 5. Date Range (issuedAt or dueDate)
-      const targetDateStr = filterDateType === "dueDate" ? inv.dueDate : (inv.issuedAt || inv.createdAt);
+      // 5. Date Range
+      const targetDateStr = inv.issuedAt || inv.createdAt;
       if (targetDateStr) {
         const targetTime = new Date(targetDateStr).getTime();
         if (filterFromDate) {
@@ -259,7 +257,7 @@ function AdminAccountingPage() {
 
       return true;
     });
-  }, [invoices, filterCustomerId, filterStatus, minAmount, maxAmount, filterFromDate, filterToDate, filterDateType]);
+  }, [invoices, filterCustomerId, filterStatus, minAmount, maxAmount, filterFromDate, filterToDate]);
 
 
   const hasActiveFilters = Boolean(
@@ -332,7 +330,7 @@ function AdminAccountingPage() {
       if (maxSupplierAmount && !isNaN(Number(maxSupplierAmount)) && amount > Number(maxSupplierAmount)) return false;
 
       // 4. Date Range
-      const targetDateStr = filterSupplierDateType === "purchaseDate" ? (svc.purchaseDate || svc.createdAt) : svc.renewalDate;
+      const targetDateStr = svc.renewalDate || svc.purchaseDate || svc.createdAt;
       if (targetDateStr) {
         const targetTime = new Date(targetDateStr).getTime();
         if (filterSupplierFromDate) {
@@ -349,7 +347,7 @@ function AdminAccountingPage() {
 
       return true;
     });
-  }, [allSupplierServices, filterSupplierId, filterSupplierStatus, minSupplierAmount, maxSupplierAmount, filterSupplierFromDate, filterSupplierToDate, filterSupplierDateType]);
+  }, [allSupplierServices, filterSupplierId, filterSupplierStatus, minSupplierAmount, maxSupplierAmount, filterSupplierFromDate, filterSupplierToDate]);
 
   const hasActiveSupplierFilters = Boolean(
     filterSupplierId !== "ALL" ||
@@ -640,36 +638,7 @@ function AdminAccountingPage() {
               </div>
 
               {/* Date Filters Row */}
-              <div className="relative z-20 grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-border/30 text-xs">
-                {/* Date Criteria Toggle */}
-                <div className="space-y-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground">مبنای تاریخ جستجو:</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      variant={filterDateType === "issuedAt" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFilterDateType("issuedAt")}
-                      className={`h-9 text-xs rounded-xl cursor-pointer font-medium ${
-                        filterDateType === "issuedAt" ? "bg-emerald-600 text-white" : ""
-                      }`}
-                    >
-                      تاریخ صدور
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={filterDateType === "dueDate" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFilterDateType("dueDate")}
-                      className={`h-9 text-xs rounded-xl cursor-pointer font-medium ${
-                        filterDateType === "dueDate" ? "bg-emerald-600 text-white" : ""
-                      }`}
-                    >
-                      تاریخ سررسید
-                    </Button>
-                  </div>
-                </div>
-
+              <div className="relative z-20 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-border/30 text-xs">
                 {/* From Date */}
                 <div className="space-y-1.5">
                   <span className="text-xs font-semibold text-muted-foreground">از تاریخ (شمسی):</span>
@@ -693,24 +662,6 @@ function AdminAccountingPage() {
                     }}
                   />
                 </div>
-              </div>
-
-              {/* Sort Dropdown */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/30">
-                <span className="text-xs text-muted-foreground font-medium">مرتب‌سازی نتایج:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => {
-                    setSortBy(e.target.value as any);
-                    setPage(1);
-                  }}
-                  className="h-9 rounded-xl border border-input bg-card/60 px-3.5 text-xs font-medium text-foreground shadow-xs focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
-                >
-                  <option value="newest">جدیدترین</option>
-                  <option value="oldest">قدیمی‌ترین</option>
-                  <option value="amount-desc">بیشترین مبلغ</option>
-                  <option value="amount-asc">کمترین مبلغ</option>
-                </select>
               </div>
             </div>
 
@@ -935,35 +886,9 @@ function AdminAccountingPage() {
                   </div>
                 </div>
 
-                {/* 4. Date Range Type & Date Pickers */}
+                {/* 4. Date Range */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground">بازه زمانی تاریخ:</span>
-                    <div className="flex items-center gap-1 text-[11px]">
-                      <button
-                        type="button"
-                        onClick={() => setFilterSupplierDateType("renewalDate")}
-                        className={`px-2 py-0.5 rounded-lg cursor-pointer ${
-                          filterSupplierDateType === "renewalDate"
-                            ? "bg-rose-500/20 text-rose-600 font-bold"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        سررسید
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFilterSupplierDateType("purchaseDate")}
-                        className={`px-2 py-0.5 rounded-lg cursor-pointer ${
-                          filterSupplierDateType === "purchaseDate"
-                            ? "bg-rose-500/20 text-rose-600 font-bold"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        خرید / ثبت
-                      </button>
-                    </div>
-                  </div>
+                  <span className="text-xs font-semibold text-muted-foreground">بازه زمانی تاریخ (شمسی):</span>
                   <div className="grid grid-cols-2 gap-2">
                     <JalaliDatePicker
                       placeholder="از تاریخ"

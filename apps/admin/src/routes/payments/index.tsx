@@ -797,9 +797,9 @@ function AdminPaymentsListPage() {
             })}
           </div>
 
-        {/* Search and Sort Toolbar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3 rounded-xl border border-border/60 shadow-xs">
-          <div className="relative w-full sm:w-80">
+        {/* Search Toolbar */}
+        <div className="bg-card p-3 rounded-xl border border-border/60 shadow-xs">
+          <div className="relative w-full max-w-md">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               placeholder={
@@ -814,23 +814,6 @@ function AdminPaymentsListPage() {
               }}
               className="pr-9 h-9 text-xs"
             />
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              <span>مرتب‌سازی:</span>
-            </div>
-            <select
-              value={sortBy}
-              onChange={(e: any) => setSortBy(e.target.value)}
-              className="h-9 px-3 rounded-lg border border-input bg-background text-xs shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring cursor-pointer"
-            >
-              <option value="newest">جدیدترین موارد</option>
-              <option value="oldest">قدیمی‌ترین موارد</option>
-              <option value="amount-desc">بیشترین مبلغ</option>
-              <option value="amount-asc">کمترین مبلغ</option>
-            </select>
           </div>
         </div>
 
