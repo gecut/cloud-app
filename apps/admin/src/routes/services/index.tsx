@@ -272,7 +272,6 @@ function AdminServicesListPage() {
   const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"newest" | "name" | "type">("newest");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingService, setEditingService] = useState<any | null>(null);
   const [editingSubService, setEditingSubService] = useState<any | null>(null);
@@ -670,12 +669,6 @@ function AdminServicesListPage() {
       return true;
     })
     .sort((a: any, b: any) => {
-      if (sortBy === "name") {
-        return (a?.name || "").localeCompare(b?.name || "", "fa");
-      }
-      if (sortBy === "type") {
-        return (a?.categorySlug || "").localeCompare(b?.categorySlug || "");
-      }
       const timeA = new Date(a?.createdAt || 0).getTime() || 0;
       const timeB = new Date(b?.createdAt || 0).getTime() || 0;
       return timeB - timeA;
@@ -1065,9 +1058,9 @@ function AdminServicesListPage() {
           </div>
         </div>
 
-        {/* Search and Sort Toolbar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="relative w-full sm:w-80">
+        {/* Search Toolbar */}
+        <div className="flex items-center gap-3">
+          <div className="relative w-full max-w-md">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={searchQuery}
@@ -1075,36 +1068,6 @@ function AdminServicesListPage() {
               placeholder="جستجوی سرویس یا بسته..."
               className="pr-9 text-xs h-9 bg-card rounded-xl"
             />
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto self-end">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">مرتب‌سازی:</span>
-            <div className="flex items-center gap-1 bg-card p-1 rounded-xl border border-border/50 text-xs">
-              <Button
-                variant={sortBy === "newest" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setSortBy("newest")}
-                className="h-7 text-xs px-2.5 rounded-lg cursor-pointer"
-              >
-                جدیدترین
-              </Button>
-              <Button
-                variant={sortBy === "name" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setSortBy("name")}
-                className="h-7 text-xs px-2.5 rounded-lg cursor-pointer"
-              >
-                نام سرویس
-              </Button>
-              <Button
-                variant={sortBy === "type" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setSortBy("type")}
-                className="h-7 text-xs px-2.5 rounded-lg cursor-pointer"
-              >
-                دسته‌بندی
-              </Button>
-            </div>
           </div>
         </div>
 
