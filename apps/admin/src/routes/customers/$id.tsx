@@ -271,8 +271,8 @@ function AdminCustomerProfileDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Active Tab: 'profile' | 'services' | 'invoices' | 'notifications'
-  const [activeTab, setActiveTab] = useState<"profile" | "services" | "invoices" | "notifications">("profile");
+  // Active Tab: 'services' | 'invoices' | 'transactions' | 'profile' | 'notifications'
+  const [activeTab, setActiveTab] = useState<"services" | "invoices" | "transactions" | "profile" | "notifications">("services");
 
   // Modals state
   const [isCreateServiceOpen, setIsCreateServiceOpen] = useState(false);
@@ -419,11 +419,19 @@ function AdminCustomerProfileDetailPage() {
     catalogServices[0] ||
     null;
 
-  useEffect(() => {
-    if (activeSelectedService && !serviceCustomName) {
-      setServiceCustomName(activeSelectedService.name);
+  const handleOpenCreateService = () => {
+    const initialSvc = catalogServices.find((s: any) => s.id === selectedCatalogServiceId) || catalogServices[0];
+    if (initialSvc) {
+      setSelectedCatalogServiceId(initialSvc.id);
+      setServiceCustomName(initialSvc.name);
+      setServicePrice(String(initialSvc.priceToman || 0));
+      setServiceTrackingType((initialSvc.trackingType || "HYBRID").toUpperCase() as any);
+      setServiceQuantity(Number(initialSvc.quantity) || 1);
+    } else {
+      setServiceCustomName("");
     }
-  }, [activeSelectedService]);
+    setIsCreateServiceOpen(true);
+  };
 
   // View Invoice Details State
   const [viewingInvoice, setViewingInvoice] = useState<any>(null);
@@ -1187,18 +1195,7 @@ function AdminCustomerProfileDetailPage() {
 
         {/* Custom Tab Navigation Bar */}
         <div className="flex border-b border-border gap-2 pb-px overflow-x-auto">
-          <button
-            onClick={() => setActiveTab("profile")}
-            className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
-              activeTab === "profile"
-                ? "border-primary text-primary bg-primary/5"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
-            }`}
-          >
-            <User className="h-4 w-4" />
-            مشخصات و ویرایش پروفایل
-          </button>
-
+          {/* 1. بسته‌ها و هاستینگ */}
           <button
             onClick={() => setActiveTab("services")}
             className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
@@ -1208,9 +1205,10 @@ function AdminCustomerProfileDetailPage() {
             }`}
           >
             <Server className="h-4 w-4" />
-            سرویس‌ها و هاستینگ ({servicesList.length})
+            بسته‌ها و هاستینگ ({servicesList.length})
           </button>
 
+          {/* 2. فاکتورها */}
           <button
             onClick={() => setActiveTab("invoices")}
             className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
@@ -1220,9 +1218,36 @@ function AdminCustomerProfileDetailPage() {
             }`}
           >
             <FileText className="h-4 w-4" />
-            فاکتورها و تراکنش‌ها ({invoicesList.length})
+            فاکتورها ({invoicesList.length})
           </button>
 
+          {/* 3. تراکنش‌ها */}
+          <button
+            onClick={() => setActiveTab("transactions")}
+            className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+              activeTab === "transactions"
+                ? "border-primary text-primary bg-primary/5"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            }`}
+          >
+            <CreditCard className="h-4 w-4" />
+            تراکنش‌ها ({invoicesList.filter((inv: any) => inv.payment).length})
+          </button>
+
+          {/* 4. ویرایش */}
+          <button
+            onClick={() => setActiveTab("profile")}
+            className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+              activeTab === "profile"
+                ? "border-primary text-primary bg-primary/5"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            }`}
+          >
+            <User className="h-4 w-4" />
+            ویرایش
+          </button>
+
+          {/* 5. اعلانات */}
           <button
             onClick={() => setActiveTab("notifications")}
             className={`flex items-center gap-2.5 px-5 py-3 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap cursor-pointer ${
@@ -1232,7 +1257,7 @@ function AdminCustomerProfileDetailPage() {
             }`}
           >
             <Bell className="h-4 w-4" />
-            اعلانات و تاریخچه فعالیت
+            اعلانات
           </button>
         </div>
 
@@ -1521,7 +1546,7 @@ function AdminCustomerProfileDetailPage() {
               </div>
               <Button
                 size="sm"
-                onClick={() => setIsCreateServiceOpen(true)}
+                onClick={handleOpenCreateService}
                 className="gap-1.5"
               >
                 <Plus className="h-4 w-4" />
@@ -1536,7 +1561,7 @@ function AdminCustomerProfileDetailPage() {
                 <p className="text-xs text-muted-foreground mt-1 mb-4">
                   می‌توانید اولین سرویس هاستینگ یا زیرساختی را برای ایشان تعریف کنید
                 </p>
-                <Button size="sm" onClick={() => setIsCreateServiceOpen(true)}>
+                <Button size="sm" onClick={handleOpenCreateService}>
                   افزودن اولین سرویس
                 </Button>
               </Card>
@@ -2051,7 +2076,21 @@ function AdminCustomerProfileDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Payments Summary Section */}
+          </div>
+        )}
+
+        {/* TAB 3: TRANSACTIONS & PAYMENTS */}
+        {activeTab === "transactions" && (
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base">تراکنش‌ها و رسیدهای آنلاین</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  مشاهده سوابق و رسیدهای پرداخت موفق درگاه‌های آنلاین این مشتری
+                </p>
+              </div>
+            </div>
+
             <Card className="rounded-2xl border bg-card shadow-xs">
               <CardHeader className="p-5 pb-3 border-b">
                 <CardTitle className="text-sm font-semibold">تراکنش‌ها و رسیدهای آنلاین</CardTitle>
@@ -2078,15 +2117,15 @@ function AdminCustomerProfileDetailPage() {
                               <CreditCard className="h-4 w-4" />
                             </div>
                             <div>
-                              <span className="font-bold block font-mono">
+                              <span className="font-bold block">
                                 {(inv.payment.amountToman || inv.totalToman).toLocaleString("fa-IR")} تومان
                               </span>
-                              <span className="text-[10px] text-muted-foreground font-mono">
+                              <span className="text-[10px] text-muted-foreground">
                                 درگاه: {inv.payment.provider} • کد رهگیری: {inv.payment.gatewayRef}
                               </span>
                             </div>
                           </div>
-                          <span className="text-[10px] font-mono text-muted-foreground">
+                          <span className="text-[10px] text-muted-foreground">
                             {formatJalaliDate(inv.payment.paidAt)}
                           </span>
                         </div>
@@ -2320,7 +2359,17 @@ function AdminCustomerProfileDetailPage() {
                     <Label className="text-xs font-semibold">انتخاب سرویس تعریف‌شده *</Label>
                     <select
                       value={activeSelectedService?.id || ""}
-                      onChange={(e) => setSelectedCatalogServiceId(e.target.value)}
+                      onChange={(e) => {
+                        const newId = e.target.value;
+                        setSelectedCatalogServiceId(newId);
+                        const found = catalogServices.find((s: any) => s.id === newId);
+                        if (found) {
+                          setServiceCustomName(found.name);
+                          setServicePrice(String(found.priceToman || 0));
+                          setServiceTrackingType((found.trackingType || "HYBRID").toUpperCase() as any);
+                          setServiceQuantity(Number(found.quantity) || 1);
+                        }
+                      }}
                       className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium"
                       required
                     >
@@ -2425,7 +2474,7 @@ function AdminCustomerProfileDetailPage() {
                           value={formatPriceInput(servicePrice)}
                           onChange={(e) => setServicePrice(parsePriceInput(e.target.value))}
                           placeholder="0"
-                          className="font-mono text-left"
+                          className="text-left"
                           required
                         />
                         {Number(servicePrice) > 0 && (
@@ -2465,7 +2514,7 @@ function AdminCustomerProfileDetailPage() {
                           value={formatPriceInput(servicePrice)}
                           onChange={(e) => setServicePrice(parsePriceInput(e.target.value))}
                           placeholder="0"
-                          className="font-mono text-left"
+                          className="text-left"
                           required
                         />
                         {Number(servicePrice) > 0 && (
@@ -2500,7 +2549,7 @@ function AdminCustomerProfileDetailPage() {
                           value={formatPriceInput(servicePrice)}
                           onChange={(e) => setServicePrice(parsePriceInput(e.target.value))}
                           placeholder="0"
-                          className="font-mono text-left"
+                          className="text-left"
                           required
                         />
                         {Number(servicePrice) > 0 && (
@@ -2750,7 +2799,7 @@ function AdminCustomerProfileDetailPage() {
                       value={formatPriceInput(editServicePrice)}
                       onChange={(e) => setEditServicePrice(parsePriceInput(e.target.value))}
                       placeholder="0"
-                      className="font-mono text-left"
+                      className="text-left"
                     />
                     {Number(editServicePrice) > 0 && (
                       <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -3051,7 +3100,7 @@ function AdminCustomerProfileDetailPage() {
                       value={formatPriceInput(invoiceItemAmount)}
                       onChange={(e) => setInvoiceItemAmount(parsePriceInput(e.target.value))}
                       placeholder="0"
-                      className="font-mono text-left"
+                      className="text-left"
                       required
                     />
                     {Number(invoiceItemAmount) > 0 && (

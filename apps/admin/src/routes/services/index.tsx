@@ -1879,7 +1879,7 @@ function AdminServicesListPage() {
                         value={formatPriceInput(priceToman)}
                         onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
                         placeholder="0"
-                        className="rounded-xl h-9 text-xs font-mono text-left"
+                        className="rounded-xl h-9 text-xs text-left"
                       />
                       {priceToman > 0 && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -1912,7 +1912,7 @@ function AdminServicesListPage() {
                         value={formatPriceInput(priceToman)}
                         onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
                         placeholder="0"
-                        className="rounded-xl h-9 text-xs font-mono text-left"
+                        className="rounded-xl h-9 text-xs text-left"
                       />
                       {priceToman > 0 && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -1944,7 +1944,7 @@ function AdminServicesListPage() {
                         value={formatPriceInput(priceToman)}
                         onChange={(e) => setPriceToman(parsePriceInput(e.target.value))}
                         placeholder="0"
-                        className="rounded-xl h-9 text-xs font-mono text-left"
+                        className="rounded-xl h-9 text-xs text-left"
                       />
                       {priceToman > 0 && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -2294,7 +2294,7 @@ function AdminServicesListPage() {
                         value={formatPriceInput(editSubPrice)}
                         onChange={(e) => setEditSubPrice(parsePriceInput(e.target.value))}
                         placeholder="0"
-                        className="rounded-xl h-9 text-xs font-mono text-left"
+                        className="rounded-xl h-9 text-xs text-left"
                       />
                       {editSubPrice > 0 && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -2327,7 +2327,7 @@ function AdminServicesListPage() {
                         value={formatPriceInput(editSubPrice)}
                         onChange={(e) => setEditSubPrice(parsePriceInput(e.target.value))}
                         placeholder="0"
-                        className="rounded-xl h-9 text-xs font-mono text-left"
+                        className="rounded-xl h-9 text-xs text-left"
                       />
                       {editSubPrice > 0 && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
@@ -2368,7 +2368,7 @@ function AdminServicesListPage() {
                         value={formatPriceInput(editSubPrice)}
                         onChange={(e) => setEditSubPrice(parsePriceInput(e.target.value))}
                         placeholder="0"
-                        className="rounded-xl h-9 text-xs font-mono text-left"
+                        className="rounded-xl h-9 text-xs text-left"
                       />
                       {editSubPrice > 0 && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
