@@ -232,30 +232,31 @@ export function AdminHeader() {
             variant="ghost"
             size="icon"
             onClick={() => setIsMobileMenuOpen(true)}
-            className="md:hidden h-9 w-9 text-muted-foreground hover:text-foreground cursor-pointer"
+            className="md:hidden h-9 w-9 text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
             title="منوی ناوبری"
           >
             <Menu className="h-5 w-5" />
           </Button>
-  <div className="relative sm:flex h-8 w-8 sm:h-10 sm:w-10 mx-2 hidden items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/5 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-all duration-300">
-              <img src="/logo.png" alt="Gecut" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
+
+          <Link to="/" className="flex items-center gap-2 sm:gap-3 group min-w-0">
+            <div className="relative flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/5 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-all duration-300">
+              <img src="/logo.png" alt="Gecut" className="w-5 h-5 sm:w-5.5 sm:h-5.5 object-contain" />
               <div className="absolute inset-0 rounded-xl bg-emerald-500/10 blur-sm -z-10 group-hover:opacity-100 opacity-60 transition-opacity" />
             </div>
-          <Link to="/" className="flex items-center gap-2 sm:gap-4 group">
-            
-            <div className="hidden sm:flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black tracking-tight text-foreground">جیکات کلود</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">ادمین</span>
+
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-sm font-black tracking-tight text-foreground truncate">جیکات کلود</span>
+                <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">ادمین</span>
               </div>
-              <span className="hidden sm:inline text-[11px] text-muted-foreground font-normal">
+              <span className="hidden sm:inline text-[11px] text-muted-foreground font-normal truncate">
                 مرکز فرماندهی زیرساخت و عملیات
               </span>
             </div>
           </Link>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Customer App Quick Link */}
           <a
             href="https://app.gecut.ir"
@@ -323,10 +324,6 @@ export function AdminHeader() {
           </Button>
 
           {/* Mode Toggle */}
-          <div className="relative flex h-8 w-8 sm:h-10 sm:w-10 mx-2 sm:hidden items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/5 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-all duration-300">
-              <img src="/logo.png" alt="Gecut" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
-              <div className="absolute inset-0 rounded-xl bg-emerald-500/10 blur-sm -z-10 group-hover:opacity-100 opacity-60 transition-opacity" />
-            </div>
           <ModeToggle />
           
         </div>

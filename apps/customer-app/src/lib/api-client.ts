@@ -323,17 +323,21 @@ export const queryClient = new QueryClient({
 
 export const API_BASE_URL = (() => {
   const configured = env.VITE_SERVER_URL;
-  if (configured) {
-    return configured;
+  if (configured && !configured.includes("admin.app.gecut.ir")) {
+    return configured.replace(/\/+$/, "");
   }
-  if (
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1")
-  ) {
-    return "http://localhost:3000";
+  if (typeof window !== "undefined") {
+    if (
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1"
+    ) {
+      return "http://localhost:3000";
+    }
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname)) {
+      return `http://${window.location.hostname}:3000`;
+    }
   }
-  return "https://api.app.gecut.ir";
+  return (configured || "http://192.168.43.134:3000").replace(/\/+$/, "");
 })();
 
 export async function apiClient<T>(
@@ -360,13 +364,13 @@ export async function apiClient<T>(
 
   if (validToken) {
     headers["Authorization"] = `Bearer ${validToken}`;
-  }
-
-  if (activeUser?.role) {
-    headers["x-user-role"] = activeUser.role;
-  }
-  if (activeUser?.id) {
-    headers["x-user-id"] = activeUser.id;
+  } else {
+    if (activeUser?.role) {
+      headers["x-user-role"] = activeUser.role;
+    }
+    if (activeUser?.id) {
+      headers["x-user-id"] = activeUser.id;
+    }
   }
 
   const res = await fetch(url, {

@@ -27,7 +27,7 @@ COPY packages ./packages
 COPY apps/customer-app ./apps/customer-app
 
 # Build arguments for Vite client environment
-ARG VITE_SERVER_URL=https://api.app.gecut.ir
+ARG VITE_SERVER_URL=http://192.168.43.134:3000
 ENV VITE_SERVER_URL=$VITE_SERVER_URL
 
 # 3. Generate Prisma client & build static assets

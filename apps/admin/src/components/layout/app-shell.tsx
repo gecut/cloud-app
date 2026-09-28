@@ -151,7 +151,7 @@ export function AppShell({ header, children }: AppShellProps) {
         </aside>
 
         {/* Main Content Area with Entrance Animation & min-w-0 for Table Responsiveness */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto animate-entrance min-w-0 pb-20 md:pb-8">
+        <main className="flex-1 p-3.5 sm:p-5 md:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto overflow-x-hidden animate-entrance min-w-0 pb-20 md:pb-8">
           {children}
         </main>
       </div>

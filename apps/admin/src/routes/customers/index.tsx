@@ -211,23 +211,23 @@ function AdminCustomersListPage() {
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-8 animate-entrance">
+      <div className="flex flex-col gap-6 animate-entrance min-w-0">
         {/* Page Title & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border/30">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border/30 min-w-0">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground truncate">
               مدیریت مشتریان و سازمان‌ها
             </h1>
             <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
               مشاهده پرونده، سرویس‌های زیرساخت و دسترسی مشترکین حقیقی و حقوقی
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer shrink-0 whitespace-nowrap"
             >
               <RefreshCw className="h-4 w-4" />
               بروزرسانی
@@ -235,7 +235,7 @@ function AdminCustomersListPage() {
             <Button
               size="sm"
               onClick={() => setIsCreateOpen(true)}
-              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer shrink-0 whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
               مشتری جدید
@@ -494,15 +494,15 @@ function AdminCustomersListPage() {
                     }
                   >
                     {/* Header: Name & Status */}
-                    <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-border/30">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-foreground group-hover:text-emerald-500 transition-colors">
+                    <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-border/30 min-w-0">
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-sm font-bold text-foreground group-hover:text-emerald-500 transition-colors truncate">
                           {customer.name}
                         </span>
                         {(customer.displayName || customer.company) && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1 min-w-0">
                             <Building className="h-3.5 w-3.5 opacity-60 shrink-0" />
-                            {customer.displayName || customer.company}
+                            <span className="truncate">{customer.displayName || customer.company}</span>
                           </span>
                         )}
                       </div>
@@ -516,7 +516,7 @@ function AdminCustomersListPage() {
                             ? "danger"
                             : "warning"
                         }
-                        className="gap-1 text-[11px] font-bold shrink-0"
+                        className="gap-1 text-[11px] font-bold shrink-0 whitespace-nowrap"
                       >
                         {customer.status === "ACTIVE" ? (
                           <CheckCircle className="h-3 w-3" />
@@ -534,41 +534,41 @@ function AdminCustomersListPage() {
                     {/* Contact details */}
                     <div className="flex flex-col gap-2 py-3.5 text-xs text-muted-foreground">
                       {customer.phone && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px]">شماره تماس:</span>
-                          <span className="font-mono text-[11px] text-foreground dir-ltr font-medium">
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <span className="text-[11px] shrink-0 whitespace-nowrap">شماره تماس:</span>
+                          <span className="font-mono text-[11px] text-foreground dir-ltr font-medium truncate">
                             {customer.phone}
                           </span>
                         </div>
                       )}
                       {customer.telegramChatId && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px]">تلگرام:</span>
-                          <span className="font-mono text-[11px] text-sky-600 dark:text-sky-400 dir-ltr flex items-center gap-1.5">
-                            <Send className="h-3 w-3" />
-                            {customer.telegramChatId}
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <span className="text-[11px] shrink-0 whitespace-nowrap">تلگرام:</span>
+                          <span className="font-mono text-[11px] text-sky-600 dark:text-sky-400 dir-ltr flex items-center gap-1.5 truncate">
+                            <Send className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{customer.telegramChatId}</span>
                           </span>
                         </div>
                       )}
                       {customer.email && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px]">ایمیل:</span>
-                          <span className="font-mono text-[11px] text-foreground dir-ltr">
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <span className="text-[11px] shrink-0 whitespace-nowrap">ایمیل:</span>
+                          <span className="font-mono text-[11px] text-foreground dir-ltr truncate">
                             {customer.email}
                           </span>
                         </div>
                       )}
                       {customer.cooperationStartDate && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px]">شروع همکاری:</span>
-                          <span className="text-[11px] text-foreground font-mono">
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <span className="text-[11px] shrink-0 whitespace-nowrap">شروع همکاری:</span>
+                          <span className="text-[11px] text-foreground font-mono shrink-0 whitespace-nowrap">
                             {formatJalaliDate(customer.cooperationStartDate)}
                           </span>
                         </div>
                       )}
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px]">تاریخ عضویت:</span>
-                        <span className="text-[11px] text-muted-foreground font-mono">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <span className="text-[11px] shrink-0 whitespace-nowrap">تاریخ عضویت:</span>
+                        <span className="text-[11px] text-muted-foreground font-mono shrink-0 whitespace-nowrap">
                           {formatJalaliDate(customer.createdAt)}
                         </span>
                       </div>

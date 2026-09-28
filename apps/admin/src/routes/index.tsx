@@ -214,13 +214,13 @@ function AdminDashboardPage() {
     <AppShell header={<AdminHeader />}>
       <div className="flex flex-col gap-8 animate-entrance">
         {/* Welcome Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/30">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border/30 min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground whitespace-nowrap">
                 مرکز عملیات و زیرساخت
               </h1>
-              <Chip size="sm" variant="soft" color="success" className="text-[11px] font-semibold">
+              <Chip size="sm" variant="soft" color="success" className="text-[11px] font-semibold whitespace-nowrap">
                 وضعیت پایدار
               </Chip>
             </div>
@@ -228,102 +228,102 @@ function AdminDashboardPage() {
               دید کلی و بی‌درنگ از مشترکین، سرویس‌های فعال، پیش‌بینی درآمدها و جریان مالی
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Link to="/customers">
-              <Button size="sm" className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer">
-                <PlusCircle className="h-4 w-4" />
-                تعریف مشتری
+              <Button size="sm" className="h-9 px-3.5 sm:px-4 rounded-xl gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer whitespace-nowrap">
+                <PlusCircle className="h-4 w-4 shrink-0" />
+                <span>تعریف مشتری</span>
               </Button>
             </Link>
             <Link to="/invoices">
-              <Button size="sm" variant="outline" className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer">
-                <FileText className="h-4 w-4" />
-                صدور صورت‌حساب
+              <Button size="sm" variant="outline" className="h-9 px-3.5 sm:px-4 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer whitespace-nowrap">
+                <FileText className="h-4 w-4 shrink-0" />
+                <span>صدور صورت‌حساب</span>
               </Button>
             </Link>
           </div>
         </div>
 
         {/* Minimalist Metric Cards Grid (Bento Style) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
           {/* 1. Customers Overview */}
           <Link
             to="/customers"
-            className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group cursor-pointer"
+            className="rounded-2xl border border-border/50 bg-card/40 p-4 sm:p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group cursor-pointer min-w-0 overflow-hidden"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">وضعیت کلی مشترکین</span>
-              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">وضعیت کلی مشترکین</span>
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform shrink-0">
                 <Users className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
+            <div className="mt-3 sm:mt-4 min-w-0">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground font-mono">
                   {loadingCustomers ? "..." : Number(totalCustomersCount).toLocaleString("fa-IR")}
                 </span>
-                <span className="text-xs text-muted-foreground font-medium">کل پرونده‌ها</span>
+                <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">کل پرونده‌ها</span>
               </div>
-              <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px]">
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[11px] whitespace-nowrap">
                 <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                   {activeCustomersCount.toLocaleString("fa-IR")} فعال
                 </span>
                 {(suspendedCustomersCount > 0 || inactiveCustomersCount > 0) ? (
                   <>
                     <span className="text-muted-foreground/40">•</span>
                     <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
                       {suspendedCustomersCount.toLocaleString("fa-IR")} معلق
                     </span>
                     <span className="text-muted-foreground/40">•</span>
                     <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold">
-                      <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                      {inactiveCustomersCount.toLocaleString("fa-IR")} غیرفعال/حذف
+                      <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" />
+                      {inactiveCustomersCount.toLocaleString("fa-IR")} غیرفعال
                     </span>
                   </>
                 ) : (
-                  <span className="text-[10px] text-muted-foreground mr-1">همه مشترکین فعال هستند</span>
+                  <span className="text-[10px] text-muted-foreground mr-1">همه مشترکین فعال</span>
                 )}
               </div>
             </div>
           </Link>
 
           {/* 2. Active Services (Prominently showing active count) */}
-          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">سرویس‌های فعال</span>
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 group-hover:scale-110 transition-transform">
+          <div className="rounded-2xl border border-border/50 bg-card/40 p-4 sm:p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">سرویس‌های فعال</span>
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 group-hover:scale-110 transition-transform shrink-0">
                 <Server className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
+            <div className="mt-3 sm:mt-4 min-w-0">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl sm:text-3xl font-black tracking-tight text-emerald-600 dark:text-emerald-400">
+                <span className="text-2xl sm:text-3xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
                   {loadingServices ? "..." : Number(activeServicesCount).toLocaleString("fa-IR")}
                 </span>
-                <span className="text-xs text-muted-foreground font-medium">
+                <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
                   از {Number(totalServicesCount).toLocaleString("fa-IR")} کل
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[11px] text-muted-foreground font-medium">سرویس‌های عملیاتی آنلاین و فعال</span>
+              <div className="flex items-center gap-1.5 mt-2 text-[11px] text-muted-foreground font-medium whitespace-nowrap truncate">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span className="truncate">سرویس‌های عملیاتی آنلاین و فعال</span>
               </div>
             </div>
           </div>
 
           {/* 3. Monthly Turnover & Projected Revenue (with in-box filter) */}
-          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
+          <div className="rounded-2xl border border-border/50 bg-card/40 p-4 sm:p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <div className="min-w-0 flex-1">
                 <select
                   value={revenueCardMode}
                   onChange={(e) => setRevenueCardMode(e.target.value as any)}
-                  className="text-xs font-bold text-foreground bg-transparent border-none outline-none cursor-pointer p-0 hover:text-emerald-600 transition-colors"
+                  className="text-xs font-bold text-foreground bg-transparent border-none outline-none cursor-pointer p-0 hover:text-emerald-600 transition-colors w-full truncate"
                 >
                   <option value="REVENUE" className="bg-card text-foreground">پیش‌بینی درآمد ماه</option>
-                  <option value="EXPENSES" className="bg-card text-foreground">خرج‌های ۱ ماه اخیر</option>
+                  <option value="EXPENSES" className="bg-card text-foreground">مخارج ۳۰ روز اخیر</option>
                   <option value="TURNOVER" className="bg-card text-foreground">گردش مالی ماهانه</option>
                 </select>
               </div>
@@ -335,8 +335,8 @@ function AdminDashboardPage() {
                 )}
               </div>
             </div>
-            <div className="mt-4">
-              <div className={`text-xl sm:text-2xl font-black tracking-tight font-mono ${
+            <div className="mt-3 sm:mt-4 min-w-0">
+              <div className={`text-xl sm:text-2xl font-black tracking-tight font-mono truncate ${
                 revenueCardMode === "EXPENSES" ? "text-rose-600 dark:text-rose-400" : "text-foreground"
               }`}>
                 {revenueCardMode === "REVENUE"
@@ -346,21 +346,21 @@ function AdminDashboardPage() {
                   : monthlyTurnoverToman.toLocaleString("fa-IR")}{" "}
                 <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
               </div>
-              <div className="flex items-center justify-between mt-1 text-[11px] text-muted-foreground">
+              <div className="flex items-center justify-between gap-1 mt-2 text-[11px] text-muted-foreground whitespace-nowrap overflow-hidden">
                 {revenueCardMode === "REVENUE" ? (
                   <>
-                    <span>گردش مالی: {monthlyTurnoverToman.toLocaleString("fa-IR")} ت</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-sans">(فاکتورهای معتبر)</span>
+                    <span className="truncate">گردش: {monthlyTurnoverToman.toLocaleString("fa-IR")} ت</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-sans shrink-0">(معتبر)</span>
                   </>
                 ) : revenueCardMode === "EXPENSES" ? (
                   <>
-                    <span>کل فاکتورهای تامین: {suppliersList.length.toLocaleString("fa-IR")} تامین‌کننده</span>
-                    <span className="text-rose-500 font-semibold font-sans">(۳۰ روز گذشته)</span>
+                    <span className="truncate">تامین: {suppliersList.length.toLocaleString("fa-IR")} مرکز</span>
+                    <span className="text-rose-500 font-semibold font-sans shrink-0">(۳۰ روز)</span>
                   </>
                 ) : (
                   <>
-                    <span>فروش: {collectedSalesToman.toLocaleString("fa-IR")} ت</span>
-                    <span>تامین: {supplierMonthlyExpensesToman.toLocaleString("fa-IR")} ت</span>
+                    <span className="truncate">فروش: {collectedSalesToman.toLocaleString("fa-IR")} ت</span>
+                    <span className="truncate">تامین: {supplierMonthlyExpensesToman.toLocaleString("fa-IR")} ت</span>
                   </>
                 )}
               </div>
@@ -368,42 +368,42 @@ function AdminDashboardPage() {
           </div>
 
           {/* 4. Supplier Expenses & Net Balance (with include-cancelled filter) */}
-          <div className="rounded-2xl border border-border/50 bg-card/40 p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
+          <div className="rounded-2xl border border-border/50 bg-card/40 p-4 sm:p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <div className="min-w-0 flex-1">
                 <select
                   value={marginCardMode}
                   onChange={(e) => setMarginCardMode(e.target.value as any)}
-                  className="text-xs font-bold text-foreground bg-transparent border-none outline-none cursor-pointer p-0 hover:text-emerald-600 transition-colors"
+                  className="text-xs font-bold text-foreground bg-transparent border-none outline-none cursor-pointer p-0 hover:text-emerald-600 transition-colors w-full truncate"
                 >
-                  <option value="ACTIVE_ONLY" className="bg-card text-foreground">سود خالص (فاکتورهای معتبر)</option>
-                  <option value="INCLUDE_CANCELLED" className="bg-card text-foreground">سود خالص (با احتساب لغوشده‌ها)</option>
+                  <option value="ACTIVE_ONLY" className="bg-card text-foreground">تراز خالص (معتبر)</option>
+                  <option value="INCLUDE_CANCELLED" className="bg-card text-foreground">تراز کل (با لغوشده)</option>
                 </select>
               </div>
               <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500 group-hover:scale-110 transition-transform shrink-0">
                 <Wallet className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className={`text-xl sm:text-2xl font-black tracking-tight font-mono ${
+            <div className="mt-3 sm:mt-4 min-w-0">
+              <div className={`text-xl sm:text-2xl font-black tracking-tight font-mono truncate ${
                 (marginCardMode === "ACTIVE_ONLY" ? projectedNetBalanceToman : netBalanceWithCancelledToman) >= 0
                   ? "text-emerald-600 dark:text-emerald-400"
                   : "text-rose-600 dark:text-rose-400"
               }`}>
                 {(marginCardMode === "ACTIVE_ONLY" ? projectedNetBalanceToman : netBalanceWithCancelledToman).toLocaleString("fa-IR")}{" "}
-                <span className="text-xs font-normal text-muted-foreground font-sans">تومان تراز</span>
+                <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
               </div>
-              <div className="flex items-center justify-between mt-1 text-[11px] text-muted-foreground">
+              <div className="flex items-center justify-between gap-1 mt-2 text-[11px] text-muted-foreground whitespace-nowrap overflow-hidden">
                 {marginCardMode === "ACTIVE_ONLY" ? (
                   <>
-                    <span>هزینه تامین: {supplierMonthlyExpensesToman.toLocaleString("fa-IR")} ت</span>
-                    <span className="font-semibold text-foreground">بدون لغوشده</span>
+                    <span className="truncate">تامین: {supplierMonthlyExpensesToman.toLocaleString("fa-IR")} ت</span>
+                    <span className="font-semibold text-foreground shrink-0">بدون لغوشده</span>
                   </>
                 ) : (
                   <>
-                    <span>کل فاکتورها: {allInvoicesTotalToman.toLocaleString("fa-IR")} ت</span>
-                    <span className="text-amber-600 dark:text-amber-400 font-semibold font-sans">
-                      (لغوشده: {cancelledTotalToman.toLocaleString("fa-IR")} ت)
+                    <span className="truncate">کل: {allInvoicesTotalToman.toLocaleString("fa-IR")} ت</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-semibold font-sans shrink-0">
+                      (لغو: {cancelledTotalToman.toLocaleString("fa-IR")})
                     </span>
                   </>
                 )}
@@ -413,41 +413,41 @@ function AdminDashboardPage() {
         </div>
 
         {/* Supplier & Customer Services Period Breakdown Card */}
-        <div className="rounded-2xl border border-border/60 bg-gradient-to-r from-purple-500/5 via-card to-emerald-500/5 p-4 sm:p-5 shadow-xs flex flex-col gap-4">
+        <div className="rounded-2xl border border-border/60 bg-gradient-to-r from-purple-500/5 via-card to-emerald-500/5 p-4 sm:p-5 shadow-xs flex flex-col gap-4 min-w-0 overflow-hidden">
           {/* Top Bar: Title & Controls */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/40">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-border/40 min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0 border border-purple-500/20">
                 <Building2 className="h-5 w-5" />
               </div>
-              <div>
-                <h3 className="font-bold text-sm text-foreground">
+              <div className="min-w-0">
+                <h3 className="font-bold text-sm text-foreground truncate">
                   گزارش تفکیکی دوره‌ای: تامین‌کنندگان و سرویس‌ها ({periodBreakdownData.label})
                 </h3>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
                   محاسبه و مقایسه همزمان مخارج تامین زیرساخت و مبالغ دوره‌ای سرویس‌های مشتریان
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto shrink-0 justify-start lg:justify-end">
               {/* View Mode Toggle */}
-              <div className="flex items-center p-1 rounded-xl bg-muted/60 border border-border/40 text-[11px] font-semibold">
+              <div className="flex items-center p-1 rounded-xl bg-muted/60 border border-border/40 text-[11px] font-semibold shrink-0">
                 <button
                   type="button"
                   onClick={() => setBreakdownViewMode("BOTH")}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2 sm:px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                     breakdownViewMode === "BOTH"
                       ? "bg-card text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  هر دو (تراز جامع)
+                  تراز جامع
                 </button>
                 <button
                   type="button"
                   onClick={() => setBreakdownViewMode("SUPPLIERS")}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2 sm:px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                     breakdownViewMode === "SUPPLIERS"
                       ? "bg-purple-600 text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
@@ -458,7 +458,7 @@ function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setBreakdownViewMode("SERVICES")}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2 sm:px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                     breakdownViewMode === "SERVICES"
                       ? "bg-emerald-600 text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
@@ -474,7 +474,7 @@ function AdminDashboardPage() {
                 onChange={(e) =>
                   setSelectedPeriodMonth(e.target.value === "ALL" ? "ALL" : Number(e.target.value))
                 }
-                className="h-8 text-xs rounded-xl border border-input bg-card px-3 text-foreground font-semibold shadow-xs focus:ring-1 focus:ring-primary cursor-pointer"
+                className="h-8 text-xs rounded-xl border border-input bg-card px-2.5 text-foreground font-semibold shadow-xs focus:ring-1 focus:ring-primary cursor-pointer whitespace-nowrap"
               >
                 {monthOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -486,71 +486,71 @@ function AdminDashboardPage() {
           </div>
 
           {/* Metrics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0">
             {/* 1. Supplier Periodic Expenses */}
             {(breakdownViewMode === "BOTH" || breakdownViewMode === "SUPPLIERS") && (
-              <div className={`rounded-xl border border-purple-500/20 bg-purple-500/5 p-3.5 flex flex-col justify-between ${
+              <div className={`rounded-xl border border-purple-500/20 bg-purple-500/5 p-3.5 flex flex-col justify-between min-w-0 overflow-hidden ${
                 breakdownViewMode === "SUPPLIERS" ? "sm:col-span-3" : ""
               }`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-xs font-semibold text-purple-700 dark:text-purple-300 whitespace-nowrap truncate">
                     مخارج دوره تامین‌کنندگان
                   </span>
-                  <Link to="/servers">
-                    <span className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5">
+                  <Link to="/servers" className="shrink-0">
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5 whitespace-nowrap">
                       تامین‌کنندگان
                       <ArrowLeft className="h-2.5 w-2.5" />
                     </span>
                   </Link>
                 </div>
-                <div className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-lg font-black text-purple-600 dark:text-purple-400 font-mono">
+                <div className="mt-2 flex items-baseline gap-1.5 min-w-0">
+                  <span className="text-lg font-black text-purple-600 dark:text-purple-400 font-mono truncate">
                     {periodBreakdownData.supplierTotalToman.toLocaleString("fa-IR")}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">تومان</span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">تومان</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground mt-1">
-                  بر اساس {periodBreakdownData.supplierCount.toLocaleString("fa-IR")} سرویس تامین‌کننده در {periodBreakdownData.label}
+                <span className="text-[10px] text-muted-foreground mt-1 truncate block">
+                  {periodBreakdownData.supplierCount.toLocaleString("fa-IR")} سرویس تامین‌کننده در {periodBreakdownData.label}
                 </span>
               </div>
             )}
 
             {/* 2. Customer Services Periodic Amount */}
             {(breakdownViewMode === "BOTH" || breakdownViewMode === "SERVICES") && (
-              <div className={`rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 flex flex-col justify-between ${
+              <div className={`rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 flex flex-col justify-between min-w-0 overflow-hidden ${
                 breakdownViewMode === "SERVICES" ? "sm:col-span-3" : ""
               }`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 whitespace-nowrap truncate">
                     مبالغ دوره سرویس‌های مشتریان
                   </span>
-                  <Link to="/services">
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5">
+                  <Link to="/services" className="shrink-0">
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 whitespace-nowrap">
                       سرویس‌ها
                       <ArrowLeft className="h-2.5 w-2.5" />
                     </span>
                   </Link>
                 </div>
-                <div className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                <div className="mt-2 flex items-baseline gap-1.5 min-w-0">
+                  <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono truncate">
                     {periodBreakdownData.customerServicesTotalToman.toLocaleString("fa-IR")}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">تومان</span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">تومان</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground mt-1">
-                  بر اساس {periodBreakdownData.customerServicesCount.toLocaleString("fa-IR")} سرویس فعال مشترکین در {periodBreakdownData.label}
+                <span className="text-[10px] text-muted-foreground mt-1 truncate block">
+                  {periodBreakdownData.customerServicesCount.toLocaleString("fa-IR")} سرویس مشترکین در {periodBreakdownData.label}
                 </span>
               </div>
             )}
 
             {/* 3. Net Balance / Profit for Period */}
             {breakdownViewMode === "BOTH" && (
-              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3.5 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3.5 flex flex-col justify-between min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 whitespace-nowrap truncate">
                     تراز و سود خالص دوره‌ای
                   </span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
                     periodBreakdownData.netPeriodBalanceToman >= 0
                       ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                       : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
@@ -558,18 +558,18 @@ function AdminDashboardPage() {
                     {periodBreakdownData.netPeriodBalanceToman >= 0 ? "تراز مثبت" : "کسری دوره"}
                   </span>
                 </div>
-                <div className="mt-2 flex items-baseline gap-1.5">
-                  <span className={`text-lg font-black font-mono ${
+                <div className="mt-2 flex items-baseline gap-1.5 min-w-0">
+                  <span className={`text-lg font-black font-mono truncate ${
                     periodBreakdownData.netPeriodBalanceToman >= 0
                       ? "text-blue-600 dark:text-blue-400"
                       : "text-rose-600 dark:text-rose-400"
                   }`}>
                     {periodBreakdownData.netPeriodBalanceToman.toLocaleString("fa-IR")}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">تومان</span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">تومان</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground mt-1">
-                  تفاضل مبالغ سرویس‌ها از مخارج تامین در {periodBreakdownData.label}
+                <span className="text-[10px] text-muted-foreground mt-1 truncate block">
+                  تفاضل سرویس‌ها از مخارج تامین در {periodBreakdownData.label}
                 </span>
               </div>
             )}
@@ -578,24 +578,24 @@ function AdminDashboardPage() {
 
         {/* Suspended / Inactive Customers Alert Strip (if any) */}
         {(suspendedCustomersCount > 0 || inactiveCustomersCount > 0) && (
-          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-4 px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-3">
+          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-4 px-5 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="p-2 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 shrink-0">
                 <Users className="h-5 w-5" />
               </div>
-              <div>
-                <span className="font-bold text-xs text-foreground">
+              <div className="min-w-0">
+                <span className="font-bold text-xs text-foreground block truncate">
                   هشدار پرونده‌های معلق یا غیرفعال: {(suspendedCustomersCount + inactiveCustomersCount).toLocaleString("fa-IR")} مشترک نیازمند پیگیری
                 </span>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  تعداد <span className="font-bold text-amber-600 dark:text-amber-400">{suspendedCustomersCount.toLocaleString("fa-IR")} مشتری معلق</span> و{" "}
-                  <span className="font-bold text-rose-600 dark:text-rose-400">{inactiveCustomersCount.toLocaleString("fa-IR")} مشتری غیرفعال یا حذف‌شده</span> در سامانه وجود دارد.
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                  تعداد <span className="font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">{suspendedCustomersCount.toLocaleString("fa-IR")} مشتری معلق</span> و{" "}
+                  <span className="font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">{inactiveCustomersCount.toLocaleString("fa-IR")} مشتری غیرفعال یا حذف‌شده</span> در سامانه وجود دارد.
                 </p>
               </div>
             </div>
-            <Link to="/customers">
-              <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-rose-500/30 hover:bg-rose-500/10 text-rose-700 dark:text-rose-300">
-                مشاهده لیست مشترکین
+            <Link to="/customers" className="shrink-0 self-start md:self-auto">
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-rose-500/30 hover:bg-rose-500/10 text-rose-700 dark:text-rose-300 whitespace-nowrap cursor-pointer">
+                <span>مشاهده لیست مشترکین</span>
                 <ArrowLeft className="h-3 w-3" />
               </Button>
             </Link>
@@ -604,23 +604,23 @@ function AdminDashboardPage() {
 
         {/* Pending Invoices Strip Alert (if any) */}
         {unpaidCount > 0 && (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-3">
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 px-5 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
                 <AlertCircle className="h-5 w-5" />
               </div>
-              <div>
-                <span className="font-bold text-xs text-foreground">
+              <div className="min-w-0">
+                <span className="font-bold text-xs text-foreground block truncate">
                   تعداد {unpaidCount.toLocaleString("fa-IR")} صورت‌حساب باز و در انتظار پرداخت
                 </span>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  مجموع مطالبات معوق فروش: <span className="font-mono font-bold text-amber-600 dark:text-amber-400">{unpaidTotalToman.toLocaleString("fa-IR")} تومان</span>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                  مجموع مطالبات معوق فروش: <span className="font-mono font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">{unpaidTotalToman.toLocaleString("fa-IR")} تومان</span>
                 </p>
               </div>
             </div>
-            <Link to="/invoices">
-              <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-amber-500/30 hover:bg-amber-500/10 text-amber-700 dark:text-amber-300">
-                پیگیری فاکتورها
+            <Link to="/invoices" className="shrink-0 self-start md:self-auto">
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-amber-500/30 hover:bg-amber-500/10 text-amber-700 dark:text-amber-300 whitespace-nowrap cursor-pointer">
+                <span>پیگیری فاکتورها</span>
                 <ArrowLeft className="h-3 w-3" />
               </Button>
             </Link>
@@ -637,7 +637,7 @@ function AdminDashboardPage() {
                 <h3 className="font-bold text-sm text-foreground">سرویس‌های هاستینگ اخیر</h3>
               </div>
               <Link to="/services">
-                <Button variant="ghost" size="sm" className="h-7 px-2.5 gap-1 text-[11px] text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="sm" className="h-7 px-2.5 gap-1 text-[11px] text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap">
                   مشاهده تمام سرویس‌ها
                   <ArrowLeft className="h-3 w-3" />
                 </Button>
@@ -650,19 +650,19 @@ function AdminDashboardPage() {
                 </div>
               ) : (
                 (servicesData?.items || []).map((svc: any) => (
-                  <div key={svc.id} className="flex items-center justify-between p-3.5 px-5 hover:bg-muted/20 transition-colors">
-                    <div className="flex items-center gap-3">
+                  <div key={svc.id} className="flex items-center justify-between gap-3 p-3.5 px-5 hover:bg-muted/20 transition-colors min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
                         <Server className="h-4 w-4" />
                       </div>
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-xs text-foreground">{svc.name}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="font-semibold text-xs text-foreground truncate">{svc.name}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono truncate">
                           {svc.id} • تعداد: {(svc.quantity || 1).toLocaleString("fa-IR")}
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 shrink-0 whitespace-nowrap">
                       <span className="text-xs font-bold text-foreground">
                         {(svc.priceToman || 0).toLocaleString("fa-IR")} <span className="text-[10px] font-normal text-muted-foreground">تومان</span>
                       </span>
@@ -683,14 +683,14 @@ function AdminDashboardPage() {
           </div>
 
           {/* Recent Invoices */}
-          <div className="rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs flex flex-col">
-            <div className="flex items-center justify-between p-4 px-5 border-b border-border/30">
-              <div className="flex items-center gap-2.5">
-                <div className="h-2 w-2 rounded-full bg-blue-500" />
-                <h3 className="font-bold text-sm text-foreground">صورت‌حساب‌های اخیر</h3>
+          <div className="rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs flex flex-col min-w-0">
+            <div className="flex items-center justify-between p-4 px-5 border-b border-border/30 gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                <h3 className="font-bold text-sm text-foreground whitespace-nowrap">صورت‌حساب‌های اخیر</h3>
               </div>
               <Link to="/invoices">
-                <Button variant="ghost" size="sm" className="h-7 px-2.5 gap-1 text-[11px] text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="sm" className="h-7 px-2.5 gap-1 text-[11px] text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap">
                   مشاهده تمام فاکتورها
                   <ArrowLeft className="h-3 w-3" />
                 </Button>
@@ -703,17 +703,17 @@ function AdminDashboardPage() {
                 </div>
               ) : (
                 (invoicesData?.items || []).map((inv: any) => (
-                  <div key={inv.id} className="flex items-center justify-between p-3.5 px-5 hover:bg-muted/20 transition-colors">
-                    <div className="flex items-center gap-3">
+                  <div key={inv.id} className="flex items-center justify-between gap-3 p-3.5 px-5 hover:bg-muted/20 transition-colors min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
                         <FileText className="h-4 w-4" />
                       </div>
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-xs font-mono text-foreground">{inv.invoiceNumber || inv.id}</span>
-                        <span className="text-[10px] text-muted-foreground">{inv.notes || "صورت‌حساب دوره‌ای زیرساخت"}</span>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="font-semibold text-xs font-mono text-foreground truncate">{inv.invoiceNumber || inv.id}</span>
+                        <span className="text-[10px] text-muted-foreground truncate">{inv.notes || "صورت‌حساب دوره‌ای زیرساخت"}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 shrink-0 whitespace-nowrap">
                       <span className="text-xs font-bold text-foreground">
                         {(inv.totalToman || 0).toLocaleString("fa-IR")} <span className="text-[10px] font-normal text-muted-foreground">تومان</span>
                       </span>

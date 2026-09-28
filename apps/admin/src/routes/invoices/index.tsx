@@ -655,21 +655,21 @@ function AdminInvoicesListPage() {
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6 min-w-0">
         {/* Page Title & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">مدیریت فاکتورها و صورت‌حساب‌ها</h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-w-0">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">مدیریت فاکتورها و صورت‌حساب‌ها</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 leading-relaxed">
               صدور صورت‌حساب‌های دوره‌ای بر پایه اسنپ‌شات قطعی تومان و پیگیری مطالبات
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer shrink-0 whitespace-nowrap"
             >
               <RefreshCw className="h-4 w-4" />
               بروزرسانی
@@ -685,7 +685,7 @@ function AdminInvoicesListPage() {
                 }
                 setIsCreateOpen(true);
               }}
-              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer shrink-0 whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
               صدور فاکتور جدید
@@ -694,31 +694,31 @@ function AdminInvoicesListPage() {
         </div>
 
         {/* Top KPI Metrics Cards (Interactive Quick Filters) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 min-w-0">
           {/* 1. Unpaid / Receivables */}
           <div
             onClick={() => {
               setSelectedStatus((s) => (s === "UNPAID" ? "ALL" : "UNPAID"));
               setPage(1);
             }}
-            className={`rounded-2xl border p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between cursor-pointer transition-all ${
+            className={`rounded-2xl border p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between cursor-pointer transition-all min-w-0 overflow-hidden ${
               selectedStatus === "UNPAID"
                 ? "border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/20"
                 : "border-border/50 bg-card/40 hover:bg-card/70"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">کل مطالبات در انتظار تسویه</span>
-              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap truncate">کل مطالبات در انتظار تسویه</span>
+              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
                 <Clock className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-xl sm:text-2xl font-black tracking-tight text-amber-600 dark:text-amber-400 font-mono">
+            <div className="mt-4 min-w-0">
+              <div className="text-xl sm:text-2xl font-black tracking-tight text-amber-600 dark:text-amber-400 font-mono whitespace-nowrap truncate">
                 {unpaidTotalToman.toLocaleString("fa-IR")}{" "}
                 <span className="text-xs font-normal text-muted-foreground">تومان</span>
               </div>
-              <span className="text-[11px] text-muted-foreground font-medium">
+              <span className="text-[11px] text-muted-foreground font-medium whitespace-nowrap block truncate mt-1">
                 {unpaidCount.toLocaleString("fa-IR")} فاکتور پرداخت‌نشده
               </span>
             </div>
@@ -730,24 +730,24 @@ function AdminInvoicesListPage() {
               setSelectedStatus((s) => (s === "OVERDUE" ? "ALL" : "OVERDUE"));
               setPage(1);
             }}
-            className={`rounded-2xl border p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between cursor-pointer transition-all ${
+            className={`rounded-2xl border p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between cursor-pointer transition-all min-w-0 overflow-hidden ${
               selectedStatus === "OVERDUE"
                 ? "border-rose-500 bg-rose-500/15 ring-2 ring-rose-500/30"
                 : "border-rose-500/20 bg-rose-500/[0.03] hover:bg-rose-500/[0.07]"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">معوقات سررسید گذشته (فوری)</span>
-              <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap truncate">معوقات سررسید گذشته (فوری)</span>
+              <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
                 <AlertCircle className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-xl sm:text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400 font-mono">
+            <div className="mt-4 min-w-0">
+              <div className="text-xl sm:text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400 font-mono whitespace-nowrap truncate">
                 {overdueTotalToman.toLocaleString("fa-IR")}{" "}
                 <span className="text-xs font-normal text-muted-foreground">تومان</span>
               </div>
-              <span className="text-[11px] text-muted-foreground font-medium">
+              <span className="text-[11px] text-muted-foreground font-medium whitespace-nowrap block truncate mt-1">
                 {overdueCount.toLocaleString("fa-IR")} فاکتور دارای تأخیر پرداخت
               </span>
             </div>
@@ -759,25 +759,25 @@ function AdminInvoicesListPage() {
               setSelectedStatus((s) => (s === "PAID" ? "ALL" : "PAID"));
               setPage(1);
             }}
-            className={`rounded-2xl border p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between cursor-pointer transition-all ${
+            className={`rounded-2xl border p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between cursor-pointer transition-all min-w-0 overflow-hidden ${
               selectedStatus === "PAID"
                 ? "border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/20"
                 : "border-border/50 bg-card/40 hover:bg-card/70"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">دریافتی‌های تسویه‌شده</span>
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap truncate">دریافتی‌های تسویه‌شده</span>
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
                 <CheckCircle className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-xl sm:text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
+            <div className="mt-4 min-w-0">
+              <div className="text-xl sm:text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap truncate">
                 {paidTotalToman.toLocaleString("fa-IR")}{" "}
                 <span className="text-xs font-normal text-muted-foreground">تومان</span>
               </div>
-              <span className="text-[11px] text-muted-foreground font-medium">
-                {paidCount.toLocaleString("fa-IR")} فاکتور پرداخت و تسویه‌شده
+              <span className="text-[11px] text-muted-foreground font-medium whitespace-nowrap block truncate mt-1">
+                {paidCount.toLocaleString("fa-IR")} فاکتور تسویه‌شده
               </span>
             </div>
           </div>
@@ -794,24 +794,24 @@ function AdminInvoicesListPage() {
               });
               setPage(1);
             }}
-            className={`rounded-2xl border p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between cursor-pointer transition-all ${
+            className={`rounded-2xl border p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between cursor-pointer transition-all min-w-0 overflow-hidden ${
               selectedStatus === "CANCELLED"
                 ? "border-zinc-500 bg-zinc-500/10 ring-2 ring-zinc-500/20"
                 : "border-border/50 bg-card/40 hover:bg-card/70"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">فاکتورهای لغو شده (باطل)</span>
-              <div className="p-2.5 rounded-xl bg-zinc-500/10 text-zinc-500">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap truncate">فاکتورهای لغو شده (باطل)</span>
+              <div className="p-2.5 rounded-xl bg-zinc-500/10 text-zinc-500 shrink-0">
                 <Ban className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-xl sm:text-2xl font-black tracking-tight text-zinc-600 dark:text-zinc-400 font-mono">
+            <div className="mt-4 min-w-0">
+              <div className="text-xl sm:text-2xl font-black tracking-tight text-zinc-600 dark:text-zinc-400 font-mono whitespace-nowrap truncate">
                 {cancelledTotalToman.toLocaleString("fa-IR")}{" "}
                 <span className="text-xs font-normal text-muted-foreground">تومان</span>
               </div>
-              <span className="text-[11px] text-muted-foreground font-medium">
+              <span className="text-[11px] text-muted-foreground font-medium whitespace-nowrap block truncate mt-1">
                 {cancelledCount.toLocaleString("fa-IR")} فاکتور لغو شده
               </span>
             </div>

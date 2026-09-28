@@ -772,15 +772,15 @@ function AdminSuppliersPage() {
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-8 animate-entrance">
+      <div className="flex flex-col gap-6 animate-entrance min-w-0">
         {/* Page Title & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border/30">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border/30 min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground truncate">
                 تامین‌کنندگان و زیرساخت
               </h1>
-              <Chip size="sm" variant="soft" color="default" className="text-[11px] font-semibold">
+              <Chip size="sm" variant="soft" color="default" className="text-[11px] font-semibold shrink-0 whitespace-nowrap">
                 مدیریت مخارج سرور و هاست
               </Chip>
             </div>
@@ -788,12 +788,12 @@ function AdminSuppliersPage() {
               مدیریت دیتاسنترها، ماشین‌های ابری، خدمات دامنه و گزارش هزینه‌های زیرساخت
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Link to="/categories">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+                className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer shrink-0 whitespace-nowrap"
               >
                 <Layers className="h-4 w-4 text-purple-500" />
                 <span>مدیریت دسته‌بندی‌ها</span>
@@ -803,7 +803,7 @@ function AdminSuppliersPage() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer shrink-0 whitespace-nowrap"
             >
               <RefreshCw className="h-4 w-4" />
               بروزرسانی
@@ -814,7 +814,7 @@ function AdminSuppliersPage() {
                 resetSupplierForm();
                 setIsCreateSupplierOpen(true);
               }}
-              className="h-9 px-4 rounded-xl gap-2 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer shrink-0 whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
               تامین‌کننده جدید
@@ -824,26 +824,26 @@ function AdminSuppliersPage() {
 
         {/* Overdue/Expired Servers High-Priority Alert Banner */}
         {expiredSupplierServices.length > 0 && (
-          <div className="p-4 sm:p-5 rounded-2xl bg-rose-500/10 border-2 border-rose-500/30 text-rose-950 dark:text-rose-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="flex items-center gap-3.5">
+          <div className="p-4 sm:p-5 rounded-2xl bg-rose-500/10 border-2 border-rose-500/30 text-rose-950 dark:text-rose-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300 min-w-0">
+            <div className="flex items-center gap-3.5 min-w-0">
               <div className="p-3 rounded-2xl bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
                 <AlertCircle className="h-6 w-6" />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <h3 className="text-sm font-bold text-rose-700 dark:text-rose-300 flex items-center gap-2">
                   <span>هشدار فوری: تاریخ سررسید {expiredSupplierServices.length.toLocaleString("fa-IR")} سرور به پایان رسیده است!</span>
                 </h3>
                 <p className="text-xs text-rose-600/90 dark:text-rose-400/90">
-                  مهلت تمدید این سرورها منقضی شده است. جهت جلوگیری از مسدودسازی و قطع خدمات توسط تامین‌کننده، سریعاً اقدام به بررسی و تمدید نمایید.
+                  مهلت تمدید این سرورها منقضی شده است. جهت جلوگیری از قطع خدمات، سریعاً اقدام به بررسی و تمدید نمایید.
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+            <div className="flex items-center gap-2.5 self-end md:self-center shrink-0">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setSelectedCategory("EXPIRED")}
-                className="h-8.5 text-xs font-bold px-3.5 rounded-xl border-rose-500/40 bg-rose-500/15 text-rose-700 dark:text-rose-300 hover:bg-rose-500/25 cursor-pointer shadow-xs"
+                className="h-8.5 text-xs font-bold px-3.5 rounded-xl border-rose-500/40 bg-rose-500/15 text-rose-700 dark:text-rose-300 hover:bg-rose-500/25 cursor-pointer shadow-xs whitespace-nowrap shrink-0"
               >
                 مشاهده سرورهای منقضی شده ({expiredSupplierServices.length.toLocaleString("fa-IR")})
               </Button>

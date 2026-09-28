@@ -973,16 +973,16 @@ function AdminServicesListPage() {
 
   return (
     <AppShell header={<AdminHeader />}>
-      <div className="flex flex-col gap-8 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 animate-entrance dir-rtl">
+      <div className="flex flex-col gap-6 w-full min-w-0 animate-entrance dir-rtl">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shadow-xs shrink-0">
                 <Server className="h-6 w-6" />
               </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
                   مدیریت سرویس‌ها و کاتالوگ خدمات
                 </h1>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
@@ -997,7 +997,7 @@ function AdminServicesListPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 text-xs h-8.5 cursor-pointer rounded-xl border-border/70 px-3 shrink-0"
+                className="gap-2 text-xs h-8.5 cursor-pointer rounded-xl border-border/70 px-3 shrink-0 whitespace-nowrap"
               >
                 <Layers className="h-3.5 w-3.5 text-purple-500" />
                 مدیریت دسته‌بندی‌ها
@@ -1007,7 +1007,7 @@ function AdminServicesListPage() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              className="gap-2 text-xs h-8.5 cursor-pointer rounded-xl px-3 shrink-0"
+              className="gap-2 text-xs h-8.5 cursor-pointer rounded-xl px-3 shrink-0 whitespace-nowrap"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
               بروزرسانی
@@ -1023,7 +1023,7 @@ function AdminServicesListPage() {
                 setTrackingType("HYBRID");
                 setIsCreateOpen(true);
               }}
-              className="gap-2 text-xs h-8.5 shadow-sm bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl px-3.5 shrink-0"
+              className="gap-2 text-xs h-8.5 shadow-sm bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl px-3.5 shrink-0 whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
               ایجاد سرویس / بسته جدید
@@ -1032,8 +1032,8 @@ function AdminServicesListPage() {
         </div>
 
         {/* Dynamic Category Filters Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/40">
-          <div className="flex flex-wrap items-center gap-2.5">
+        <div className="w-full overflow-x-auto scrollbar-none pb-2 border-b border-border/40">
+          <div className="flex items-center gap-2 min-w-max">
             {categoryTabs.map((cat) => {
               const Icon = cat.icon;
               const isSelected = selectedCategory === cat.slug;
@@ -1044,7 +1044,7 @@ function AdminServicesListPage() {
                   variant={isSelected ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSelectedCategory(cat.slug)}
-                  className={`gap-2 text-xs h-8.5 px-3 rounded-xl transition-all cursor-pointer ${
+                  className={`gap-2 text-xs h-8.5 px-3 rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                     isSelected
                       ? "shadow-xs bg-emerald-600 hover:bg-emerald-500 text-white"
                       : "bg-card hover:bg-muted/40 text-muted-foreground hover:text-foreground"

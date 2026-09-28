@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3001,
     proxy: {
       "/api": {
-        target: "https://api.app.gecut.ir",
+        target: process.env.VITE_SERVER_URL || "http://192.168.43.134:3000",
         changeOrigin: true,
       },
     },
