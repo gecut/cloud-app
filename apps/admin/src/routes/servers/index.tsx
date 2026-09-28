@@ -788,37 +788,37 @@ function AdminSuppliersPage() {
               مدیریت دیتاسنترها، ماشین‌های ابری، خدمات دامنه و گزارش هزینه‌های زیرساخت
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Link to="/categories">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer shrink-0 whitespace-nowrap"
-              >
-                <Layers className="h-4 w-4 text-purple-500" />
-                <span>مدیریت دسته‌بندی‌ها</span>
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer shrink-0 whitespace-nowrap"
-            >
-              <RefreshCw className="h-4 w-4" />
-              بروزرسانی
-            </Button>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button
               size="sm"
               onClick={() => {
                 resetSupplierForm();
                 setIsCreateSupplierOpen(true);
               }}
-              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer shrink-0 whitespace-nowrap"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-xs cursor-pointer whitespace-nowrap flex-1 sm:flex-initial justify-center"
             >
-              <Plus className="h-4 w-4" />
-              تامین‌کننده جدید
+              <Plus className="h-4 w-4 shrink-0" />
+              <span>تامین‌کننده جدید</span>
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="h-9 px-3 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <RefreshCw className="h-4 w-4 shrink-0" />
+              <span>بروزرسانی</span>
+            </Button>
+            <Link to="/categories">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 px-3 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <Layers className="h-4 w-4 text-purple-500 shrink-0" />
+                <span>دسته‌بندی‌ها</span>
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -854,13 +854,13 @@ function AdminSuppliersPage() {
         {/* Monthly Expense & Nearest Due Highlight Banner */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
           {/* Monthly Commitment Summary with Month Selector */}
-          <div className="rounded-2xl border border-border/50 bg-card/60 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between gap-4">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground font-medium">مجموع هزینه‌های دوره تامین</span>
+          <div className="rounded-2xl border border-border/50 bg-card/60 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between gap-4 min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-xs text-muted-foreground font-medium shrink-0 whitespace-nowrap">مجموع هزینه‌های دوره</span>
               <select
                 value={String(selectedPeriodMonth)}
                 onChange={(e) => setSelectedPeriodMonth(e.target.value === "ALL" ? "ALL" : Number(e.target.value))}
-                className="h-8 text-xs rounded-xl border border-input bg-card px-2.5 py-0 text-foreground font-medium shadow-xs focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                className="h-8 text-xs rounded-xl border border-input bg-card px-2.5 py-0 text-foreground font-medium shadow-xs focus:ring-1 focus:ring-purple-500 cursor-pointer max-w-[160px] truncate shrink-0"
               >
                 {monthOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -869,31 +869,31 @@ function AdminSuppliersPage() {
                 ))}
               </select>
             </div>
-            <div className="flex items-end justify-between">
-              <div className="space-y-1">
-                <div className="text-xl font-black text-foreground font-mono">
+            <div className="flex items-end justify-between min-w-0 gap-2">
+              <div className="space-y-1 min-w-0">
+                <div className="text-xl font-black text-foreground font-mono truncate">
                   {periodExpensesData.totalToman.toLocaleString("fa-IR")}{" "}
                   <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground truncate">
                   بر اساس {periodExpensesData.count.toLocaleString("fa-IR")} سرویس در {periodExpensesData.label}
                 </p>
               </div>
-              <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+              <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0">
                 <Wallet className="h-5 w-5" />
               </div>
             </div>
           </div>
 
           {/* Nearest Upcoming Payment Highlight */}
-          <div className={`md:col-span-2 rounded-2xl border p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+          <div className={`md:col-span-2 rounded-2xl border p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-w-0 overflow-hidden ${
             nearestPayment && nearestPayment.diffDays <= 0
               ? "bg-rose-500/10 border-rose-500/40 text-rose-950 dark:text-rose-100"
               : nearestPayment && nearestPayment.diffDays <= 7
               ? "bg-amber-500/5 border-amber-500/30 text-amber-950 dark:text-amber-100"
               : "bg-card/60 border-border/50 text-foreground"
           }`}>
-            <div className="flex items-start sm:items-center gap-3.5">
+            <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
               <div className={`p-3 rounded-2xl shrink-0 ${
                 nearestPayment && nearestPayment.diffDays <= 0
                   ? "bg-rose-500/20 text-rose-600 dark:text-rose-400"
@@ -905,9 +905,9 @@ function AdminSuppliersPage() {
                   <Clock className="h-5 w-5" />
                 )}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold whitespace-nowrap">
                     {nearestPayment && nearestPayment.diffDays <= 0 ? "سررسید منقضی شده سرور:" : "نزدیک‌ترین موعد پرداخت آتی:"}
                   </span>
                   {nearestPayment && (
@@ -945,41 +945,43 @@ function AdminSuppliersPage() {
 
         {/* Content-Based Category Tabs (Dynamic) */}
         <div className="flex flex-col gap-3.5">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="text-xs text-muted-foreground font-semibold ml-1">دسته‌بندی موضوعی:</span>
-            {supplierCategoryTabs.map((cat) => {
-              const Icon = cat.icon;
-              const isSelected = selectedCategory === cat.id;
-              const count = getSupplierCategoryCount(cat.id);
-              return (
-                <Button
-                  key={cat.id}
-                  variant={isSelected ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setSelectedCategory(cat.id);
-                    setPage(1);
-                  }}
-                  className={`h-8.5 px-3.5 rounded-xl text-xs gap-2 transition-all cursor-pointer ${
-                    isSelected
-                      ? "bg-purple-600 hover:bg-purple-500 text-white shadow-xs"
-                      : "border-border/60 hover:bg-muted/40 text-muted-foreground"
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{cat.label}</span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+          <div className="w-full overflow-x-auto scrollbar-none pb-1">
+            <div className="flex items-center gap-2 min-w-max">
+              <span className="text-xs text-muted-foreground font-semibold ml-1 shrink-0">دسته‌بندی موضوعی:</span>
+              {supplierCategoryTabs.map((cat) => {
+                const Icon = cat.icon;
+                const isSelected = selectedCategory === cat.id;
+                const count = getSupplierCategoryCount(cat.id);
+                return (
+                  <Button
+                    key={cat.id}
+                    variant={isSelected ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      setPage(1);
+                    }}
+                    className={`h-8.5 px-3 rounded-xl text-xs gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       isSelected
-                        ? "bg-white/20 text-white"
-                        : "bg-muted text-muted-foreground"
+                        ? "bg-purple-600 hover:bg-purple-500 text-white shadow-xs"
+                        : "border-border/60 hover:bg-muted/40 text-muted-foreground"
                     }`}
                   >
-                    {count.toLocaleString("fa-IR")}
-                  </span>
-                </Button>
-              );
-            })}
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span>{cat.label}</span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                        isSelected
+                          ? "bg-white/20 text-white"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {count.toLocaleString("fa-IR")}
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Search, Sort and Service Sort Toolbar */}

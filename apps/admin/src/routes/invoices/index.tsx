@@ -664,16 +664,7 @@ function AdminInvoicesListPage() {
               صدور صورت‌حساب‌های دوره‌ای بر پایه اسنپ‌شات قطعی تومان و پیگیری مطالبات
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer shrink-0 whitespace-nowrap"
-            >
-              <RefreshCw className="h-4 w-4" />
-              بروزرسانی
-            </Button>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button
               size="sm"
               onClick={() => {
@@ -685,10 +676,19 @@ function AdminInvoicesListPage() {
                 }
                 setIsCreateOpen(true);
               }}
-              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer shrink-0 whitespace-nowrap"
+              className="h-9 px-3.5 rounded-xl gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer whitespace-nowrap flex-1 sm:flex-initial justify-center"
             >
-              <Plus className="h-4 w-4" />
-              صدور فاکتور جدید
+              <Plus className="h-4 w-4 shrink-0" />
+              <span>صدور فاکتور جدید</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold border-border/60 hover:bg-muted/40 cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <RefreshCw className="h-4 w-4 shrink-0" />
+              <span>بروزرسانی</span>
             </Button>
           </div>
         </div>

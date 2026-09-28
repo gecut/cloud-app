@@ -992,26 +992,7 @@ function AdminServicesListPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <Link to="/categories">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 text-xs h-8.5 cursor-pointer rounded-xl border-border/70 px-3 shrink-0 whitespace-nowrap"
-              >
-                <Layers className="h-3.5 w-3.5 text-purple-500" />
-                مدیریت دسته‌بندی‌ها
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              className="gap-2 text-xs h-8.5 cursor-pointer rounded-xl px-3 shrink-0 whitespace-nowrap"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-              بروزرسانی
-            </Button>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button
               size="sm"
               onClick={() => {
@@ -1023,11 +1004,30 @@ function AdminServicesListPage() {
                 setTrackingType("HYBRID");
                 setIsCreateOpen(true);
               }}
-              className="gap-2 text-xs h-8.5 shadow-sm bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl px-3.5 shrink-0 whitespace-nowrap"
+              className="gap-2 text-xs h-9 shadow-sm bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl px-3.5 whitespace-nowrap flex-1 sm:flex-initial justify-center"
             >
-              <Plus className="h-4 w-4" />
-              ایجاد سرویس / بسته جدید
+              <Plus className="h-4 w-4 shrink-0" />
+              <span>ایجاد سرویس / بسته جدید</span>
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="gap-1.5 text-xs h-9 cursor-pointer rounded-xl px-3 whitespace-nowrap shrink-0 border-border/70"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${isLoading ? "animate-spin" : ""}`} />
+              <span>بروزرسانی</span>
+            </Button>
+            <Link to="/categories">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs h-9 cursor-pointer rounded-xl border-border/70 px-3 whitespace-nowrap shrink-0"
+              >
+                <Layers className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                <span>دسته‌بندی‌ها</span>
+              </Button>
+            </Link>
           </div>
         </div>
 
