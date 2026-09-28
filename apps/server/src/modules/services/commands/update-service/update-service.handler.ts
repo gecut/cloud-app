@@ -1,5 +1,6 @@
 import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { Prisma, ServiceStatus } from "@gecut-cloud/db";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
 import { RenewalsSchedulerService } from "../../../renewals/renewals-scheduler.service";
 import { UpdateServiceCommand } from "./update-service.command";
@@ -28,13 +29,13 @@ export class UpdateServiceHandler
       throw new NotFoundException(`Service with ID ${id} not found`);
     }
 
-    const updateData: any = {};
+    const updateData: Prisma.ServiceUncheckedUpdateInput = {};
     if (dto.name !== undefined) updateData.name = dto.name;
     if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.status !== undefined) updateData.status = dto.status;
+    if (dto.status !== undefined) updateData.status = dto.status as ServiceStatus;
     if (dto.priceToman !== undefined) updateData.priceToman = dto.priceToman;
-    if (dto.startDate !== undefined) updateData.startDate = dto.startDate ? new Date(dto.startDate) : null;
-    if (dto.renewalDate !== undefined) updateData.renewalDate = dto.renewalDate ? new Date(dto.renewalDate) : null;
+    if (dto.startDate !== undefined) updateData.startDate = dto.startDate ? new Date(dto.startDate) : undefined;
+    if (dto.renewalDate !== undefined) updateData.renewalDate = dto.renewalDate ? new Date(dto.renewalDate) : undefined;
     if (dto.purchaseDate !== undefined) updateData.purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : null;
     if (dto.trackingType !== undefined) updateData.trackingType = dto.trackingType;
     if (dto.serverId !== undefined) updateData.serverId = dto.serverId || null;
@@ -48,7 +49,7 @@ export class UpdateServiceHandler
       if (matchedCustomer) {
         finalCustomerId = matchedCustomer.id;
       }
-      updateData.customerId = finalCustomerId;
+      updateData.customerId = finalCustomerId || null;
     }
     if (dto.serviceTypeId !== undefined) {
       const matched = await this.prisma.serviceType.findFirst({
@@ -72,7 +73,7 @@ export class UpdateServiceHandler
       }
     }
     if (dto.parentServiceId !== undefined) updateData.parentServiceId = dto.parentServiceId || null;
-    if (dto.billingCycle !== undefined) updateData.billingCycle = dto.billingCycle;
+    if (dto.billingCycle !== undefined) updateData.billingCycle = dto.billingCycle || null;
     if (dto.autoRenew !== undefined) updateData.autoRenew = dto.autoRenew;
     if (dto.quantity !== undefined) updateData.quantity = Math.max(1, Number(dto.quantity) || 1);
     if (dto.usedQuantity !== undefined) updateData.usedQuantity = Math.max(0, Number(dto.usedQuantity) || 0);
@@ -86,61 +87,26 @@ export class UpdateServiceHandler
       effectiveTrackingType !== "QUANTITY" &&
       effectiveRenewalDate &&
       effectivePurchaseDate &&
-      new Date(effectiveRenewalDate).getTime() < new Date(effectivePurchaseDate).getTime()
+      new Date(effectiveRenewalDate as Date).getTime() < new Date(effectivePurchaseDate as Date).getTime()
     ) {
       throw new BadRequestException("تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
     }
 
-    let updated: any;
-    try {
-      updated = await this.prisma.service.update({
-        where: { id },
-        data: updateData,
-        include: {
-          customer: true,
-          serviceType: true,
-          serviceGroup: true,
-          server: true,
-          endpoints: true,
-          parentService: true,
-          childServices: {
-            include: { customer: true },
-          },
+    const updated = await this.prisma.service.update({
+      where: { id },
+      data: updateData,
+      include: {
+        customer: true,
+        serviceType: true,
+        serviceGroup: true,
+        server: true,
+        endpoints: true,
+        parentService: true,
+        childServices: {
+          include: { customer: true },
         },
-      });
-    } catch (err: any) {
-      if (err?.message?.includes("billingCycle") || String(err).includes("billingCycle")) {
-        const cycle = updateData.billingCycle;
-        delete updateData.billingCycle;
-        updated = await this.prisma.service.update({
-          where: { id },
-          data: updateData,
-          include: {
-            customer: true,
-            serviceType: true,
-            serviceGroup: true,
-            server: true,
-            endpoints: true,
-            parentService: true,
-            childServices: {
-              include: { customer: true },
-            },
-          },
-        });
-        if (cycle !== undefined) {
-          try {
-            await (this.prisma as any).$executeRawUnsafe(
-              `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
-              cycle,
-              id,
-            );
-          } catch {}
-          updated.billingCycle = cycle;
-        }
-      } else {
-        throw err;
-      }
-    }
+      },
+    });
 
     // Synchronize all invoices and payments for this service when service details are edited
     try {

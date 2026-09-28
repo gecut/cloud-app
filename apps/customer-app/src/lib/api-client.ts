@@ -323,10 +323,17 @@ export const queryClient = new QueryClient({
 
 export const API_BASE_URL = (() => {
   const configured = env.VITE_SERVER_URL;
-  if (!configured || configured.includes("localhost:3000") || configured.includes("127.0.0.1:3000")) {
-    return "https://api.app.gecut.ir";
+  if (configured) {
+    return configured;
   }
-  return configured;
+  if (
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1")
+  ) {
+    return "http://localhost:3000";
+  }
+  return "https://api.app.gecut.ir";
 })();
 
 export async function apiClient<T>(

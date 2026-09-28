@@ -44,6 +44,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url,
     };
 
+    const origin = request.headers.origin;
+    if (origin && typeof response.header === "function") {
+      response.header("access-control-allow-origin", origin);
+      response.header("access-control-allow-credentials", "true");
+      response.header("vary", "Origin");
+    }
+
     response.status(status).send(errorResponse);
   }
 }

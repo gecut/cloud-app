@@ -1,5 +1,6 @@
 import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
 import { BadRequestException, Logger } from "@nestjs/common";
+import { Prisma, ServiceStatus } from "@gecut-cloud/db";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
 import { CreateServiceCommand } from "./create-service.command";
 import { getNextUniqueInvoiceNumber } from "../../../invoices/utils/invoice-number.util";
@@ -12,8 +13,8 @@ export class CreateServiceHandler
 
   constructor(private readonly prisma: PrismaService) {}
 
-    async execute(command: CreateServiceCommand) {
-      const { dto } = command;
+  async execute(command: CreateServiceCommand) {
+    const { dto } = command;
 
       let serviceTypeId = dto.serviceTypeId;
       if (serviceTypeId) {
@@ -60,10 +61,14 @@ export class CreateServiceHandler
       }
 
       if (!serviceTypeId) {
-        let defaultType = await this.prisma.serviceType.findFirst();
+        const defaultType = await this.prisma.serviceType.findFirst();
         if (defaultType) {
           serviceTypeId = defaultType.id;
         }
+      }
+
+      if (!serviceTypeId) {
+        throw new BadRequestException("دسته‌بندی خدمات (serviceTypeId) مشخص نشده است");
       }
 
       const now = new Date();
@@ -106,23 +111,24 @@ export class CreateServiceHandler
         }
       }
 
-      const baseData: any = {
-        customerId: customerId || null,
-        parentServiceId: parentServiceId || null,
-        serviceGroupId: dto.serviceGroupId || null,
-        serviceTypeId,
-        serverId: dto.serverId || null,
+      const serviceData: Prisma.ServiceUncheckedCreateInput = {
         name: dto.name,
         description: dto.description || null,
+        status: (dto.status as ServiceStatus) || "ACTIVE",
         priceToman: dto.priceToman || 0,
-        autoRenew: dto.autoRenew !== undefined ? dto.autoRenew : true,
+        billingCycle: dto.billingCycle || "MONTHLY",
         quantity: Math.max(1, Number(dto.quantity) || 1),
         usedQuantity: 0,
         trackingType,
         purchaseDate,
         startDate,
         renewalDate,
-        status: (dto.status as any) || "ACTIVE",
+        autoRenew: dto.autoRenew !== undefined ? dto.autoRenew : true,
+        serviceTypeId,
+        customerId: customerId || null,
+        serviceGroupId: dto.serviceGroupId || null,
+        serverId: dto.serverId || null,
+        parentServiceId: parentServiceId || null,
       };
 
       const includes = {
@@ -137,33 +143,10 @@ export class CreateServiceHandler
         },
       };
 
-      let service: any;
-      try {
-        service = await this.prisma.service.create({
-          data: {
-            ...baseData,
-            billingCycle: dto.billingCycle || "MONTHLY",
-          },
-          include: includes,
-        });
-      } catch (err: any) {
-        if (err?.message?.includes("billingCycle") || String(err).includes("billingCycle")) {
-          service = await this.prisma.service.create({
-            data: baseData,
-            include: includes,
-          });
-          try {
-            await (this.prisma as any).$executeRawUnsafe(
-              `UPDATE "Service" SET "billingCycle" = $1 WHERE "id" = $2`,
-              dto.billingCycle || "MONTHLY",
-              service.id,
-            );
-          } catch {}
-          service.billingCycle = dto.billingCycle || "MONTHLY";
-        } else {
-          throw err;
-        }
-      }
+      const service = await this.prisma.service.create({
+        data: serviceData,
+        include: includes,
+      });
 
       // Automatically create initial invoice whenever allocated to a customer
       if (customerId) {

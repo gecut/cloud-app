@@ -31,16 +31,6 @@ async function bootstrap() {
     origin: true,
     credentials: true,
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Accept",
-      "Authorization",
-      "x-user-role",
-      "x-user-id",
-      "x-request-id",
-      "Origin",
-      "X-Requested-With",
-    ],
   });
 
   app.enableShutdownHooks();
