@@ -41,12 +41,13 @@ export class CreateCustomerHandler
         });
       } else {
         const userUpdateData: any = {};
-        if (dto.name) userUpdateData.name = dto.name;
+        // Never overwrite an ADMIN user's name with customer details
+        if (dto.name && user.role !== "ADMIN") userUpdateData.name = dto.name;
         if (user.phone !== cleanPhone) userUpdateData.phone = cleanPhone;
         if (validBirthDate && !user.birthDate) userUpdateData.birthDate = validBirthDate;
         if (validCoopDate && !user.cooperationStartDate) userUpdateData.cooperationStartDate = validCoopDate;
         if (dto.telegramChatId) userUpdateData.telegramChatId = dto.telegramChatId;
-        if (dto.address) userUpdateData.address = dto.address;
+        if (dto.address && user.role !== "ADMIN") userUpdateData.address = dto.address;
         if (Object.keys(userUpdateData).length > 0) {
           user = await tx.user.update({
             where: { id: user.id },

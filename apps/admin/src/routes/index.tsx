@@ -53,6 +53,7 @@ function AdminDashboardPage() {
 
   const [revenueCardMode, setRevenueCardMode] = useState<"REVENUE" | "EXPENSES" | "TURNOVER">("REVENUE");
   const [marginCardMode, setMarginCardMode] = useState<"ACTIVE_ONLY" | "INCLUDE_CANCELLED">("ACTIVE_ONLY");
+  const [dashboardServicesTab, setDashboardServicesTab] = useState<"ALL" | "CUSTOMERS" | "SUPPLIERS">("ALL");
 
   const { data: suppliersData, isLoading: loadingSuppliers } = useQuery({
     queryKey: ["admin", "suppliers", "dashboard"],
@@ -71,15 +72,57 @@ function AdminDashboardPage() {
   const totalCustomersCount = customersData?.total ?? allCustomers.length;
 
   const allServices = servicesData?.items || [];
-  // Active services must realistically count customer-assigned sub-services (excluding master catalog templates)
+  // Active customer services (sub-services assigned to a customer, excluding master catalog templates)
   const customerAssignedServices = allServices.filter((s: any) => Boolean(s.customerId));
-  const activeServices = customerAssignedServices.filter((s: any) => s.status === "ACTIVE");
-  const activeServicesCount = activeServices.length;
-  const totalServicesCount = customerAssignedServices.length;
+  const activeCustomerServices = customerAssignedServices.filter((s: any) => s.status === "ACTIVE");
+  const activeCustomerServicesCount = activeCustomerServices.length;
+  const totalCustomerServicesCount = customerAssignedServices.length;
 
   const allInvoices = invoicesData?.items || [];
   const suppliersList = suppliersData?.items || [];
   const supplierServicesList = supplierServicesData?.items || [];
+
+  // Active supplier services (purchased sub-services from suppliers, excluding master suppliers)
+  const activeSupplierServices = supplierServicesList.filter((s: any) => s.status === "ACTIVE" || !s.status);
+  const activeSupplierServicesCount = activeSupplierServices.length;
+  const totalSupplierServicesCount = supplierServicesList.length;
+
+  // Combined active services count
+  const totalCombinedActiveCount = activeCustomerServicesCount + activeSupplierServicesCount;
+
+  // Combined recent services for dashboard table
+  const recentServicesUnified = useMemo(() => {
+    const custSvcs = (servicesData?.items || []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      category: "CUSTOMER" as const,
+      categoryLabel: "مشتری",
+      ownerName: s.customer?.displayName || s.customer?.name || "بدون مشتری",
+      priceToman: s.priceToman || 0,
+      quantity: s.quantity || 1,
+      status: s.status || "ACTIVE",
+      createdAt: s.createdAt,
+    }));
+
+    const supSvcs = (supplierServicesData?.items || []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      category: "SUPPLIER" as const,
+      categoryLabel: "تامین‌کننده",
+      ownerName: s.supplier?.name || "تامین‌کننده",
+      priceToman: Number(s.priceToman ?? s.monthlyExpenseToman) || 0,
+      quantity: s.quantity || 1,
+      status: s.status || "ACTIVE",
+      createdAt: s.createdAt || s.purchaseDate,
+    }));
+
+    if (dashboardServicesTab === "CUSTOMERS") return custSvcs;
+    if (dashboardServicesTab === "SUPPLIERS") return supSvcs;
+
+    return [...custSvcs, ...supSvcs].sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+    );
+  }, [servicesData?.items, supplierServicesData?.items, dashboardServicesTab]);
 
   // 1 month recent supplier expenses calculation (30 days)
   const now = Date.now();
@@ -289,7 +332,7 @@ function AdminDashboardPage() {
             </div>
           </Link>
 
-          {/* 2. Active Services (Prominently showing active count) */}
+          {/* 2. Active Services (Breakdown of customer vs supplier active services) */}
           <div className="rounded-2xl border border-border/50 bg-card/40 p-4 sm:p-5 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all group min-w-0 overflow-hidden">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">سرویس‌های فعال</span>
@@ -300,15 +343,28 @@ function AdminDashboardPage() {
             <div className="mt-3 sm:mt-4 min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl sm:text-3xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
-                  {loadingServices ? "..." : Number(activeServicesCount).toLocaleString("fa-IR")}
+                  {loadingServices || loadingSuppliers ? "..." : Number(totalCombinedActiveCount).toLocaleString("fa-IR")}
                 </span>
-                <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                  از {Number(totalServicesCount).toLocaleString("fa-IR")} کل
-                </span>
+                <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">کل سرویس‌های فعال</span>
               </div>
-              <div className="flex items-center gap-1.5 mt-2 text-[11px] text-muted-foreground font-medium whitespace-nowrap truncate">
-                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                <span className="truncate">سرویس‌های عملیاتی آنلاین و فعال</span>
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[11px] whitespace-nowrap">
+                <Link
+                  to="/services"
+                  className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
+                  title="سرویس‌های فعال مشترکین"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  {activeCustomerServicesCount.toLocaleString("fa-IR")} مشتری
+                </Link>
+                <span className="text-muted-foreground/40">•</span>
+                <Link
+                  to="/servers"
+                  className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 font-semibold hover:underline"
+                  title="سرویس‌های فعال خریداری‌شده از تامین‌کنندگان"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0" />
+                  {activeSupplierServicesCount.toLocaleString("fa-IR")} تامین‌کننده
+                </Link>
               </div>
             </div>
           </div>
@@ -629,36 +685,83 @@ function AdminDashboardPage() {
 
         {/* Two-Column Overview Tables (Sleek Minimal Design) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Services */}
+          {/* Recent Services (With Customer vs Supplier filter) */}
           <div className="rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xs overflow-hidden shadow-xs flex flex-col">
-            <div className="flex items-center justify-between p-4 px-5 border-b border-border/30">
-              <div className="flex items-center gap-2.5">
-                <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                <h3 className="font-bold text-sm text-foreground">سرویس‌های هاستینگ اخیر</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 px-5 border-b border-border/30 gap-2.5">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                <h3 className="font-bold text-sm text-foreground whitespace-nowrap">سرویس‌های عملیاتی اخیر</h3>
               </div>
-              <Link to="/services">
-                <Button variant="ghost" size="sm" className="h-7 px-2.5 gap-1 text-[11px] text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap">
-                  مشاهده تمام سرویس‌ها
-                  <ArrowLeft className="h-3 w-3" />
-                </Button>
-              </Link>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="inline-flex rounded-lg bg-muted/60 p-0.5 text-[11px] font-medium">
+                  <button
+                    onClick={() => setDashboardServicesTab("ALL")}
+                    className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                      dashboardServicesTab === "ALL"
+                        ? "bg-card text-foreground font-bold shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    همه ({recentServicesUnified.length})
+                  </button>
+                  <button
+                    onClick={() => setDashboardServicesTab("CUSTOMERS")}
+                    className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                      dashboardServicesTab === "CUSTOMERS"
+                        ? "bg-card text-emerald-600 dark:text-emerald-400 font-bold shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    مشتریان
+                  </button>
+                  <button
+                    onClick={() => setDashboardServicesTab("SUPPLIERS")}
+                    className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                      dashboardServicesTab === "SUPPLIERS"
+                        ? "bg-card text-purple-600 dark:text-purple-400 font-bold shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    تامین‌کنندگان
+                  </button>
+                </div>
+                <Link to={dashboardServicesTab === "SUPPLIERS" ? "/servers" : "/services"}>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 gap-0.5 text-[11px] text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap">
+                    مشاهده کل
+                    <ArrowLeft className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
             </div>
-            <div className="max-h-[320px] overflow-y-auto divide-y divide-border/20 text-xs">
-              {(servicesData?.items || []).length === 0 ? (
+            <div className="max-h-[340px] overflow-y-auto divide-y divide-border/20 text-xs">
+              {recentServicesUnified.length === 0 ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">
                   هنوز سرویسی تعریف نشده است
                 </div>
               ) : (
-                (servicesData?.items || []).map((svc: any) => (
+                recentServicesUnified.slice(0, 15).map((svc: any) => (
                   <div key={svc.id} className="flex items-center justify-between gap-3 p-3.5 px-5 hover:bg-muted/20 transition-colors min-w-0">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
+                      <div className={`p-2 rounded-xl shrink-0 ${
+                        svc.category === "SUPPLIER"
+                          ? "bg-purple-500/10 text-purple-500"
+                          : "bg-emerald-500/10 text-emerald-500"
+                      }`}>
                         <Server className="h-4 w-4" />
                       </div>
                       <div className="flex flex-col min-w-0 flex-1">
-                        <span className="font-semibold text-xs text-foreground truncate">{svc.name}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono truncate">
-                          {svc.id} • تعداد: {(svc.quantity || 1).toLocaleString("fa-IR")}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-semibold text-xs text-foreground truncate">{svc.name}</span>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-medium shrink-0 ${
+                            svc.category === "SUPPLIER"
+                              ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          }`}>
+                            {svc.categoryLabel}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          {svc.ownerName} • تعداد: {(svc.quantity || 1).toLocaleString("fa-IR")}
                         </span>
                       </div>
                     </div>

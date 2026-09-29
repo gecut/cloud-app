@@ -43,24 +43,31 @@ export class UpdateCustomerHandler
       }
     }
 
-    // Sync associated user if present
+    // Sync associated user if present (and not ADMIN)
     if (existing.userId) {
-      const userUpdate: any = {};
-      if (cleanPhone !== undefined) userUpdate.phone = cleanPhone;
-      if (dto.name) userUpdate.name = dto.name;
-      if (dto.email !== undefined) userUpdate.email = dto.email;
-      if (validBirthDate !== undefined) userUpdate.birthDate = validBirthDate;
-      if (validCoopDate !== undefined) userUpdate.cooperationStartDate = validCoopDate;
-      if (dto.telegramChatId !== undefined) userUpdate.telegramChatId = dto.telegramChatId || null;
-      if (dto.address !== undefined) userUpdate.address = dto.address || null;
+      const associatedUser = await this.prisma.user.findUnique({
+        where: { id: existing.userId },
+        select: { id: true, role: true },
+      });
 
-      if (Object.keys(userUpdate).length > 0) {
-        await this.prisma.user
-          .update({
-            where: { id: existing.userId },
-            data: userUpdate,
-          })
-          .catch(() => {});
+      if (associatedUser && associatedUser.role !== "ADMIN") {
+        const userUpdate: any = {};
+        if (cleanPhone !== undefined) userUpdate.phone = cleanPhone;
+        if (dto.name) userUpdate.name = dto.name;
+        if (dto.email !== undefined) userUpdate.email = dto.email;
+        if (validBirthDate !== undefined) userUpdate.birthDate = validBirthDate;
+        if (validCoopDate !== undefined) userUpdate.cooperationStartDate = validCoopDate;
+        if (dto.telegramChatId !== undefined) userUpdate.telegramChatId = dto.telegramChatId || null;
+        if (dto.address !== undefined) userUpdate.address = dto.address || null;
+
+        if (Object.keys(userUpdate).length > 0) {
+          await this.prisma.user
+            .update({
+              where: { id: existing.userId },
+              data: userUpdate,
+            })
+            .catch(() => {});
+        }
       }
     }
 

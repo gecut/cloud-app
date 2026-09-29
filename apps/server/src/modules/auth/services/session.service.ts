@@ -107,13 +107,16 @@ export class SessionService {
     }
 
     const customerId = targetCustomer?.id || (user as any).customerId || null;
-    const resolvedName = targetCustomer?.displayName || targetCustomer?.name || user.name;
+    const resolvedName =
+      user.role === "ADMIN"
+        ? user.name
+        : targetCustomer?.displayName || targetCustomer?.name || user.name;
 
     return {
       id: user.id,
       name: resolvedName,
       phone: user.phone,
-      email: targetCustomer?.email || user.email,
+      email: user.role === "ADMIN" ? user.email : (targetCustomer?.email || user.email),
       role: user.role,
       customerId: customerId,
       tokenVersion: user.tokenVersion,
@@ -177,13 +180,16 @@ export class SessionService {
     }
 
     const customerId = targetCustomer?.id || (user as any).customerId || null;
-    const resolvedName = targetCustomer?.displayName || targetCustomer?.name || user.name;
+    const resolvedName =
+      user.role === "ADMIN"
+        ? user.name
+        : targetCustomer?.displayName || targetCustomer?.name || user.name;
 
     return {
       id: user.id,
       name: resolvedName,
       phone: user.phone,
-      email: targetCustomer?.email || user.email,
+      email: user.role === "ADMIN" ? user.email : (targetCustomer?.email || user.email),
       role: user.role,
       customerId: customerId,
       tokenVersion: user.tokenVersion,

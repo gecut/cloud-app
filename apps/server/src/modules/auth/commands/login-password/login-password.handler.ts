@@ -88,12 +88,15 @@ export class LoginPasswordHandler implements ICommandHandler<LoginPasswordComman
 
     await this.sessionService.recordLogin(user.id);
 
-    const resolvedName = user.customer?.displayName || user.customer?.name || user.name;
+    const resolvedName =
+      user.role === "ADMIN"
+        ? user.name
+        : user.customer?.displayName || user.customer?.name || user.name;
     const authUser: AuthenticatedUser = {
       id: user.id,
       name: resolvedName,
       phone: user.phone,
-      email: user.customer?.email || user.email,
+      email: user.role === "ADMIN" ? user.email : (user.customer?.email || user.email),
       role: user.role,
       customerId: user.customer?.id || (user as any).customerId || null,
       tokenVersion: user.tokenVersion,

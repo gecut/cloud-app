@@ -115,10 +115,13 @@ export class VerifyOtpHandler implements ICommandHandler<VerifyOtpCommand, AuthR
     await this.sessionService.recordLogin(user.id);
 
     const customerId = targetCustomer?.id || user.customer?.id || (user as any).customerId || null;
-    const resolvedName = targetCustomer?.displayName || targetCustomer?.name || user.name;
+    const resolvedName =
+      user.role === "ADMIN"
+        ? user.name
+        : targetCustomer?.displayName || targetCustomer?.name || user.name;
 
-    // Synchronize customer relation with user
-    if (targetCustomer) {
+    // Synchronize customer relation with user (only if user is not an ADMIN)
+    if (targetCustomer && user.role !== "ADMIN") {
       if (!targetCustomer.userId || targetCustomer.userId !== user.id) {
         await this.prisma.customer
           .update({
@@ -144,7 +147,7 @@ export class VerifyOtpHandler implements ICommandHandler<VerifyOtpCommand, AuthR
       id: user.id,
       name: resolvedName,
       phone: user.phone,
-      email: targetCustomer?.email || user.email,
+      email: user.role === "ADMIN" ? user.email : (targetCustomer?.email || user.email),
       role: user.role,
       customerId: customerId,
       tokenVersion: user.tokenVersion,
