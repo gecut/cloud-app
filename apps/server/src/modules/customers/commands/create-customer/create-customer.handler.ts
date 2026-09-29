@@ -14,8 +14,11 @@ export class CreateCustomerHandler
     const cleanPhone = dto.phone ? normalizePhoneNumber(dto.phone) : `090000000${Math.floor(10 + Math.random() * 90)}`;
 
     return this.prisma.$transaction(async (tx) => {
+      // Look ONLY for an existing CUSTOMER user with this phone number.
+      // Admin accounts are completely separate and must NEVER be linked or modified when creating a customer.
       let user = await tx.user.findFirst({
         where: {
+          role: "CUSTOMER",
           OR: [{ phone: cleanPhone }, { phone: dto.phone || cleanPhone }],
         },
       });
@@ -27,10 +30,19 @@ export class CreateCustomerHandler
       const validCoopDate = parsedCoopDate && !isNaN(parsedCoopDate.getTime()) ? parsedCoopDate : null;
 
       if (!user) {
+        // If an ADMIN already has this phone, create a separate customer user with a unique identifier
+        const existingAdmin = await tx.user.findFirst({
+          where: {
+            role: "ADMIN",
+            OR: [{ phone: cleanPhone }, { phone: dto.phone || cleanPhone }],
+          },
+        });
+        const userPhone = existingAdmin ? `${cleanPhone}_c${Date.now().toString().slice(-4)}` : cleanPhone;
+
         user = await tx.user.create({
           data: {
             name: dto.name,
-            phone: cleanPhone,
+            phone: userPhone,
             email: dto.email || null,
             role: "CUSTOMER",
             birthDate: validBirthDate,
@@ -41,13 +53,12 @@ export class CreateCustomerHandler
         });
       } else {
         const userUpdateData: any = {};
-        // Never overwrite an ADMIN user's name with customer details
-        if (dto.name && user.role !== "ADMIN") userUpdateData.name = dto.name;
+        if (dto.name) userUpdateData.name = dto.name;
         if (user.phone !== cleanPhone) userUpdateData.phone = cleanPhone;
         if (validBirthDate && !user.birthDate) userUpdateData.birthDate = validBirthDate;
         if (validCoopDate && !user.cooperationStartDate) userUpdateData.cooperationStartDate = validCoopDate;
         if (dto.telegramChatId) userUpdateData.telegramChatId = dto.telegramChatId;
-        if (dto.address && user.role !== "ADMIN") userUpdateData.address = dto.address;
+        if (dto.address) userUpdateData.address = dto.address;
         if (Object.keys(userUpdateData).length > 0) {
           user = await tx.user.update({
             where: { id: user.id },

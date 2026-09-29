@@ -2,6 +2,7 @@ import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Prisma, ServiceStatus } from "@gecut-cloud/db";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
+import { RenewalsSchedulerService } from "../../../renewals/renewals-scheduler.service";
 import { UpdateServiceCommand } from "./update-service.command";
 
 @CommandHandler(UpdateServiceCommand)
@@ -10,6 +11,7 @@ export class UpdateServiceHandler
 {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly renewalsScheduler: RenewalsSchedulerService,
   ) {}
 
   async execute(command: UpdateServiceCommand) {
@@ -155,6 +157,11 @@ export class UpdateServiceHandler
         },
       })
       .catch(() => {});
+
+    // If autoRenew is active or status is active, immediately check expiration/renewal
+    if (updated.autoRenew || updated.status === "ACTIVE") {
+      await this.renewalsScheduler.processSingleServiceById(updated.id).catch(() => {});
+    }
 
     return updated;
   }

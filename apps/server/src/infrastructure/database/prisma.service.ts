@@ -553,7 +553,7 @@ export class PrismaService
             (where.id && u.id === where.id)
           ) {
             let cust = u.customerId ? this.memCustomers.get(u.customerId) || null : null;
-            if (!cust) {
+            if (!cust && u.role !== "ADMIN") {
               cust = Array.from(this.memCustomers.values()).find((c) => c.userId === u.id || matchPhone(c.phone, u.phone)) || null;
               if (cust) {
                 u.customerId = cust.id;
@@ -581,7 +581,7 @@ export class PrismaService
             if (!matchesOr) continue;
           }
           let cust = u.customerId ? this.memCustomers.get(u.customerId) || null : null;
-          if (!cust) {
+          if (!cust && u.role !== "ADMIN") {
             cust = Array.from(this.memCustomers.values()).find((c) => c.userId === u.id || matchPhone(c.phone, u.phone)) || null;
             if (cust) {
               u.customerId = cust.id;
@@ -645,7 +645,7 @@ export class PrismaService
             }
             Object.assign(u, d, { updatedAt: new Date() });
             let cust = u.customerId ? this.memCustomers.get(u.customerId) || null : null;
-            if (!cust) {
+            if (!cust && u.role !== "ADMIN") {
               cust = Array.from(this.memCustomers.values()).find((c) => c.userId === u.id) || null;
               if (cust) {
                 u.customerId = cust.id;
@@ -807,7 +807,7 @@ export class PrismaService
         this.memCustomers.set(id, newCust);
         if (d.userId) {
           const u = this.memUsers.get(d.userId);
-          if (u) {
+          if (u && u.role !== "ADMIN") {
             u.customerId = id;
             u.customer = newCust;
           }
@@ -1026,9 +1026,23 @@ export class PrismaService
     const matchServiceFilter = (s: any, where: any) => {
       if (!where) return true;
       if (where.id && s.id !== where.id) return false;
-      if (where.status && where.status !== "ALL" && s.status !== where.status) return false;
       if (where.serviceGroupId && s.serviceGroupId !== where.serviceGroupId) return false;
       if (where.serverId && s.serverId !== where.serverId) return false;
+
+      // Handle autoRenew filter
+      if (where.autoRenew !== undefined) {
+        if (Boolean(s.autoRenew) !== Boolean(where.autoRenew)) return false;
+      }
+
+      // Handle status filter (supports string and { in: [...], not: ... })
+      if (where.status !== undefined && where.status !== "ALL") {
+        if (typeof where.status === "object" && where.status !== null) {
+          if (Array.isArray(where.status.in) && !where.status.in.includes(s.status)) return false;
+          if (where.status.not !== undefined && s.status === where.status.not) return false;
+        } else if (s.status !== where.status) {
+          return false;
+        }
+      }
 
       if (where.trackingType) {
         if (typeof where.trackingType === "object") {
@@ -1059,11 +1073,33 @@ export class PrismaService
         }
       }
 
-      if (where.customerId) {
-        if (s.customerId !== where.customerId) {
+      // Handle customerId filter (supports null, { not: null }, string, etc.)
+      if (where.customerId !== undefined) {
+        if (where.customerId === null) {
+          if (s.customerId !== null && s.customerId !== undefined) return false;
+        } else if (typeof where.customerId === "object" && where.customerId !== null) {
+          if (where.customerId.not === null) {
+            if (!s.customerId) return false;
+          } else if (where.customerId.not !== undefined) {
+            if (s.customerId === where.customerId.not) return false;
+          } else if (where.customerId.equals !== undefined) {
+            if (s.customerId !== where.customerId.equals) return false;
+          }
+        } else if (s.customerId !== where.customerId) {
           const cust = this.memCustomers.get(s.customerId);
           const matches = cust && (cust.userId === where.customerId || cust.id === where.customerId);
           if (!matches) return false;
+        }
+      }
+
+      if (where.parentServiceId !== undefined) {
+        if (where.parentServiceId === null) {
+          if (s.parentServiceId !== null && s.parentServiceId !== undefined) return false;
+        } else if (typeof where.parentServiceId === "object" && where.parentServiceId !== null) {
+          if (where.parentServiceId.not === null && !s.parentServiceId) return false;
+          if (where.parentServiceId.not !== undefined && s.parentServiceId === where.parentServiceId.not) return false;
+        } else if (s.parentServiceId !== where.parentServiceId) {
+          return false;
         }
       }
 

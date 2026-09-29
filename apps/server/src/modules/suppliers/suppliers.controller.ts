@@ -20,6 +20,7 @@ import { CreateServerCommand } from "./commands/create-server/create-server.comm
 import { CreateServerDto } from "./commands/create-server/create-server.dto";
 import { ListServersQuery } from "./queries/list-servers/list-servers.query";
 import { getNextUniqueInvoiceNumber } from "../invoices/utils/invoice-number.util";
+import { RenewalsSchedulerService } from "../renewals/renewals-scheduler.service";
 
 @ApiTags("suppliers")
 @Controller("suppliers")
@@ -31,6 +32,7 @@ export class SuppliersController {
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
     private readonly prisma: PrismaService,
+    private readonly renewalsScheduler: RenewalsSchedulerService,
   ) {}
 
   @Post("servers")
@@ -390,6 +392,10 @@ export class SuppliersController {
           },
         })
         .catch(() => {});
+
+      if (s.autoRenew !== false || s.status === "ACTIVE") {
+        await this.renewalsScheduler.processSupplierServiceExpiration(s).catch(() => {});
+      }
 
       return s;
     }

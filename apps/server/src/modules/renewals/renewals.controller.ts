@@ -13,6 +13,7 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { RenewServiceCommand } from "./commands/renew-service/renew-service.command";
 import { RenewServiceDto } from "./commands/renew-service/renew-service.dto";
 import { ListUpcomingRenewalsQuery } from "./queries/list-upcoming-renewals/list-upcoming-renewals.query";
+import { RenewalsSchedulerService } from "./renewals-scheduler.service";
 
 @ApiTags("renewals")
 @Controller("renewals")
@@ -21,7 +22,16 @@ export class RenewalsController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
+    private readonly renewalsScheduler: RenewalsSchedulerService,
   ) {}
+
+  @Post("trigger-check")
+  @Roles("ADMIN")
+  @ApiOperation({ summary: "Manually trigger background expired services renewal check" })
+  async triggerCheck() {
+    await this.renewalsScheduler.checkAndProcessExpiredServices();
+    return { success: true, message: "تمدید خودکار سرویس‌های منقضی با موفقیت اجرا شد" };
+  }
 
   @Post("renew")
   @Roles("ADMIN")
