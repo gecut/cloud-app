@@ -91,8 +91,12 @@ export function SubscriptionCard({ data }: SubscriptionCardProps) {
   const overdueDays = dateAnalysis.overdueDays;
 
   const isQuantityDepleted = remained <= 0;
-  const isQuantityNearDepletion = !isQuantityDepleted && (remainPercent <= 5 || remained <= Math.max(1, Math.ceil(total * 0.05)));
-  const isTimeNearExpiry = isHybrid && !isExpired && daysLeft > 0 && daysLeft <= 3;
+  const isQuantityNearDepletion = !isQuantityDepleted && (remainPercent <= 20 || remained <= Math.max(1, Math.ceil(total * 0.2)));
+  const isTimeNearExpiry =
+    isHybrid &&
+    !isExpired &&
+    daysLeft > 0 &&
+    (remainingDaysPercent <= 20 || daysLeft <= Math.max(1, Math.ceil(totalDays * 0.2)));
 
   return (
     <div className="w-full flex flex-col items-stretch gap-5 bg-surface rounded-3xl p-6 sm:p-7 border border-border/40 shadow-xs">
@@ -150,7 +154,7 @@ export function SubscriptionCard({ data }: SubscriptionCardProps) {
         </div>
       )}
 
-      {/* نمایش هشدار ۵ درصد مانده به پایان سهمیه بسته */}
+      {/* نمایش هشدار ۲۰ درصد مانده به پایان سهمیه بسته */}
       {isQuantityNearDepletion && (
         <div className="flex items-center gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold animate-pulse">
           <svg className="h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -159,21 +163,21 @@ export function SubscriptionCard({ data }: SubscriptionCardProps) {
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
           <span>
-            هشدار: کمتر از ۵٪ از سهمیه این بسته باقی مانده است ({remained.toLocaleString("fa-IR")} عدد مانده). لطفاً نسبت به تمدید اقدام فرمایید.
+            هشدار: کمتر از ۲۰٪ از سهمیه این بسته باقی مانده است ({remained.toLocaleString("fa-IR")} عدد مانده). لطفاً نسبت به تمدید اقدام فرمایید.
           </span>
         </div>
       )}
 
-      {/* نمایش هشدار ۳ روز مانده به پایان اعتبار زمانی */}
+      {/* نمایش هشدار کمتر از ۲۰٪ مانده به پایان اعتبار زمانی */}
       {isTimeNearExpiry && (
         <div className="flex items-center gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold animate-pulse">
           <svg className="h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
           <span>
-            هشدار: تنها {daysLeft.toLocaleString("fa-IR")} روز تا پایان مهلت این بسته باقی مانده است. لطفاً نسبت به تمدید اقدام فرمایید.
+            هشدار: کمتر از ۲۰٪ مهلت این بسته باقی مانده است ({daysLeft.toLocaleString("fa-IR")} روز مانده). لطفاً نسبت به تمدید اقدام فرمایید.
           </span>
         </div>
       )}

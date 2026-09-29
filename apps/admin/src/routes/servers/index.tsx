@@ -345,11 +345,14 @@ function getServiceRemainingDetails(service: any) {
   const isQuantityNearDepletion =
     (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
     !isQuantityDepleted &&
-    (remainingQty <= Math.max(1, Math.ceil(totalQty * 0.05)) || (totalQty > 0 && (remainingQty / totalQty) <= 0.05));
+    (remainingQty <= Math.max(1, Math.ceil(totalQty * 0.2)) || (totalQty > 0 && (remainingQty / totalQty) <= 0.2));
 
   const isTimeExpired = trackingType !== "QUANTITY" && analysis.isExpired;
   const isTimeNearExpiry =
-    trackingType !== "QUANTITY" && !isTimeExpired && analysis.daysLeft > 0 && analysis.daysLeft <= 3;
+    trackingType !== "QUANTITY" &&
+    !isTimeExpired &&
+    analysis.daysLeft > 0 &&
+    (analysis.remainingPercent <= 20 || analysis.daysLeft <= Math.max(1, Math.ceil(analysis.totalDays * 0.2)));
 
   const isExpired = isTimeExpired || isQuantityDepleted;
 
@@ -1670,13 +1673,13 @@ function AdminSuppliersPage() {
                                 {!details.isExpired && details.isQuantityNearDepletion && (
                                   <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-semibold">
                                     <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
-                                    <span>هشدار: کمتر از ۵٪ سهمیه بسته باقی مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
+                                    <span>هشدار: کمتر از ۲۰٪ سهمیه بسته باقی مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
                                   </div>
                                 )}
                                 {!details.isExpired && details.isTimeNearExpiry && (
                                   <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-semibold">
                                     <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
-                                    <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرور</span>
+                                    <span>هشدار: کمتر از ۲۰٪ مهلت زمانی ({details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرور)</span>
                                   </div>
                                 )}
 
@@ -2788,13 +2791,13 @@ function AdminSuppliersPage() {
                             {!details.isExpired && details.isQuantityNearDepletion && (
                               <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold">
                                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                <span>هشدار: کمتر از ۵٪ سهمیه بسته باقی مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
+                                <span>هشدار: کمتر از ۲۰٪ سهمیه بسته باقی مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
                               </div>
                             )}
                             {!details.isExpired && details.isTimeNearExpiry && (
                               <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold">
                                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرور</span>
+                                <span>هشدار: کمتر از ۲۰٪ مهلت زمانی ({details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرور)</span>
                               </div>
                             )}
 

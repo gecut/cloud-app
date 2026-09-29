@@ -1,20 +1,15 @@
 import { IQueryHandler, QueryHandler } from "@nestjs/cqrs";
 import { NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
-import { RenewalsSchedulerService } from "../../../renewals/renewals-scheduler.service";
 import { GetCustomerQuery } from "./get-customer.query";
 
 @QueryHandler(GetCustomerQuery)
 export class GetCustomerHandler implements IQueryHandler<GetCustomerQuery> {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly renewalsScheduler: RenewalsSchedulerService,
   ) {}
 
   async execute(query: GetCustomerQuery) {
-    // Proactively auto-renew any services that have autoRenew: true and are expired or depleted
-    await this.renewalsScheduler.checkAndProcessExpiredServices().catch(() => {});
-
     const customer = await this.prisma.customer.findFirst({
       where: {
         OR: [{ id: query.id }, { userId: query.id }],

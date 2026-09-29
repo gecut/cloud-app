@@ -514,7 +514,7 @@ export function analyzeServiceLifecycle(params: {
   const isQuantityNearDepletion =
     (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
     !isQuantityDepleted &&
-    (quantityPercent <= 5 || remainingQty <= Math.max(1, Math.ceil(totalQty * 0.05)));
+    (quantityPercent <= 20 || remainingQty <= Math.max(1, Math.ceil(totalQty * 0.2)));
 
   // 2. Date & Time analysis
   const rawCycle = Number(params.billingCycle);
@@ -535,7 +535,7 @@ export function analyzeServiceLifecycle(params: {
     trackingType !== "QUANTITY" &&
     !isTimeExpired &&
     dateAnalysis.daysLeft > 0 &&
-    dateAnalysis.daysLeft <= 3;
+    (dateAnalysis.remainingPercent <= 20 || dateAnalysis.daysLeft <= Math.max(1, Math.ceil(dateAnalysis.totalSpanDays * 0.2)));
 
   // 3. Expiration logic with priority
   // Rule: For HYBRID packages, priority is on quantity: if quantity ends first, service is expired!
@@ -568,11 +568,11 @@ export function analyzeServiceLifecycle(params: {
   let warningMessage: string | undefined;
   if (hasWarning) {
     if (isQuantityNearDepletion && isTimeNearExpiry) {
-      warningMessage = `هشدار: کمتر از ۵٪ سهمیه (${toPersianDigits(remainingQty)} عدد) و تنها ${toPersianDigits(dateAnalysis.daysLeft)} روز تا سررسید باقی است`;
+      warningMessage = `هشدار: کمتر از ۲۰٪ سهمیه (${toPersianDigits(remainingQty)} عدد) و کمتر از ۲۰٪ مهلت زمانی (${toPersianDigits(dateAnalysis.daysLeft)} روز) باقی مانده است`;
     } else if (isQuantityNearDepletion) {
-      warningMessage = `هشدار: کمتر از ۵٪ از سهمیه بسته باقی مانده است (${toPersianDigits(remainingQty)} عدد باقی‌مانده)`;
+      warningMessage = `هشدار: کمتر از ۲۰٪ از سهمیه بسته باقی مانده است (${toPersianDigits(remainingQty)} عدد باقی‌مانده)`;
     } else if (isTimeNearExpiry) {
-      warningMessage = `هشدار: تنها ${toPersianDigits(dateAnalysis.daysLeft)} روز تا پایان مهلت سرویس باقی مانده است`;
+      warningMessage = `هشدار: کمتر از ۲۰٪ از مهلت زمانی بسته باقی مانده است (${toPersianDigits(dateAnalysis.daysLeft)} روز مانده)`;
     }
   }
 

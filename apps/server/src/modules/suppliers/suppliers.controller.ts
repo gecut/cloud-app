@@ -20,7 +20,6 @@ import { CreateServerCommand } from "./commands/create-server/create-server.comm
 import { CreateServerDto } from "./commands/create-server/create-server.dto";
 import { ListServersQuery } from "./queries/list-servers/list-servers.query";
 import { getNextUniqueInvoiceNumber } from "../invoices/utils/invoice-number.util";
-import { RenewalsSchedulerService } from "../renewals/renewals-scheduler.service";
 
 @ApiTags("suppliers")
 @Controller("suppliers")
@@ -32,7 +31,6 @@ export class SuppliersController {
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
     private readonly prisma: PrismaService,
-    private readonly renewalsScheduler: RenewalsSchedulerService,
   ) {}
 
   @Post("servers")
@@ -62,7 +60,6 @@ export class SuppliersController {
   @Roles("ADMIN")
   @ApiOperation({ summary: "List all suppliers and their services" })
   async listSuppliers() {
-    await this.renewalsScheduler.checkAndProcessExpiredServices().catch(() => {});
     const suppliers = Array.from(this.prisma.memSuppliers.values()).map((sup) => {
       const services = Array.from(this.prisma.memSupplierServices.values()).filter(
         (s) => s.supplierId === sup.id,
@@ -348,20 +345,6 @@ export class SuppliersController {
         body.billingCycle = String(d);
       }
       Object.assign(s, body, { updatedAt: new Date() });
-
-      if (s.autoRenew !== false) {
-        const trackingType = (s.trackingType || "TIME").toUpperCase();
-        const now = new Date();
-        const isTimeExpired = s.renewalDate && new Date(s.renewalDate).getTime() <= now.getTime();
-        const isQtyDepleted =
-          (trackingType === "QUANTITY" || trackingType === "HYBRID" || (s.quantity && s.quantity > 1)) &&
-          s.quantity != null &&
-          Number(s.usedQuantity || 0) >= Number(s.quantity);
-
-        if (isTimeExpired || isQtyDepleted) {
-          await this.renewSupplierService(s.id).catch(() => {});
-        }
-      }
 
       const sup = this.prisma.memSuppliers.get(s.supplierId);
       if (sup) {

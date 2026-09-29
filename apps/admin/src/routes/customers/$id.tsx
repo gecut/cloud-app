@@ -231,11 +231,14 @@ function getServiceRemainingDetails(service: any) {
   const isQuantityNearDepletion =
     (trackingType === "QUANTITY" || trackingType === "HYBRID") &&
     !isQuantityDepleted &&
-    (remainingQty <= Math.max(1, Math.ceil(totalQty * 0.05)) || (totalQty > 0 && (remainingQty / totalQty) <= 0.05));
+    (remainingQty <= Math.max(1, Math.ceil(totalQty * 0.2)) || (totalQty > 0 && (remainingQty / totalQty) <= 0.2));
 
   const isTimeExpired = trackingType !== "QUANTITY" && analysis.isExpired;
   const isTimeNearExpiry =
-    trackingType !== "QUANTITY" && !isTimeExpired && analysis.daysLeft > 0 && analysis.daysLeft <= 3;
+    trackingType !== "QUANTITY" &&
+    !isTimeExpired &&
+    analysis.daysLeft > 0 &&
+    (analysis.remainingPercent <= 20 || analysis.daysLeft <= Math.max(1, Math.ceil(analysis.totalDays * 0.2)));
 
   const isExpired = isTimeExpired || isQuantityDepleted;
 
@@ -833,12 +836,19 @@ function AdminCustomerProfileDetailPage() {
       toast.error("خطای بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
       return;
     }
+    const finalEditDurationDays =
+      editServiceTrackingType === "QUANTITY"
+        ? 0
+        : editServicePurchaseDate && editServiceRenewalDate
+          ? calcDaysBetween(editServicePurchaseDate, editServiceRenewalDate)
+          : editServiceDurationDays;
+
     updateServiceMutation.mutate({
       serviceId: selectedService.id,
       data: {
         name: editServiceName,
         priceToman: Math.round(Number(editServicePrice)) || 0,
-        billingCycle: editServiceTrackingType === "QUANTITY" ? "NONE" : String(editServiceDurationDays),
+        billingCycle: editServiceTrackingType === "QUANTITY" ? "NONE" : String(finalEditDurationDays),
         autoRenew: editServiceAutoRenew,
         quantity: editServiceTrackingType === "TIME" ? 1 : Math.max(1, Number(editServiceQuantity) || 1),
         usedQuantity: editServiceTrackingType === "TIME" ? 0 : Math.max(0, Number(editServiceUsedQuantity) || 0),
@@ -1773,13 +1783,13 @@ function AdminCustomerProfileDetailPage() {
                                   {!details.isExpired && details.isQuantityNearDepletion && (
                                     <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse w-fit">
                                       <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
-                                      <span>هشدار: کمتر از ۵٪ سهمیه بسته باقی‌مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
+                                      <span>هشدار: کمتر از ۲۰٪ سهمیه بسته باقی‌مانده است ({details.remainingQty.toLocaleString("fa-IR")} عدد)</span>
                                     </span>
                                   )}
                                   {!details.isExpired && details.isTimeNearExpiry && (
                                     <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold mt-0.5 animate-pulse w-fit">
                                       <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
-                                      <span>هشدار: {details.daysLeft.toLocaleString("fa-IR")} روز مانده تا پایان مهلت سرویس</span>
+                                      <span>هشدار: کمتر از ۲۰٪ مهلت باقی‌مانده ({details.daysLeft.toLocaleString("fa-IR")} روز تا سررسید)</span>
                                     </span>
                                   )}
 

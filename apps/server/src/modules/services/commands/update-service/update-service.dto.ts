@@ -38,10 +38,9 @@ export class UpdateServiceDto {
   @IsOptional()
   startDate?: string;
 
-  @ApiPropertyOptional({ description: "Renewal Date (ISO string)" })
-  @IsDateString()
+  @ApiPropertyOptional({ description: "Renewal Date (ISO string or null)" })
   @IsOptional()
-  renewalDate?: string;
+  renewalDate?: string | null;
 
   @ApiPropertyOptional({ description: "Server ID" })
   @IsString()

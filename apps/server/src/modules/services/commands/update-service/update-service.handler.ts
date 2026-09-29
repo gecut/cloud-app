@@ -2,7 +2,6 @@ import { CommandHandler, ICommandHandler } from "@nestjs/cqrs";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Prisma, ServiceStatus } from "@gecut-cloud/db";
 import { PrismaService } from "../../../../infrastructure/database/prisma.service";
-import { RenewalsSchedulerService } from "../../../renewals/renewals-scheduler.service";
 import { UpdateServiceCommand } from "./update-service.command";
 
 @CommandHandler(UpdateServiceCommand)
@@ -11,7 +10,6 @@ export class UpdateServiceHandler
 {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly renewalsScheduler: RenewalsSchedulerService,
   ) {}
 
   async execute(command: UpdateServiceCommand) {
@@ -35,7 +33,13 @@ export class UpdateServiceHandler
     if (dto.status !== undefined) updateData.status = dto.status as ServiceStatus;
     if (dto.priceToman !== undefined) updateData.priceToman = dto.priceToman;
     if (dto.startDate !== undefined) updateData.startDate = dto.startDate ? new Date(dto.startDate) : undefined;
-    if (dto.renewalDate !== undefined) updateData.renewalDate = dto.renewalDate ? new Date(dto.renewalDate) : undefined;
+    if (dto.renewalDate !== undefined) {
+      if (dto.renewalDate === null || dto.renewalDate === "") {
+        updateData.renewalDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      } else {
+        updateData.renewalDate = new Date(dto.renewalDate);
+      }
+    }
     if (dto.purchaseDate !== undefined) updateData.purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : null;
     if (dto.trackingType !== undefined) updateData.trackingType = dto.trackingType;
     if (dto.serverId !== undefined) updateData.serverId = dto.serverId || null;
@@ -151,28 +155,6 @@ export class UpdateServiceHandler
         },
       })
       .catch(() => {});
-
-    // If autoRenew is active, immediately check if service has expired/depleted and should be auto-renewed
-    if (updated.autoRenew) {
-      await this.renewalsScheduler.processSingleServiceById(updated.id).catch(() => {});
-      const refreshed = await this.prisma.service.findUnique({
-        where: { id },
-        include: {
-          customer: true,
-          serviceType: true,
-          serviceGroup: true,
-          server: true,
-          endpoints: true,
-          parentService: true,
-          childServices: {
-            include: { customer: true },
-          },
-        },
-      });
-      if (refreshed) {
-        return refreshed;
-      }
-    }
 
     return updated;
   }
