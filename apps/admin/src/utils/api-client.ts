@@ -230,7 +230,10 @@ export const queryClient = new QueryClient({
 });
 
 export const API_BASE_URL = (() => {
-  const configured = env.VITE_SERVER_URL;
+  const rawConfigured = env.VITE_SERVER_URL;
+  const configured = typeof rawConfigured === "string"
+    ? rawConfigured.trim().replace(/^[{(["']+|[})\]"']+$/g, "").trim()
+    : "";
   if (configured && !configured.includes("admin.app.gecut.ir")) {
     return configured.replace(/\/+$/, "");
   }
