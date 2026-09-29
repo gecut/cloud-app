@@ -32,7 +32,7 @@ export function DashboardList({ data }: DashboardListProps) {
 
   return (
     <div className="w-full flex flex-col gap-4">
-      <div className="w-full flex flex-col md:grid md:grid-cols-2 gap-3 md:gap-4">
+      <div className="w-full flex flex-col gap-3">
         {data.map((service) => (
           <DashboardCard key={service.id} data={service} />
         ))}

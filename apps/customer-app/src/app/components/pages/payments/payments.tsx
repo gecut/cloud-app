@@ -438,8 +438,8 @@ export function Payments() {
         </Tabs.ListContainer>
 
         {/* Search, Filter and Sort Toolbar */}
-        <div className="w-full flex flex-col gap-2.5 p-3 my-3 rounded-2xl bg-surface border border-border/40 shadow-xs">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+      <div className="w-fit flex flex-col gap-2.5 px-2 pb-1 rounded-2xl shadow-xs mt-4">
+          {/* <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
             <div className="relative flex-1">
               <input
                 type="text"
@@ -473,7 +473,7 @@ export function Payments() {
                 <option value="price-asc">کمترین مبلغ</option>
               </select>
             </div>
-          </div>
+          </div> */}
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
             <button

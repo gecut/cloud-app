@@ -57,8 +57,8 @@ export function Navigation() {
     >
       <nav
         className={cn(
-          "w-full flex items-center justify-between h-full px-6",
-          "max-w-xl md:max-w-3xl lg:max-w-5xl mx-auto transition-all duration-200",
+          "w-full flex items-center max-w-xl md:max-w-md justify-between h-full px-6",
+          " mx-auto transition-all duration-200",
         )}
       >
         {Object.keys(NAVIGATION_ITEMS).map((key) => {

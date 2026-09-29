@@ -233,10 +233,10 @@ export function DashboardPage() {
       </div>
 
       {/* Filter and Sorting Toolbar */}
-      <div className="w-full flex flex-col gap-2.5 p-3 rounded-2xl bg-surface border border-border/40 shadow-xs">
+      <div className="w-fit flex flex-col gap-2.5 px-2 pb-1 rounded-2xl shadow-xs">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
           {/* Search input */}
-          <div className="relative flex-1">
+          {/* <div className="relative flex-1">
             <input
               type="text"
               value={searchQuery}
@@ -253,10 +253,10 @@ export function DashboardPage() {
                 ✕
               </button>
             )}
-          </div>
+          </div> */}
 
           {/* Sort Select */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          {/* <div className="flex items-center gap-1.5 shrink-0">
             <span className="text-xs text-muted-foreground whitespace-nowrap">مرتب‌سازی:</span>
             <select
               value={sortBy}
@@ -271,7 +271,7 @@ export function DashboardPage() {
               <option value="price-asc">کمترین هزینه</option>
               <option value="renewal-asc">نزدیک‌ترین زمان تمدید</option>
             </select>
-          </div>
+          </div> */}
         </div>
 
         {/* Status Filter Buttons */}

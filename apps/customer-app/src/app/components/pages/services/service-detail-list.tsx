@@ -26,7 +26,7 @@ export function ServiceDetailList({
           <span className="font-bold text-sm text-foreground">
             {emptyTitle || "هیچ سرویسی در این دسته وجود ندارد"}
           </span>
-          <span className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+          <span className="text-xs text-muted-foreground max-w-full leading-relaxed">
             {emptyDescription || "به محض ایجاد سرویس یا اتصال منابع توسط مدیریت، در این بخش نمایش داده خواهد شد."}
           </span>
         </div>
@@ -35,7 +35,7 @@ export function ServiceDetailList({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mt-6 w-full">
+    <div className="w-full flex flex-col gap-4">
       {data.map((service) => (
         <ServiceDetailCard
           key={service.id}

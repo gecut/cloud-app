@@ -1128,7 +1128,7 @@ function AdminSuppliersPage() {
         )}
 
         {/* Monthly Expense & Nearest Due Highlight Banner */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
+        <div className="lg:grid-cols-3 gap-4 lg:gap-5">
           {/* Monthly Commitment Summary with Month Selector */}
           <div className="rounded-2xl border border-border/50 bg-card/60 p-5 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between gap-4 min-w-0 overflow-hidden">
             <div className="flex items-center justify-between gap-2 min-w-0">
@@ -1442,7 +1442,7 @@ function AdminSuppliersPage() {
                         هنوز سرویسی از این تامین‌کننده ثبت نشده است. با کلیک روی دکمه «سرویس جدید» هاست، سرور یا دامنه خریداری شده را اضافه کنید.
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="g lg:grid-cols-3 gap-4">
                         {sortedServices.map((svc: any) => {
                           const badge = getSupplierServiceBadge(svc.type, dynamicCategories);
                           const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
