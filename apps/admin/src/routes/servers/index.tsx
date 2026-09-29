@@ -713,6 +713,18 @@ function AdminSuppliersPage() {
         ? calcAddDays(pDate, 365)
         : safeIso(serviceRenewalDate, new Date(calcAddDays(pDate, serviceDurationDays)));
 
+    if (serviceTrackingType !== "QUANTITY") {
+      const pTime = new Date(pDate).getTime();
+      const rTime = new Date(rDate).getTime();
+      if (rTime < pTime) {
+        toast.error("خطا در بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!");
+        return;
+      }
+    }
+
+    const calculatedSpanDays = calcDaysBetween(pDate, rDate);
+    const finalDurationDays = serviceTrackingType === "QUANTITY" ? serviceDurationDays : calculatedSpanDays;
+
     addServiceMutation.mutate({
       supplierId: targetSupplierId,
       name: serviceName,
@@ -724,8 +736,8 @@ function AdminSuppliersPage() {
         serviceTrackingType === "QUANTITY" || serviceTrackingType === "HYBRID"
           ? Math.max(1, Number(serviceQuantity) || 1)
           : 1,
-      durationDays: serviceDurationDays,
-      billingCycleDays: serviceDurationDays,
+      durationDays: finalDurationDays,
+      billingCycleDays: finalDurationDays,
       autoRenew: serviceAutoRenew,
       purchaseDate: pDate,
       renewalDate: rDate,
@@ -748,12 +760,12 @@ function AdminSuppliersPage() {
     setServiceName("");
     setServicePriceToman("3400000");
     setServiceTrackingType("HYBRID");
-    setServiceDurationDays(30);
-    setServiceQuantity(1000);
-    setServiceAutoRenew(true);
     const nowIso = new Date().toISOString();
     setServicePurchaseDate(nowIso);
+    setServiceDurationDays(30);
     setServiceRenewalDate(calcAddDays(nowIso, 30));
+    setServiceQuantity(1000);
+    setServiceAutoRenew(true);
     setIsAddServiceOpen(true);
   };
 
@@ -767,7 +779,7 @@ function AdminSuppliersPage() {
     setEditServicePurchaseDate(pDate);
     setEditServiceRenewalDate(rDate);
     setEditServiceTrackingType((svc.trackingType as any) || "HYBRID");
-    const cycleDays = svc.billingCycleDays || calcDaysBetween(pDate, rDate) || 30;
+    const cycleDays = calcDaysBetween(pDate, rDate) || svc.billingCycleDays || 30;
     setEditServiceDurationDays(cycleDays);
     setEditServiceQuantity(svc.quantity ?? 1000);
     setEditServiceUsedQuantity(svc.usedQuantity ?? 0);
@@ -786,6 +798,18 @@ function AdminSuppliersPage() {
         ? calcAddDays(pDate, 365)
         : safeIso(editServiceRenewalDate, new Date(calcAddDays(pDate, editServiceDurationDays)));
 
+    if (editServiceTrackingType !== "QUANTITY") {
+      const pTime = new Date(pDate).getTime();
+      const rTime = new Date(rDate).getTime();
+      if (rTime < pTime) {
+        toast.error("خطا در بازه تاریخی: تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد!");
+        return;
+      }
+    }
+
+    const calculatedSpanDays = calcDaysBetween(pDate, rDate);
+    const finalDurationDays = editServiceTrackingType === "QUANTITY" ? editServiceDurationDays : calculatedSpanDays;
+
     updateServiceMutation.mutate({
       serviceId: editingService.id,
       body: {
@@ -799,8 +823,8 @@ function AdminSuppliersPage() {
             ? Math.max(1, Number(editServiceQuantity) || 1)
             : 1,
         usedQuantity: Math.max(0, Number(editServiceUsedQuantity) || 0),
-        durationDays: editServiceDurationDays,
-        billingCycleDays: editServiceDurationDays,
+        durationDays: finalDurationDays,
+        billingCycleDays: finalDurationDays,
         autoRenew: editServiceAutoRenew,
         purchaseDate: pDate,
         renewalDate: rDate,
@@ -1442,7 +1466,7 @@ function AdminSuppliersPage() {
                         هنوز سرویسی از این تامین‌کننده ثبت نشده است. با کلیک روی دکمه «سرویس جدید» هاست، سرور یا دامنه خریداری شده را اضافه کنید.
                       </div>
                     ) : (
-                      <div className="g lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {sortedServices.map((svc: any) => {
                           const badge = getSupplierServiceBadge(svc.type, dynamicCategories);
                           const amt = Number(svc.priceToman ?? svc.monthlyExpenseToman ?? 0);
@@ -2106,12 +2130,30 @@ function AdminSuppliersPage() {
                           </div>
                         )}
 
-                        {isServiceAlarmExceeded && !serviceRangeAnalysis.isNegativeRange && (
-                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold mt-1">
-                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                        {!serviceRangeAnalysis.isNegativeRange && serviceRangeAnalysis.isExpired && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
+                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
                             <span>
-                              توجه: فاصله تاریخ سررسید ({serviceSpanDays} روز) با دوره تنظیمی ({serviceDurationDays} روز) همخوانی ندارد.
+                              خطای انقضای سررسید: تاریخ سررسید در گذشته است ({serviceRangeAnalysis.overdueDays?.toLocaleString("fa-IR")} روز معوقه). این سرویس منقضی شده است!
                             </span>
+                          </div>
+                        )}
+
+                        {isServiceAlarmExceeded && !serviceRangeAnalysis.isNegativeRange && (
+                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold mt-1">
+                            <div className="flex items-center gap-1.5">
+                              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                              <span>
+                                توجه: فاصله تاریخ سررسید ({serviceSpanDays} روز) با دوره تنظیمی ({serviceDurationDays} روز) همخوانی ندارد.
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleServiceDurationChange(serviceSpanDays)}
+                              className="text-[11px] underline text-amber-800 dark:text-amber-200 font-bold hover:text-amber-900 cursor-pointer shrink-0"
+                            >
+                              تطبیق بازه روزانه ({serviceSpanDays.toLocaleString("fa-IR")} روز)
+                            </button>
                           </div>
                         )}
                       </div>
@@ -2135,7 +2177,12 @@ function AdminSuppliersPage() {
 
                   <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
                     <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddServiceOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
-                    <Button type="submit" size="sm" disabled={addServiceMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={addServiceMutation.isPending || (serviceTrackingType !== "QUANTITY" && serviceRangeAnalysis.isNegativeRange)}
+                      className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs disabled:opacity-50"
+                    >
                       {addServiceMutation.isPending ? "در حال ثبت..." : "افزودن به خدمات تامین‌کننده"}
                     </Button>
                   </div>
@@ -2412,12 +2459,30 @@ function AdminSuppliersPage() {
                           </div>
                         )}
 
-                        {isEditServiceAlarmExceeded && !editServiceRangeAnalysis.isNegativeRange && (
-                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold mt-1">
-                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                        {!editServiceRangeAnalysis.isNegativeRange && editServiceRangeAnalysis.isExpired && (
+                          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold mt-1">
+                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
                             <span>
-                              توجه: فاصله تاریخ سررسید ({editServiceSpanDays} روز) با دوره تنظیمی ({editServiceDurationDays} روز) همخوانی ندارد.
+                              خطای انقضای سررسید: تاریخ سررسید در گذشته است ({editServiceRangeAnalysis.overdueDays?.toLocaleString("fa-IR")} روز معوقه). این سرویس منقضی شده است!
                             </span>
+                          </div>
+                        )}
+
+                        {isEditServiceAlarmExceeded && !editServiceRangeAnalysis.isNegativeRange && (
+                          <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold mt-1">
+                            <div className="flex items-center gap-1.5">
+                              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                              <span>
+                                توجه: فاصله تاریخ سررسید ({editServiceSpanDays} روز) با دوره تنظیمی ({editServiceDurationDays} روز) همخوانی ندارد.
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleEditServiceDurationChange(editServiceSpanDays)}
+                              className="text-[11px] underline text-amber-800 dark:text-amber-200 font-bold hover:text-amber-900 cursor-pointer shrink-0"
+                            >
+                              تطبیق بازه روزانه ({editServiceSpanDays.toLocaleString("fa-IR")} روز)
+                            </button>
                           </div>
                         )}
                       </div>
@@ -2459,7 +2524,12 @@ function AdminSuppliersPage() {
 
                   <div className="flex justify-end gap-2.5 pt-4 border-t border-border/40 mt-2">
                     <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditServiceOpen(false)} className="h-10 px-4 rounded-xl text-xs">انصراف</Button>
-                    <Button type="submit" size="sm" disabled={updateServiceMutation.isPending} className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={updateServiceMutation.isPending || (editServiceTrackingType !== "QUANTITY" && editServiceRangeAnalysis.isNegativeRange)}
+                      className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs disabled:opacity-50"
+                    >
                       {updateServiceMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
                     </Button>
                   </div>
