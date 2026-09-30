@@ -1,10 +1,6 @@
 services:
   migration:
-    platform: linux/amd64
     image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-latest}}
-    build:
-      context: .
-      dockerfile: apps/server/Dockerfile
     restart: "no"
     command: ["pnpm", "--filter", "@gecut-cloud/db", "db:migrate:deploy"]
     environment:
@@ -13,11 +9,7 @@ services:
       - dokploy-network
 
   server:
-    platform: linux/amd64
     image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-latest}}
-    build:
-      context: .
-      dockerfile: apps/server/Dockerfile
     restart: unless-stopped
     command: ["sh", "-c", "pnpm --filter @gecut-cloud/db db:migrate:deploy || true && node dist/src/main.js"]
     expose:
@@ -31,7 +23,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/gcloud?schema=public}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://${ADMIN_DOMAIN:-admin.app.gecut.ir},https://admin.app.gecut.ir,https://${CUSTOMER_APP_DOMAIN:-app.gecut.ir},https://app.gecut.ir,https://${SERVER_DOMAIN:-api.app.gecut.ir},https://api.app.gecut.ir,https://admin.cloud.gecut.ir,https://app.cloud.gecut.ir,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://${ADMIN_DOMAIN:-admin.app.gecut.ir},https://${CUSTOMER_APP_DOMAIN:-app.gecut.ir},https://admin.cloud.gecut.ir,https://app.cloud.gecut.ir,https://${SERVER_DOMAIN:-api.app.gecut.ir}}
       SESSION_SECRET: ${SESSION_SECRET:-super-secret-development-session-key-must-be-32-chars-long}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-gecut_session}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-604800}
@@ -41,59 +33,26 @@ services:
       CUSTOMER_APP_URL: ${CUSTOMER_APP_URL:-https://${CUSTOMER_APP_DOMAIN:-app.gecut.ir}}
     volumes:
       - gecut_cloud_server_data:/app/apps/server/data
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.server.rule=Host(`${SERVER_DOMAIN:-api.app.gecut.ir}`)"
-      - "traefik.http.routers.server.entrypoints=websecure"
-      - "traefik.http.routers.server.tls=true"
-      - "traefik.http.routers.server.tls.certresolver=letsencrypt"
-      - "traefik.http.services.server.loadbalancer.server.port=3000"
     networks:
       - dokploy-network
 
   admin:
-    platform: linux/amd64
     image: ghcr.io/gecut/cloud-app/admin:${ADMIN_TAG:-${TAG:-latest}}
-    build:
-      context: .
-      dockerfile: apps/admin/Dockerfile
-      args:
-        VITE_SERVER_URL: ${VITE_SERVER_URL:-https://${SERVER_DOMAIN:-api.app.gecut.ir}}
     restart: unless-stopped
     expose:
       - "80"
     depends_on:
       - server
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.admin.rule=Host(`${ADMIN_DOMAIN:-admin.app.gecut.ir}`)"
-      - "traefik.http.routers.admin.entrypoints=websecure"
-      - "traefik.http.routers.admin.tls=true"
-      - "traefik.http.routers.admin.tls.certresolver=letsencrypt"
-      - "traefik.http.services.admin.loadbalancer.server.port=80"
     networks:
       - dokploy-network
 
   customer-app:
-    platform: linux/amd64
     image: ghcr.io/gecut/cloud-app/customer-app:${CUSTOMER_APP_TAG:-${TAG:-latest}}
-    build:
-      context: .
-      dockerfile: apps/customer-app/Dockerfile
-      args:
-        VITE_SERVER_URL: ${VITE_SERVER_URL:-https://${SERVER_DOMAIN:-api.app.gecut.ir}}
     restart: unless-stopped
     expose:
       - "80"
     depends_on:
       - server
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.customer.rule=Host(`${CUSTOMER_APP_DOMAIN:-app.gecut.ir}`)"
-      - "traefik.http.routers.customer.entrypoints=websecure"
-      - "traefik.http.routers.customer.tls=true"
-      - "traefik.http.routers.customer.tls.certresolver=letsencrypt"
-      - "traefik.http.services.customer.loadbalancer.server.port=80"
     networks:
       - dokploy-network
 
