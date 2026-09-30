@@ -34,10 +34,6 @@ COPY apps/server ./apps/server
 RUN pnpm --filter @gecut-cloud/db db:generate
 RUN pnpm --filter server build
 
-# 4. Prune devDependencies to keep final image compact
-RUN pnpm prune --prod --no-optional && \
-    rm -rf /root/.local /root/.cache /root/.npm /tmp/*
-
 # --- Production Runner Stage ---
 FROM base AS runner
 WORKDIR /app

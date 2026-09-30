@@ -13,7 +13,7 @@ const sanitizeUrl = (val: unknown): string | undefined => {
 export const env = createEnv({
   clientPrefix: "VITE_",
   client: {
-    VITE_SERVER_URL: z.string().optional().default("https://api.app.gecut.ir"),
+    VITE_SERVER_URL: z.string().optional().default("http://192.168.43.134:3000"),
   },
   runtimeEnv: {
     VITE_SERVER_URL: sanitizeUrl(import.meta.env.VITE_SERVER_URL),
