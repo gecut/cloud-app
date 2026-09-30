@@ -2,6 +2,9 @@ services:
   migration:
     platform: linux/amd64
     image: ghcr.io/gecut/cloud-app/server:${SERVER_TAG:-${TAG:-latest}}
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
     restart: "no"
     command: ["pnpm", "--filter", "@gecut-cloud/db", "db:migrate:deploy"]
     environment:

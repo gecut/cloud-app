@@ -19,8 +19,9 @@ COPY packages/payment/package.json ./packages/payment/
 COPY packages/ui/package.json ./packages/ui/
 COPY apps/admin/package.json ./apps/admin/
 
-# Install dependencies with BuildKit pnpm cache
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# Install dependencies without lifecycle scripts (prisma generate runs after code copy)
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts
 
 # 2. Copy source code
 COPY packages ./packages

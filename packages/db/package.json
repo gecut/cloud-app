@@ -9,6 +9,9 @@
       "default": "./src/*.ts"
     }
   },
+  "prisma": {
+    "schema": "prisma/schema/schema.prisma"
+  },
   "scripts": {
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
