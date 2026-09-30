@@ -215,19 +215,28 @@ function AdminAccountingPage() {
   const suppliers = suppliersData?.items || [];
   const customersList = customersData?.items || [];
 
-  // Financial calculations
-  const paidInvoices = invoices.filter((i: any) => i.status === "PAID");
-  const unpaidInvoices = invoices.filter((i: any) => i.status === "UNPAID");
+  // Financial calculations with strict counterparty separation
+  const customerInvoices = useMemo(
+    () => invoices.filter((i: any) => !i.supplierId && i.counterpartyType !== "SUPPLIER"),
+    [invoices],
+  );
+  const supplierInvoices = useMemo(
+    () => invoices.filter((i: any) => Boolean(i.supplierId) || i.counterpartyType === "SUPPLIER"),
+    [invoices],
+  );
 
-  const collectedSalesToman = paidInvoices.reduce((acc: number, curr: any) => acc + (curr.totalToman || 0), 0);
-  const receivableSalesToman = unpaidInvoices.reduce((acc: number, curr: any) => acc + (curr.totalToman || 0), 0);
+  const paidCustomerInvoices = customerInvoices.filter((i: any) => i.status === "PAID");
+  const unpaidCustomerInvoices = customerInvoices.filter((i: any) => i.status === "UNPAID");
+
+  const collectedSalesToman = paidCustomerInvoices.reduce((acc: number, curr: any) => acc + (curr.totalToman || 0), 0);
+  const receivableSalesToman = unpaidCustomerInvoices.reduce((acc: number, curr: any) => acc + (curr.totalToman || 0), 0);
 
   const supplierExpensesToman = suppliers.reduce((acc: number, curr: any) => acc + (Number(curr.totalPayableToman) || 0), 0);
   const netBalanceToman = collectedSalesToman - supplierExpensesToman;
 
-  // Multi-Criteria Filtering
+  // Multi-Criteria Filtering (Sales Tab strictly filters customer invoices)
   const filteredInvoices = useMemo(() => {
-    return invoices.filter((inv: any) => {
+    return customerInvoices.filter((inv: any) => {
       // 1. Customer
       if (filterCustomerId !== "ALL" && String(inv.customerId) !== String(filterCustomerId)) return false;
 
@@ -257,7 +266,7 @@ function AdminAccountingPage() {
 
       return true;
     });
-  }, [invoices, filterCustomerId, filterStatus, minAmount, maxAmount, filterFromDate, filterToDate]);
+  }, [customerInvoices, filterCustomerId, filterStatus, minAmount, maxAmount, filterFromDate, filterToDate]);
 
 
   const hasActiveFilters = Boolean(
@@ -439,7 +448,7 @@ function AdminAccountingPage() {
           {/* 1. Collected Revenue */}
           <div className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-emerald-500/30 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">وصول‌شده ماه (فروش)</span>
+              <span className="text-xs font-semibold text-muted-foreground">وصول‌شده (فروش به مشتریان)</span>
               <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
                 <ArrowDownLeft className="h-4 w-4" />
               </div>
@@ -449,14 +458,14 @@ function AdminAccountingPage() {
                 {collectedSalesToman.toLocaleString("fa-IR")}{" "}
                 <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
               </div>
-              <span className="text-xs text-muted-foreground font-medium">فاکتورهای تایید و تسویه‌شده</span>
+              <span className="text-xs text-muted-foreground font-medium">فاکتورهای تسویه‌شده مشتریان</span>
             </div>
           </div>
 
           {/* 2. Supplier Expenses */}
           <div className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-rose-500/30 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">هزینه‌های تامین‌کنندگان</span>
+              <span className="text-xs font-semibold text-muted-foreground">بدهی به تامین‌کنندگان (ما بدهکاریم)</span>
               <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">
                 <ArrowUpRight className="h-4 w-4" />
               </div>
@@ -466,7 +475,7 @@ function AdminAccountingPage() {
                 {supplierExpensesToman.toLocaleString("fa-IR")}{" "}
                 <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
               </div>
-              <span className="text-xs text-muted-foreground font-medium">هزینه سرورها، هاست و لایسنس</span>
+              <span className="text-xs text-muted-foreground font-medium">هزینه سرورها و فاکتورهای تامین‌کننده</span>
             </div>
           </div>
 
@@ -494,7 +503,7 @@ function AdminAccountingPage() {
           {/* 4. Customer Receivables */}
           <div className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6 shadow-xs backdrop-blur-xs flex flex-col justify-between hover:border-amber-500/30 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">مطالبات معوق از مشتریان</span>
+              <span className="text-xs font-semibold text-muted-foreground">مطالبات و طلب از مشتریان (ما طلبکاریم)</span>
               <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
                 <AlertCircle className="h-4 w-4" />
               </div>
@@ -504,7 +513,7 @@ function AdminAccountingPage() {
                 {receivableSalesToman.toLocaleString("fa-IR")}{" "}
                 <span className="text-xs font-normal text-muted-foreground font-sans">تومان</span>
               </div>
-              <span className="text-xs text-muted-foreground font-medium">مانده فاکتورهای پرداخت‌نشده</span>
+              <span className="text-xs text-muted-foreground font-medium">مانده فاکتورهای پرداخت‌نشده مشتریان</span>
             </div>
           </div>
         </div>
@@ -520,7 +529,7 @@ function AdminAccountingPage() {
             }`}
           >
             <CreditCard className="h-4 w-4" />
-            فروش و درآمدها (مشتریان)
+            فروش و درآمدها (طلب از مشتریان)
           </Button>
 
           <Button
@@ -528,11 +537,11 @@ function AdminAccountingPage() {
             size="sm"
             onClick={() => setActiveTab("procurement")}
             className={`rounded-xl text-xs gap-2 cursor-pointer h-9 px-4 font-semibold justify-center sm:justify-start ${
-              activeTab === "procurement" ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs" : "text-muted-foreground"
+              activeTab === "procurement" ? "bg-purple-600 text-white hover:bg-purple-500 shadow-xs" : "text-muted-foreground"
             }`}
           >
             <Building2 className="h-4 w-4" />
-            تامین و هزینه‌ها (تامین‌کنندگان)
+            تامین و هزینه‌ها (بدهی به تامین‌کنندگان)
           </Button>
         </div>
 

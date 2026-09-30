@@ -87,23 +87,27 @@ export function InvoiceDetailModal({
 
   const formatPrice = (n: number) => Number(n || 0).toLocaleString("fa-IR");
 
+  const supplierName = invoice.supplier?.name || invoice.supplierName || "تامین‌کننده زیرساخت";
+  const supplierContact = invoice.supplier?.contactPerson || "";
+  const supplierPhone = toPersianDigits(invoice.supplier?.phone || "-");
+  const supplierNotes = invoice.supplier?.notes || "";
+
   const customerName =
     invoice.customer?.name ||
     invoice.customer?.displayName ||
-    (isSupplier ? invoice.supplier?.name || "تامین‌کننده" : "جناب آقای طباطبایی");
+    "مشتری";
 
   const projectName =
     invoice.customer?.displayName ||
     invoice.customer?.company ||
     items[0]?.serviceNameSnapshot ||
     items[0]?.service?.name ||
-    (isSupplier ? "تامین زیرساخت" : "rasta-company.com");
+    (isSupplier ? "تامین زیرساخت" : "-");
 
   const customerPhone = toPersianDigits(
     invoice.customer?.phone ||
       invoice.customer?.user?.phone ||
-      (isSupplier ? invoice.supplier?.phone : "090136891759") ||
-      "۰۹۰۱۳۶۸۹۱۷۵۹",
+      "-",
   );
 
   const invoiceNum = toPersianDigits(invoice.invoiceNumber || invoice.id || "753");
@@ -179,16 +183,53 @@ export function InvoiceDetailModal({
                 شماره فاکتور: <span style="font-weight: 700;">${invoiceNum}</span>
               </div>
               <div style="font-size: 18px; font-weight: 800; color: #0f172a; text-align: center;">
-                فاکتور فروش خدمات
+                ${isSupplier ? "فاکتور خرید و تامین خدمات" : "فاکتور فروش خدمات"}
               </div>
               <div style="font-size: 12.5px; font-weight: 500; color: #1f2937;">
                 تاریخ: <span>${jalaliDateStr}</span>
               </div>
             </div>
 
-            <!-- 2. Parties Info (Seller on Right, Customer on Left) -->
+            <!-- 2. Parties Info (Seller on Right, Buyer on Left) -->
             <div style="display: grid; grid-template-columns: 1fr 1px 1fr; gap: 24px; align-items: stretch; margin-bottom: 32px;">
-              <!-- Right: Seller -->
+              ${
+                isSupplier
+                  ? `
+              <!-- Right: Seller (Supplier) -->
+              <div style="text-align: right; line-height: 1.8;">
+                <div style="font-weight: 800; font-size: 13.5px; color: #111827; margin-bottom: 4px;">مشخصات فروشنده (تامین‌کننده)</div>
+                <div style="font-size: 12px; color: #374151; font-weight: 600;">${supplierName}</div>
+                ${supplierContact ? `<div style="font-size: 12px; color: #374151;">مسئول / رابط: ${supplierContact}</div>` : ""}
+                <div style="font-size: 12px; color: #374151;">
+                  <span>شماره تماس: </span>
+                  <span style="font-weight: 600; color: #111827;">${supplierPhone}</span>
+                </div>
+                <div style="font-size: 11px; color: #7c3aed; font-weight: 700; margin-top: 4px;">وضعیت: بستانکار (طلبکار از جیکات وب)</div>
+              </div>
+
+              <!-- Center Divider -->
+              <div style="border-left: 1px dashed #d1d5db; height: 100%;"></div>
+
+              <!-- Left: Buyer (Gecut Web) -->
+              <div style="text-align: right; line-height: 1.8;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                  <div style="text-align: left; line-height: 1.1;">
+                    <div style="color: #059669; font-weight: 800; font-size: 11px;">جیکات وب</div>
+                    <div style="color: #1f2937; font-weight: 900; font-size: 10px; letter-spacing: 0.5px;">GECUT WEB</div>
+                  </div>
+                  <img src="${logoUrl}" alt="Gecut" style="width: 26px; height: 26px; object-fit: contain;" onerror="this.style.display='none'" />
+                </div>
+                <div style="font-weight: 800; font-size: 13.5px; color: #111827; margin-bottom: 4px;">مشخصات خریدار</div>
+                <div style="font-size: 12px; color: #374151;">شرکت طراحی سایت جیکات وب</div>
+                <div style="font-size: 12px; color: #374151;">
+                  <span>شماره تماس : </span>
+                  <span style="font-weight: 600; color: #111827;">۰۹۳۰۴۷۱۳۰۵۸</span>
+                </div>
+                <div style="font-size: 11px; color: #dc2626; font-weight: 700; margin-top: 4px;">وضعیت: بدهکار به تامین‌کننده</div>
+              </div>
+              `
+                  : `
+              <!-- Right: Seller (Gecut Web) -->
               <div style="text-align: right; line-height: 1.8;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
                   <div style="text-align: left; line-height: 1.1;">
@@ -203,14 +244,15 @@ export function InvoiceDetailModal({
                   <span>شماره تماس : </span>
                   <span style="font-weight: 600; color: #111827;">۰۹۳۰۴۷۱۳۰۵۸</span>
                 </div>
+                <div style="font-size: 11px; color: #059669; font-weight: 700; margin-top: 4px;">وضعیت: بستانکار (طلبکار از مشتری)</div>
               </div>
 
               <!-- Center Divider -->
               <div style="border-left: 1px dashed #d1d5db; height: 100%;"></div>
 
-              <!-- Left: Customer -->
+              <!-- Left: Customer (Buyer) -->
               <div style="text-align: right; line-height: 1.8;">
-                <div style="font-weight: 800; font-size: 13.5px; color: #111827; margin-bottom: 6px; padding-top: 4px;">مشخصات مشتری</div>
+                <div style="font-weight: 800; font-size: 13.5px; color: #111827; margin-bottom: 6px; padding-top: 4px;">مشخصات مشتری (خریدار)</div>
                 <div style="font-size: 12px; color: #374151;">
                   <span>نام و نام خانوادگی:</span>
                   <span style="font-weight: 600; color: #111827; margin-right: 4px;">${customerName}</span>
@@ -223,7 +265,10 @@ export function InvoiceDetailModal({
                   <span>شماره تماس :</span>
                   <span style="font-weight: 600; color: #111827; margin-right: 4px;">${customerPhone}</span>
                 </div>
+                <div style="font-size: 11px; color: #d97706; font-weight: 700; margin-top: 4px;">وضعیت: بدهکار به شرکت</div>
               </div>
+              `
+              }
             </div>
 
             <!-- 3. Items Table -->
@@ -279,7 +324,18 @@ export function InvoiceDetailModal({
             <!-- 5. Horizontal Dashed Separator -->
             <div style="border-top: 1px dashed #d1d5db; width: 100%; margin: 24px 0;"></div>
 
-            <!-- 6. Bank Information -->
+            <!-- 6. Bank / Settlement Information -->
+            ${
+              isSupplier
+                ? `
+            <div style="text-align: right; line-height: 1.9; font-size: 12.5px; color: #1f2937;">
+              <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">اطلاعات تسویه بدهی به تامین‌کننده</div>
+              <div style="color: #374151;">طرف حساب: <span style="font-weight: 700; color: #111827;">${supplierName}</span></div>
+              <div style="color: #4b5563; font-size: 12px;">شرکت جیکات وب خریدار خدمت بوده و بدهکار به تامین‌کننده است (واریز توسط جیکات وب).</div>
+              ${supplierNotes ? `<div style="color: #6b7280; font-size: 11px; margin-top: 2px;">مشخصات حساب / یادداشت: ${supplierNotes}</div>` : ""}
+            </div>
+            `
+                : `
             <div style="text-align: right; line-height: 1.9; font-size: 12.5px; color: #1f2937;">
               <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">اطلاعات بانکی</div>
               <div style="font-size: 14px; font-weight: 800; color: #0f172a;">
@@ -291,6 +347,8 @@ export function InvoiceDetailModal({
                 لینک کارت آنلاین: <a href="https://k32.ir/sahbaee" target="_blank" style="color: #1f2937; text-decoration: underline; font-weight: 500;">k32.ir/sahbaee</a>
               </div>
             </div>
+            `
+            }
           </div>
 
           <script>
@@ -405,58 +463,109 @@ export function InvoiceDetailModal({
               شماره فاکتور <span className="font-bold">{invoiceNum}</span>
             </div>
             <div className="text-lg font-bold text-gray-900 text-center">
-              فاکتور فروش خدمات
+              {isSupplier ? "فاکتور خرید و تامین خدمات" : "فاکتور فروش خدمات"}
             </div>
             <div className="text-xs font-medium text-gray-800">
               تاریخ: <span>{jalaliDateStr}</span>
             </div>
           </div>
 
-          {/* 2. Parties Info: Seller (Right) | Divider | Customer (Left) */}
+          {/* 2. Parties Info: Seller (Right) | Divider | Buyer (Left) */}
           <div className="grid grid-cols-[1fr_1px_1fr] gap-6 items-stretch mb-8">
             {/* Right: Seller */}
-            <div className="text-right leading-relaxed space-y-1">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="text-left leading-none">
-                  <div className="text-[#059669] font-bold text-[11px]">جیکات وب</div>
-                  <div className="text-gray-900 font-extrabold text-[10px] tracking-wider">GECUT WEB</div>
+            {isSupplier ? (
+              <div className="text-right leading-relaxed space-y-1">
+                <div className="font-bold text-sm text-gray-900">مشخصات فروشنده (تامین‌کننده)</div>
+                <div className="text-xs text-gray-800 font-semibold">{supplierName}</div>
+                {supplierContact && (
+                  <div className="text-xs text-gray-700">رابط / مسئول: {supplierContact}</div>
+                )}
+                <div className="text-xs text-gray-800">
+                  <span>شماره تماس : </span>
+                  <span className="font-semibold text-gray-900 font-mono">{supplierPhone}</span>
                 </div>
-                <img
-                  src="/logo.png"
-                  alt="Gecut"
-                  className="w-6 h-6 object-contain"
-                  onError={(e) => {
-                    (e.target as any).style.display = "none";
-                  }}
-                />
+                <div className="text-[11px] font-bold text-purple-700 bg-purple-50 inline-block px-2 py-0.5 rounded mt-1">
+                  وضعیت: بستانکار (طلبکار از جیکات وب)
+                </div>
               </div>
-              <div className="font-bold text-sm text-gray-900">مشخصات فروشنده</div>
-              <div className="text-xs text-gray-800">شرکت طراحی سایت جیکات وب</div>
-              <div className="text-xs text-gray-800">
-                <span>شماره تماس : </span>
-                <span className="font-semibold text-gray-900">{toPersianDigits("09304713058")}</span>
+            ) : (
+              <div className="text-right leading-relaxed space-y-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-left leading-none">
+                    <div className="text-[#059669] font-bold text-[11px]">جیکات وب</div>
+                    <div className="text-gray-900 font-extrabold text-[10px] tracking-wider">GECUT WEB</div>
+                  </div>
+                  <img
+                    src="/logo.png"
+                    alt="Gecut"
+                    className="w-6 h-6 object-contain"
+                    onError={(e) => {
+                      (e.target as any).style.display = "none";
+                    }}
+                  />
+                </div>
+                <div className="font-bold text-sm text-gray-900">مشخصات فروشنده</div>
+                <div className="text-xs text-gray-800">شرکت طراحی سایت جیکات وب</div>
+                <div className="text-xs text-gray-800">
+                  <span>شماره تماس : </span>
+                  <span className="font-semibold text-gray-900">{toPersianDigits("09304713058")}</span>
+                </div>
+                <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 inline-block px-2 py-0.5 rounded mt-1">
+                  وضعیت: بستانکار (طلبکار از مشتری)
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Center Divider */}
             <div className="border-l border-dashed border-gray-300 h-full" />
 
-            {/* Left: Customer */}
-            <div className="text-right leading-relaxed space-y-1 pt-1">
-              <div className="font-bold text-sm text-gray-900 mb-2">مشخصات مشتری</div>
-              <div className="text-xs text-gray-800">
-                <span className="text-gray-600">نام و نام خانوادگی: </span>
-                <span className="font-semibold text-gray-900">{customerName}</span>
+            {/* Left: Buyer */}
+            {isSupplier ? (
+              <div className="text-right leading-relaxed space-y-1 pt-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-left leading-none">
+                    <div className="text-[#059669] font-bold text-[11px]">جیکات وب</div>
+                    <div className="text-gray-900 font-extrabold text-[10px] tracking-wider">GECUT WEB</div>
+                  </div>
+                  <img
+                    src="/logo.png"
+                    alt="Gecut"
+                    className="w-6 h-6 object-contain"
+                    onError={(e) => {
+                      (e.target as any).style.display = "none";
+                    }}
+                  />
+                </div>
+                <div className="font-bold text-sm text-gray-900">مشخصات خریدار</div>
+                <div className="text-xs text-gray-800">شرکت طراحی سایت جیکات وب</div>
+                <div className="text-xs text-gray-800">
+                  <span>شماره تماس : </span>
+                  <span className="font-semibold text-gray-900">{toPersianDigits("09304713058")}</span>
+                </div>
+                <div className="text-[11px] font-bold text-rose-700 bg-rose-50 inline-block px-2 py-0.5 rounded mt-1">
+                  وضعیت: بدهکار به تامین‌کننده (ما بدهکاریم)
+                </div>
               </div>
-              <div className="text-xs text-gray-800">
-                <span className="text-gray-600">پروژه: </span>
-                <span className="font-semibold text-gray-900 font-mono">{projectName}</span>
+            ) : (
+              <div className="text-right leading-relaxed space-y-1 pt-1">
+                <div className="font-bold text-sm text-gray-900 mb-2">مشخصات مشتری (خریدار)</div>
+                <div className="text-xs text-gray-800">
+                  <span className="text-gray-600">نام و نام خانوادگی: </span>
+                  <span className="font-semibold text-gray-900">{customerName}</span>
+                </div>
+                <div className="text-xs text-gray-800">
+                  <span className="text-gray-600">پروژه: </span>
+                  <span className="font-semibold text-gray-900 font-mono">{projectName}</span>
+                </div>
+                <div className="text-xs text-gray-800">
+                  <span className="text-gray-600">شماره تماس : </span>
+                  <span className="font-semibold text-gray-900 font-mono">{customerPhone}</span>
+                </div>
+                <div className="text-[11px] font-bold text-amber-700 bg-amber-50 inline-block px-2 py-0.5 rounded mt-1">
+                  وضعیت: بدهکار به شرکت
+                </div>
               </div>
-              <div className="text-xs text-gray-800">
-                <span className="text-gray-600">شماره تماس : </span>
-                <span className="font-semibold text-gray-900 font-mono">{customerPhone}</span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* 3. Items Table */}
@@ -526,26 +635,44 @@ export function InvoiceDetailModal({
           {/* 5. Horizontal Dashed Divider */}
           <div className="border-t border-dashed border-gray-300 w-full my-6" />
 
-          {/* 6. Bank Information Section */}
-          <div className="text-right leading-relaxed text-xs text-gray-800 space-y-1">
-            <div className="text-sm font-bold text-gray-900 mb-1">اطلاعات بانکی</div>
-            <div className="text-sm font-bold text-gray-900 font-mono">
-              شماره کارت: {toPersianDigits("6219861073760684")}
+          {/* 6. Bank / Settlement Information Section */}
+          {isSupplier ? (
+            <div className="text-right leading-relaxed text-xs text-gray-800 space-y-1">
+              <div className="text-sm font-bold text-gray-900 mb-1">اطلاعات تسویه بدهی به تامین‌کننده</div>
+              <div className="text-gray-700">
+                طرف‌حساب: <span className="font-bold text-gray-900">{supplierName}</span>
+              </div>
+              <div className="text-gray-600 text-[11px]">
+                شرکت جیکات وب در این فاکتور خریدار خدمت بوده و بدهکار به تامین‌کننده می‌باشد (تسویه توسط مدیریت).
+              </div>
+              {supplierNotes && (
+                <div className="text-gray-600 text-[11px]">
+                  <span>مشخصات حساب / یادداشت: </span>
+                  <span className="font-medium text-gray-800">{supplierNotes}</span>
+                </div>
+              )}
             </div>
-            <div className="text-gray-700">بانک: سامان</div>
-            <div className="text-gray-700">نام صاحب حساب: مهدیار صهبائی احمدی</div>
-            <div className="text-gray-700">
-              <span>لینک کارت آنلاین: </span>
-              <a
-                href="https://k32.ir/sahbaee"
-                target="_blank"
-                rel="noreferrer"
-                className="text-gray-900 underline font-medium"
-              >
-                k32.ir/sahbaee
-              </a>
+          ) : (
+            <div className="text-right leading-relaxed text-xs text-gray-800 space-y-1">
+              <div className="text-sm font-bold text-gray-900 mb-1">اطلاعات بانکی</div>
+              <div className="text-sm font-bold text-gray-900 font-mono">
+                شماره کارت: {toPersianDigits("6219861073760684")}
+              </div>
+              <div className="text-gray-700">بانک: سامان</div>
+              <div className="text-gray-700">نام صاحب حساب: مهدیار صهبائی احمدی</div>
+              <div className="text-gray-700">
+                <span>لینک کارت آنلاین: </span>
+                <a
+                  href="https://k32.ir/sahbaee"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-gray-900 underline font-medium"
+                >
+                  k32.ir/sahbaee
+                </a>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Status notice if Unpaid / Cancelled / Paid (Hidden on Print) */}
@@ -553,7 +680,11 @@ export function InvoiceDetailModal({
           <div className="mt-4 p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between print:hidden">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span>این صورت‌حساب در انتظار پرداخت است و مشتری می‌تواند آن را به صورت آنلاین تسویه کند.</span>
+              <span>
+                {isSupplier
+                  ? "این صورت‌حساب خرید در انتظار پرداخت و تسویه توسط جیکات وب است (ما به تامین‌کننده بدهکاریم)."
+                  : "این صورت‌حساب در انتظار پرداخت است و مشتری می‌تواند آن را به صورت آنلاین تسویه کند (طلب از مشتری)."}
+              </span>
             </div>
             {onCancel && (
               <Button
@@ -592,7 +723,11 @@ export function InvoiceDetailModal({
         ) : invoice.status === "PAID" ? (
           <div className="mt-4 p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2 print:hidden">
             <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span>این صورت‌حساب تسویه و پرداخت گردیده است.</span>
+            <span>
+              {isSupplier
+                ? "این صورت‌حساب به تامین‌کننده پرداخت و تسویه شده است (بدهی تسویه گردید)."
+                : "این صورت‌حساب تسویه و دریافت گردیده است (طلب وصول شد)."}
+            </span>
           </div>
         ) : null}
 

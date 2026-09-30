@@ -35,12 +35,8 @@ export class UpdateServiceHandler
     if (dto.status !== undefined) updateData.status = dto.status as ServiceStatus;
     if (dto.priceToman !== undefined) updateData.priceToman = dto.priceToman;
     if (dto.startDate !== undefined) updateData.startDate = dto.startDate ? new Date(dto.startDate) : undefined;
-    if (dto.renewalDate !== undefined) {
-      if (dto.renewalDate === null || dto.renewalDate === "") {
-        updateData.renewalDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-      } else {
-        updateData.renewalDate = new Date(dto.renewalDate);
-      }
+    if (dto.renewalDate !== undefined && dto.renewalDate) {
+      updateData.renewalDate = new Date(dto.renewalDate);
     }
     if (dto.purchaseDate !== undefined) updateData.purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : null;
     if (dto.trackingType !== undefined) updateData.trackingType = dto.trackingType;
@@ -96,6 +92,15 @@ export class UpdateServiceHandler
       new Date(effectiveRenewalDate as Date).getTime() < new Date(effectivePurchaseDate as Date).getTime()
     ) {
       throw new BadRequestException("تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
+    }
+
+    const isExpired =
+      effectiveTrackingType !== "QUANTITY" &&
+      effectiveRenewalDate &&
+      new Date(effectiveRenewalDate as Date).getTime() <= Date.now();
+
+    if (isExpired && dto.status === undefined) {
+      updateData.status = "INACTIVE";
     }
 
     const updated = await this.prisma.service.update({
@@ -158,9 +163,26 @@ export class UpdateServiceHandler
       })
       .catch(() => {});
 
-    // If autoRenew is active or status is active, immediately check expiration/renewal
-    if (updated.autoRenew || updated.status === "ACTIVE") {
-      await this.renewalsScheduler.processSingleServiceById(updated.id).catch(() => {});
+    // If autoRenew is active, immediately check expiration/renewal unless the user is explicitly editing dates
+    if (updated.autoRenew && dto.renewalDate === undefined && dto.purchaseDate === undefined) {
+      const processed = await this.renewalsScheduler.processSingleServiceById(updated.id).catch(() => false);
+      if (processed) {
+        const reloaded = await this.prisma.service.findUnique({
+          where: { id: updated.id },
+          include: {
+            customer: true,
+            serviceType: true,
+            serviceGroup: true,
+            server: true,
+            endpoints: true,
+            parentService: true,
+            childServices: {
+              include: { customer: true },
+            },
+          },
+        });
+        if (reloaded) return reloaded;
+      }
     }
 
     return updated;

@@ -111,10 +111,18 @@ export class CreateServiceHandler
         }
       }
 
+      const isExpired =
+        trackingType !== "QUANTITY" &&
+        renewalDate &&
+        renewalDate.getTime() <= now.getTime();
+
+      const serviceStatus: ServiceStatus =
+        (dto.status as ServiceStatus) || (isExpired ? "INACTIVE" : "ACTIVE");
+
       const serviceData: Prisma.ServiceUncheckedCreateInput = {
         name: dto.name,
         description: dto.description || null,
-        status: (dto.status as ServiceStatus) || "ACTIVE",
+        status: serviceStatus,
         priceToman: dto.priceToman || 0,
         billingCycle: dto.billingCycle || "MONTHLY",
         quantity: Math.max(1, Number(dto.quantity) || 1),

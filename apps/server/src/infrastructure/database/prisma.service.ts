@@ -1130,13 +1130,19 @@ export class PrismaService
         const where = args?.where || {};
         let items = Array.from(this.memServices.values());
 
-        // Auto-heal: If service has valid date and remaining quota, ensure status is ACTIVE
+        // Ensure expired services or quota-depleted services are marked INACTIVE if still marked ACTIVE
         const nowMs = Date.now();
         for (const s of items) {
-          const isDateValid = !s.renewalDate || new Date(s.renewalDate).getTime() >= nowMs;
-          const hasQuota = s.quantity == null || Number(s.quantity) > Number(s.usedQuantity || 0);
-          if (s.status === "INACTIVE" && isDateValid && hasQuota) {
-            s.status = "ACTIVE";
+          const isExpired =
+            s.trackingType !== "QUANTITY" &&
+            s.renewalDate &&
+            new Date(s.renewalDate).getTime() < nowMs;
+          const isDepleted =
+            (s.trackingType === "QUANTITY" || s.trackingType === "HYBRID") &&
+            s.quantity != null &&
+            Number(s.usedQuantity || 0) >= Number(s.quantity);
+          if ((isExpired || isDepleted) && s.status === "ACTIVE") {
+            s.status = "INACTIVE";
           }
         }
 
@@ -1172,10 +1178,16 @@ export class PrismaService
         const s = this.memServices.get(where.id);
         if (!s) return null;
         const nowMs = Date.now();
-        const isDateValid = !s.renewalDate || new Date(s.renewalDate).getTime() >= nowMs;
-        const hasQuota = s.quantity == null || Number(s.quantity) > Number(s.usedQuantity || 0);
-        if (s.status === "INACTIVE" && isDateValid && hasQuota) {
-          s.status = "ACTIVE";
+        const isExpired =
+          s.trackingType !== "QUANTITY" &&
+          s.renewalDate &&
+          new Date(s.renewalDate).getTime() < nowMs;
+        const isDepleted =
+          (s.trackingType === "QUANTITY" || s.trackingType === "HYBRID") &&
+          s.quantity != null &&
+          Number(s.usedQuantity || 0) >= Number(s.quantity);
+        if ((isExpired || isDepleted) && s.status === "ACTIVE") {
+          s.status = "INACTIVE";
         }
         const parentSvc = s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null;
         const effTypeId = s.serviceTypeId || parentSvc?.serviceTypeId;
@@ -1204,10 +1216,16 @@ export class PrismaService
         const where = args?.where || {};
         const nowMs = Date.now();
         for (const s of this.memServices.values()) {
-          const isDateValid = !s.renewalDate || new Date(s.renewalDate).getTime() >= nowMs;
-          const hasQuota = s.quantity == null || Number(s.quantity) > Number(s.usedQuantity || 0);
-          if (s.status === "INACTIVE" && isDateValid && hasQuota) {
-            s.status = "ACTIVE";
+          const isExpired =
+            s.trackingType !== "QUANTITY" &&
+            s.renewalDate &&
+            new Date(s.renewalDate).getTime() < nowMs;
+          const isDepleted =
+            (s.trackingType === "QUANTITY" || s.trackingType === "HYBRID") &&
+            s.quantity != null &&
+            Number(s.usedQuantity || 0) >= Number(s.quantity);
+          if ((isExpired || isDepleted) && s.status === "ACTIVE") {
+            s.status = "INACTIVE";
           }
           if (matchServiceFilter(s, where)) {
             const parentSvc = s.parentServiceId ? this.memServices.get(s.parentServiceId) || null : null;
@@ -1289,10 +1307,11 @@ export class PrismaService
           if (d.usedQuantity !== undefined) svc.usedQuantity = Number(d.usedQuantity) || 0;
           if (d.trackingType !== undefined) svc.trackingType = d.trackingType;
           if (d.parentServiceId !== undefined) svc.parentServiceId = d.parentServiceId;
-          if (d.purchaseDate) svc.purchaseDate = new Date(d.purchaseDate);
-          if (d.startDate) svc.startDate = new Date(d.startDate);
-          if (d.renewalDate) svc.renewalDate = new Date(d.renewalDate);
-          if (d.customerId) {
+          if (d.purchaseDate !== undefined) svc.purchaseDate = d.purchaseDate ? new Date(d.purchaseDate) : null;
+          if (d.startDate !== undefined) svc.startDate = d.startDate ? new Date(d.startDate) : svc.startDate;
+          if (d.renewalDate !== undefined) svc.renewalDate = d.renewalDate ? new Date(d.renewalDate) : null;
+          if (d.status !== undefined) svc.status = d.status;
+          if (d.customerId !== undefined) {
             svc.customerId = d.customerId;
             svc.customer = this.memCustomers.get(d.customerId) || null;
           }

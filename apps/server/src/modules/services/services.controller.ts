@@ -165,18 +165,19 @@ export class ServicesController {
       cycleDays = 90;
     }
 
-    // Update service dates and reactivate starting from previous renewal date
+    // Update service dates starting from previous renewal date
     const previousRenewalDate = service.renewalDate ? new Date(service.renewalDate) : now;
     const newStartDate = previousRenewalDate;
-    let newRenewalDate = new Date(newStartDate.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-    if (newRenewalDate.getTime() <= now.getTime()) {
-      newRenewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-    }
+    const newRenewalDate = new Date(newStartDate.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+
+    const isExpired =
+      service.trackingType !== "QUANTITY" &&
+      newRenewalDate.getTime() <= now.getTime();
 
     const updatedService = await this.prisma.service.update({
       where: { id: service.id },
       data: {
-        status: "ACTIVE",
+        status: isExpired ? "INACTIVE" : "ACTIVE",
         purchaseDate: newStartDate,
         renewalDate: newRenewalDate,
         usedQuantity: 0,

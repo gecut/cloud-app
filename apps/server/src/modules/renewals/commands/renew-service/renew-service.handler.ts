@@ -20,11 +20,13 @@ export class RenewServiceHandler
       throw new NotFoundException(`Service ${dto.serviceId} not found`);
     }
 
+    const newRenewalDate = new Date(dto.newRenewalDate);
+    const isExpired = newRenewalDate.getTime() <= Date.now();
     return this.prisma.service.update({
       where: { id: dto.serviceId },
       data: {
-        renewalDate: new Date(dto.newRenewalDate),
-        status: "ACTIVE",
+        renewalDate: newRenewalDate,
+        status: isExpired ? "INACTIVE" : "ACTIVE",
       },
     });
   }

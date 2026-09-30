@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -119,6 +120,21 @@ export class SuppliersController {
     if (supplierId) {
       items = items.filter((s) => s.supplierId === supplierId);
     }
+    const nowMs = Date.now();
+    for (const s of items) {
+      const effTracking = (s.trackingType || "HYBRID").toUpperCase();
+      const isExpired =
+        effTracking !== "QUANTITY" &&
+        s.renewalDate &&
+        new Date(s.renewalDate).getTime() <= nowMs;
+      const isDepleted =
+        (effTracking === "QUANTITY" || effTracking === "HYBRID") &&
+        s.quantity != null &&
+        Number(s.usedQuantity || 0) >= Number(s.quantity);
+      if ((isExpired || isDepleted) && s.status === "ACTIVE") {
+        s.status = "INACTIVE";
+      }
+    }
     return {
       items: items.map((s) => ({
         ...s,
@@ -156,6 +172,17 @@ export class SuppliersController {
     const now = new Date();
     const cycleDays = Number(body.durationDays || body.billingCycleDays) || 30;
     const trackingType = (body.trackingType || "HYBRID").toUpperCase();
+
+    const purchaseDate = body.purchaseDate ? new Date(body.purchaseDate) : now;
+    const renewalDate = body.renewalDate ? new Date(body.renewalDate) : new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+
+    if (trackingType !== "QUANTITY" && renewalDate.getTime() < purchaseDate.getTime()) {
+      throw new BadRequestException("تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
+    }
+
+    const isExpired = trackingType !== "QUANTITY" && renewalDate.getTime() <= now.getTime();
+    const status = body.status || (isExpired ? "INACTIVE" : "ACTIVE");
+
     const newService = {
       id,
       supplierId: body.supplierId,
@@ -163,8 +190,8 @@ export class SuppliersController {
       type: body.type || "HOSTING",
       priceToman: amount,
       monthlyExpenseToman: amount,
-      purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : now,
-      renewalDate: body.renewalDate ? new Date(body.renewalDate) : new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000),
+      purchaseDate,
+      renewalDate,
       billingCycleDays: cycleDays,
       billingCycle: String(cycleDays),
       trackingType,
@@ -172,7 +199,7 @@ export class SuppliersController {
       usedQuantity: Math.max(0, Number(body.usedQuantity) || 0),
       autoRenew: body.autoRenew !== undefined ? Boolean(body.autoRenew) : true,
       notes: body.notes || null,
-      status: body.status || "ACTIVE",
+      status,
       createdAt: now,
       updatedAt: now,
     };
@@ -346,6 +373,20 @@ export class SuppliersController {
         body.billingCycleDays = d;
         body.billingCycle = String(d);
       }
+
+      const effTracking = (body.trackingType || s.trackingType || "HYBRID").toUpperCase();
+      const effPurchase = body.purchaseDate ? new Date(body.purchaseDate) : (s.purchaseDate ? new Date(s.purchaseDate) : new Date());
+      const effRenewal = body.renewalDate ? new Date(body.renewalDate) : (s.renewalDate ? new Date(s.renewalDate) : null);
+
+      if (effTracking !== "QUANTITY" && effRenewal && effRenewal.getTime() < effPurchase.getTime()) {
+        throw new BadRequestException("تاریخ سررسید نمی‌تواند قبل از تاریخ خرید باشد");
+      }
+
+      const isExpired = effTracking !== "QUANTITY" && effRenewal && effRenewal.getTime() <= Date.now();
+      if (isExpired && !body.status) {
+        body.status = "INACTIVE";
+      }
+
       Object.assign(s, body, { updatedAt: new Date() });
 
       const sup = this.prisma.memSuppliers.get(s.supplierId);
@@ -393,7 +434,7 @@ export class SuppliersController {
         })
         .catch(() => {});
 
-      if (s.autoRenew !== false || s.status === "ACTIVE") {
+      if (s.autoRenew !== false && body.renewalDate === undefined && body.purchaseDate === undefined) {
         await this.renewalsScheduler.processSupplierServiceExpiration(s).catch(() => {});
       }
 
@@ -416,16 +457,15 @@ export class SuppliersController {
 
     const now = new Date();
     const cycleDays = Number(body?.cycleDays) || s.billingCycleDays || 30;
-    const prevRenewal = s.renewalDate ? new Date(s.renewalDate) : now;
-    let nextRenewal = new Date(prevRenewal.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-    if (nextRenewal.getTime() <= now.getTime()) {
-      nextRenewal = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-    }
+    const prevRenewal = s.renewalDate ? new Date(s.renewalDate) : (s.purchaseDate ? new Date(s.purchaseDate) : now);
+    const nextRenewal = new Date(prevRenewal.getTime() + cycleDays * 24 * 60 * 60 * 1000);
+
+    const isExpired = s.trackingType !== "QUANTITY" && nextRenewal.getTime() <= now.getTime();
 
     s.purchaseDate = prevRenewal;
     s.renewalDate = nextRenewal;
     s.usedQuantity = 0;
-    s.status = "ACTIVE";
+    s.status = isExpired ? "INACTIVE" : "ACTIVE";
     s.updatedAt = now;
 
     const amount = Number(s.priceToman ?? s.monthlyExpenseToman) || 0;

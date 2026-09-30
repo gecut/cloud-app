@@ -14,6 +14,11 @@ export class RenewalsSchedulerService implements OnModuleInit {
     this.checkAndProcessExpiredServices().catch((err) => {
       this.logger.error("Error during initial expired services check", err);
     });
+
+    // Check periodically every 15 seconds for responsive background renewals
+    setInterval(() => {
+      this.checkAndProcessExpiredServices().catch(() => {});
+    }, 15000);
   }
 
   
@@ -107,15 +112,12 @@ export class RenewalsSchedulerService implements OnModuleInit {
       service.quantity != null &&
       Number(service.usedQuantity || 0) >= Number(service.quantity);
 
-    // Business rule: For HYBRID packages, priority is on quantity:
-    // If quantity ends first, service is expired immediately!
     const isExpired =
-      (service.status === "INACTIVE" && Boolean(service.autoRenew)) ||
-      (trackingType === "QUANTITY"
+      trackingType === "QUANTITY"
         ? isQuantityDepleted
         : trackingType === "TIME"
         ? isTimeExpired
-        : isQuantityDepleted || isTimeExpired);
+        : (isQuantityDepleted || isTimeExpired);
 
     if (!isExpired) {
       return false;
@@ -148,19 +150,20 @@ export class RenewalsSchedulerService implements OnModuleInit {
         newStartDate = now;
         targetRenewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
       } else {
-        // Time-based renewal
+        // Time-based renewal: advance strictly 1 cycle from previous renewal date
         const previousRenewalDate = service.renewalDate ? new Date(service.renewalDate) : now;
-        newStartDate = previousRenewalDate.getTime() > now.getTime() ? now : previousRenewalDate;
+        newStartDate = previousRenewalDate;
         targetRenewalDate = new Date(previousRenewalDate.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-        if (targetRenewalDate.getTime() <= now.getTime()) {
-          targetRenewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-        }
       }
+
+      const isTargetExpired =
+        trackingType !== "QUANTITY" &&
+        targetRenewalDate.getTime() <= now.getTime();
 
       await this.prisma.service.update({
         where: { id: service.id },
         data: {
-          status: "ACTIVE",
+          status: isTargetExpired ? "INACTIVE" : "ACTIVE",
           purchaseDate: newStartDate,
           renewalDate: targetRenewalDate,
           usedQuantity: 0,
@@ -320,12 +323,11 @@ export class RenewalsSchedulerService implements OnModuleInit {
       Number(supSvc.usedQuantity || 0) >= Number(supSvc.quantity);
 
     const isExpired =
-      (supSvc.status === "INACTIVE" && isAutoRenew) ||
-      (trackingType === "QUANTITY"
+      trackingType === "QUANTITY"
         ? isQuantityDepleted
         : trackingType === "TIME"
         ? isTimeExpired
-        : isQuantityDepleted || isTimeExpired);
+        : (isQuantityDepleted || isTimeExpired);
 
     if (!isExpired) {
       return false;
@@ -342,15 +344,14 @@ export class RenewalsSchedulerService implements OnModuleInit {
       } else {
         const prevRenewal = supSvc.renewalDate ? new Date(supSvc.renewalDate) : now;
         nextRenewal = new Date(prevRenewal.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-        if (nextRenewal.getTime() <= now.getTime()) {
-          nextRenewal = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000);
-        }
       }
 
-      supSvc.purchaseDate = now;
+      const isNextExpired = trackingType !== "QUANTITY" && nextRenewal.getTime() <= now.getTime();
+
+      supSvc.purchaseDate = supSvc.renewalDate ? new Date(supSvc.renewalDate) : now;
       supSvc.renewalDate = nextRenewal;
       supSvc.usedQuantity = 0;
-      supSvc.status = "ACTIVE";
+      supSvc.status = isNextExpired ? "INACTIVE" : "ACTIVE";
       supSvc.updatedAt = now;
 
       const amount = Number(supSvc.priceToman ?? supSvc.monthlyExpenseToman) || 0;

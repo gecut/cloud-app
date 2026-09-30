@@ -1306,7 +1306,7 @@ function AdminInvoicesListPage() {
                 }`}
               >
                 <User className="h-4 w-4 shrink-0" />
-                فاکتورهای مشتریان (فروش)
+                فاکتورهای مشتریان (فروش - طلبکار)
               </Button>
               <Button
                 variant={counterpartyFilter === "SUPPLIER" ? "default" : "outline"}
@@ -1320,7 +1320,7 @@ function AdminInvoicesListPage() {
                 }`}
               >
                 <Building2 className="h-4 w-4 shrink-0" />
-                فاکتورهای تامین‌کنندگان (خرید)
+                فاکتورهای تامین‌کنندگان (خرید - بدهکار)
               </Button>
             </div>
           </div>
@@ -1479,7 +1479,7 @@ function AdminInvoicesListPage() {
                             className="gap-1.5 text-[10px] font-medium whitespace-nowrap"
                           >
                             <CheckCircle className="h-3 w-3 shrink-0" />
-                            پرداخت شده
+                            {isSupplier ? "تسویه با تامین‌کننده" : "وصول از مشتری"}
                           </Chip>
                         ) : inv.status === "CANCELLED" ? (
                           <Chip
@@ -1499,17 +1499,17 @@ function AdminInvoicesListPage() {
                             className="gap-1.5 text-[10px] font-bold whitespace-nowrap"
                           >
                             <AlertCircle className="h-3 w-3 shrink-0" />
-                            منقضی شده ({Math.max(1, Math.floor((Date.now() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24))).toLocaleString("fa-IR")} روز معوقه)
+                            {isSupplier ? "بدهی معوقه ما به تامین‌کننده" : "طلب معوقه ما از مشتری"} ({Math.max(1, Math.floor((Date.now() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24))).toLocaleString("fa-IR")} روز معوقه)
                           </Chip>
                         ) : (
                           <Chip
                             size="sm"
                             variant="soft"
-                            color="warning"
+                            color={isSupplier ? "accent" : "warning"}
                             className="gap-1.5 text-[10px] font-medium whitespace-nowrap"
                           >
                             <Clock className="h-3 w-3 shrink-0" />
-                            در انتظار پرداخت
+                            {isSupplier ? "بدهی به تامین‌کننده (ما بدهکاریم)" : "طلب از مشتری (ما طلبکاریم)"}
                           </Chip>
                         )}
                       </td>
