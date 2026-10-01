@@ -18,7 +18,7 @@ export const env = createEnv({
     JWT_REFRESH_EXPIRATION: z.coerce.number().int().default(7776000),
     ZIBAL_MERCHANT: z.string().default("zibal"),
     ZIBAL_CALLBACK_URL: z.string().optional(),
-    SERVER_URL: z.string().default("http://192.168.43.134:3000"),
+    SERVER_URL: z.string().default("https://api.app.gecut.ir"),
     CUSTOMER_APP_URL: z.string().default("https://app.gecut.ir"),
   },
   runtimeEnv: process.env,

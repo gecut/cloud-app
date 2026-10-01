@@ -234,7 +234,12 @@ export const API_BASE_URL = (() => {
   const configured = typeof rawConfigured === "string"
     ? rawConfigured.trim().replace(/^[{(["']+|[})\]"']+$/g, "").trim()
     : "";
-  if (configured && !configured.includes("admin.app.gecut.ir")) {
+  if (
+    configured &&
+    !configured.includes("admin.app.gecut.ir") &&
+    !configured.includes("app.gecut.ir") &&
+    !configured.includes("192.168.")
+  ) {
     return configured.replace(/\/+$/, "");
   }
   if (typeof window !== "undefined") {
@@ -244,11 +249,8 @@ export const API_BASE_URL = (() => {
     ) {
       return "http://localhost:3000";
     }
-    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname)) {
-      return `http://${window.location.hostname}:3000`;
-    }
   }
-  return (configured || "http://192.168.43.134:3000").replace(/\/+$/, "");
+  return "https://api.app.gecut.ir";
 })();
 
 export async function apiClient<T>(
